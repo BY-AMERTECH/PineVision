@@ -2,8 +2,7 @@
    drone-view.css
    Page-specific styles for drone-view.html
    Supplements tokens.css + components.css — never overrides
-   All theme colors via CSS variables; bright overlay colors
-   hardcoded for legibility against dark video backgrounds.
+   Overlay colors hardcoded for legibility against dark video.
    ============================================================ */
 
 
@@ -14,7 +13,7 @@ body {
     flex-direction: column;
     height: 100vh;
     overflow: hidden;
-    background: #0d1117;
+    background: #0b0f13;
 }
 
 
@@ -22,33 +21,35 @@ body {
 
 #dv-topbar {
     background: var(--surf);
-    border-bottom: 0.5px solid var(--border);
+    border-bottom: 1px solid var(--border);
     position: sticky;
     top: 0;
     z-index: 100;
     height: 56px;
     flex-shrink: 0;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 }
 
 .dv-page-title {
     font-size: var(--font-size-md);
-    font-weight: 500;
+    font-weight: 600;
     color: var(--color-text-primary);
-    letter-spacing: 0.01em;
+    letter-spacing: -0.01em;
 }
 
-/* Status indicator dot */
+/* Status indicator */
 .dv-status-dot {
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: var(--muted);
+    background: var(--color-border-primary);
     flex-shrink: 0;
     transition: background 0.3s ease;
 }
 
 .dv-status-label {
     font-size: var(--font-size-sm);
+    font-weight: 500;
     color: var(--muted);
     transition: color 0.3s ease;
 }
@@ -57,118 +58,117 @@ body {
     font-family: var(--font-mono);
     font-size: var(--font-size-sm);
     color: var(--muted);
-    letter-spacing: 0.05em;
+    letter-spacing: 0.06em;
+    background: var(--surf2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 3px 10px;
 }
 
-/* Status state: connecting */
+/* Status states */
 #dv-status-indicator.dv-status-connecting .dv-status-dot {
     background: #f59e0b;
     animation: dv-pulse 1s infinite;
 }
-#dv-status-indicator.dv-status-connecting .dv-status-label {
-    color: #f59e0b;
-}
+#dv-status-indicator.dv-status-connecting .dv-status-label { color: #f59e0b; }
 
-/* Status state: active */
 #dv-status-indicator.dv-status-active .dv-status-dot {
     background: #22c55e;
-    animation: dv-pulse 2s infinite;
+    animation: dv-pulse 2.2s infinite;
 }
-#dv-status-indicator.dv-status-active .dv-status-label {
-    color: #22c55e;
-}
+#dv-status-indicator.dv-status-active .dv-status-label { color: #22c55e; }
 
-/* Status state: ending */
-#dv-status-indicator.dv-status-ending .dv-status-dot {
-    background: var(--muted);
-}
-
-/* Status state: reconnecting — faster amber pulse signals urgency */
 #dv-status-indicator.dv-status-reconnecting .dv-status-dot {
     background: #f59e0b;
-    animation: dv-pulse 0.6s infinite;
+    animation: dv-pulse 0.55s infinite;
 }
-#dv-status-indicator.dv-status-reconnecting .dv-status-label {
-    color: #f59e0b;
-}
+#dv-status-indicator.dv-status-reconnecting .dv-status-label { color: #f59e0b; }
 
-/* Status state: failed */
-#dv-status-indicator.dv-status-failed .dv-status-dot {
-    background: #ef4444;
-}
-#dv-status-indicator.dv-status-failed .dv-status-label {
-    color: #ef4444;
-}
+#dv-status-indicator.dv-status-failed .dv-status-dot { background: #ef4444; }
+#dv-status-indicator.dv-status-failed .dv-status-label { color: #ef4444; }
 
 @keyframes dv-pulse {
-    0%, 100% { opacity: 1; }
-    50%       { opacity: 0.4; }
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: 0.45; transform: scale(0.85); }
 }
 
-/* Back navigation button */
+/* Back nav button */
 .dv-btn-back {
     background: transparent;
-    border: 0.5px solid var(--color-border-secondary);
+    border: 1px solid var(--color-border-secondary);
     color: var(--color-text-primary);
-    border-radius: 8px;
-    padding: 6px 10px;
-    font-size: 16px;
+    border-radius: var(--radius-md);
+    padding: 6px 12px;
+    font-size: var(--font-size-sm);
     line-height: 1;
     display: inline-flex;
     align-items: center;
+    gap: 6px;
     text-decoration: none;
-    transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
+    font-family: var(--font-sans);
+    font-weight: 500;
+    transition: all 0.2s ease;
 }
 .dv-btn-back:hover {
     border-color: var(--color-border-primary);
     color: var(--color-text-primary);
     background: var(--surf2);
     text-decoration: none;
+    box-shadow: var(--shadow-xs);
 }
 
-/* Topbar buttons */
+/* Topbar action buttons */
 .dv-btn-connect {
     font-size: var(--font-size-sm);
-    background: transparent;
-    border: 0.5px solid var(--color-border-secondary);
-    color: var(--color-text-primary);
-    border-radius: 8px;
+    font-weight: 500;
+    background: rgba(34, 197, 94, 0.06);
+    border: 1px solid rgba(34, 197, 94, 0.35);
+    color: #22c55e;
+    border-radius: var(--radius-md);
     padding: 6px 14px;
-    transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
+    font-family: var(--font-sans);
+    transition: all 0.2s ease;
+    cursor: pointer;
 }
 .dv-btn-connect:hover {
+    background: rgba(34, 197, 94, 0.12);
     border-color: #22c55e;
-    color: #22c55e;
-    background: var(--green-bg);
+    box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.12);
 }
 
 .dv-btn-upload {
     font-size: var(--font-size-sm);
+    font-weight: 500;
     background: transparent;
-    border: 0.5px solid var(--color-border-secondary);
-    color: var(--color-text-primary);
-    border-radius: 8px;
+    border: 1px solid var(--color-border-secondary);
+    color: var(--color-text-secondary);
+    border-radius: var(--radius-md);
     padding: 6px 14px;
-    transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
+    font-family: var(--font-sans);
+    transition: all 0.2s ease;
+    cursor: pointer;
 }
 .dv-btn-upload:hover {
     border-color: #3b82f6;
     color: #3b82f6;
-    background: rgba(59, 130, 246, 0.07);
+    background: rgba(59, 130, 246, 0.06);
 }
 
 .dv-btn-end-scan {
     font-size: var(--font-size-sm);
-    background: transparent;
-    border: 0.5px solid var(--color-border-secondary);
+    font-weight: 500;
+    background: rgba(245, 158, 11, 0.07);
+    border: 1px solid rgba(245, 158, 11, 0.40);
     color: #f59e0b;
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     padding: 6px 14px;
-    transition: border-color 0.2s ease, background 0.2s ease;
+    font-family: var(--font-sans);
+    transition: all 0.2s ease;
+    cursor: pointer;
 }
 .dv-btn-end-scan:hover {
     border-color: #f59e0b;
-    background: var(--amber-bg);
+    background: rgba(245, 158, 11, 0.12);
 }
 
 
@@ -178,19 +178,15 @@ body {
     flex: 1;
     overflow: hidden;
     min-height: 0;
-    /* Flex items accept z-index; value 0 creates a stacking context that keeps
-       the entire video area below Bootstrap's modal (z-index 1040/1055). */
     z-index: 0;
 }
 
 #drone-feed-wrapper {
     position: relative;
-    /* Explicit stacking context — contains all video overlays so they cannot
-       bleed above the Bootstrap modal backdrop or dialog. */
     z-index: 0;
     width: 100%;
     height: 100%;
-    background: #0d1117;
+    background: #0b0f13;
     overflow: hidden;
 }
 
@@ -200,11 +196,9 @@ body {
     object-fit: cover;
     display: none;
 }
-#drone-feed.dv-feed-active {
-    display: block;
-}
+#drone-feed.dv-feed-active { display: block; }
 
-/* Bounding-box canvas overlay — sits directly above the video */
+/* Bounding-box canvas overlay */
 .dv-bbox-canvas {
     position: absolute;
     inset: 0;
@@ -212,11 +206,9 @@ body {
     display: none;
     z-index: 2;
 }
-.dv-bbox-canvas.dv-bbox-active {
-    display: block;
-}
+.dv-bbox-canvas.dv-bbox-active { display: block; }
 
-/* Generic overlay base */
+/* Generic overlay */
 .dv-overlay {
     position: absolute;
     pointer-events: none;
@@ -226,12 +218,14 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(13, 17, 23, 0.75);
+    background: rgba(11, 15, 19, 0.80);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
     transition: opacity 0.3s ease;
 }
 .dv-overlay--bottom-left {
-    bottom: 12px;
-    left: 14px;
+    bottom: 14px;
+    left: 16px;
     display: flex;
     align-items: center;
     gap: 10px;
@@ -240,30 +234,31 @@ body {
 /* Placeholder */
 .dv-placeholder-inner {
     text-align: center;
+    max-width: 280px;
 }
 .dv-drone-icon {
-    width: 56px;
-    height: 56px;
-    opacity: 0.3;
-    margin-bottom: 14px;
+    width: 52px;
+    height: 52px;
+    opacity: 0.25;
+    margin: 0 auto 16px;
+    display: block;
     filter: invert(1);
 }
 .dv-placeholder-title {
     font-size: var(--font-size-lg);
     font-weight: 500;
-    color: rgba(255, 255, 255, 0.5);
-    margin: 0 0 6px;
+    color: rgba(255, 255, 255, 0.50);
+    margin: 0 0 8px;
 }
 .dv-placeholder-hint {
     font-size: var(--font-size-sm);
     color: rgba(255, 255, 255, 0.25);
     margin: 0;
+    line-height: 1.6;
 }
 
 /* Connecting spinner */
-.dv-spinner-wrapper {
-    text-align: center;
-}
+.dv-spinner-wrapper { text-align: center; }
 .dv-spinner {
     color: #22c55e;
     width: 36px;
@@ -271,8 +266,8 @@ body {
 }
 .dv-connecting-label {
     font-size: var(--font-size-sm);
-    color: rgba(255, 255, 255, 0.5);
-    margin: 0;
+    color: rgba(255, 255, 255, 0.45);
+    margin: 10px 0 0;
 }
 
 /* Live badge */
@@ -280,50 +275,59 @@ body {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    background: rgba(34, 197, 94, 0.15);
-    border: 0.5px solid rgba(34, 197, 94, 0.4);
+    background: rgba(34, 197, 94, 0.16);
+    border: 1px solid rgba(34, 197, 94, 0.40);
     color: #22c55e;
-    font-size: var(--font-size-xs);
-    font-weight: 500;
-    letter-spacing: 0.1em;
-    padding: 4px 10px;
-    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    padding: 4px 11px;
+    border-radius: var(--radius-pill);
+    text-transform: uppercase;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
 }
 .dv-live-dot {
     width: 6px;
     height: 6px;
     border-radius: 50%;
     background: #22c55e;
-    animation: dv-pulse 1.5s infinite;
+    animation: dv-pulse 1.6s infinite;
+    flex-shrink: 0;
 }
 .dv-quality-label {
     font-size: var(--font-size-xs);
-    color: rgba(255, 255, 255, 0.4);
+    color: rgba(255, 255, 255, 0.35);
+    font-family: var(--font-mono);
+    letter-spacing: 0.03em;
 }
 
 /* Fullscreen button */
 .dv-fullscreen-btn {
     position: absolute;
-    bottom: 12px;
-    right: 14px;
+    bottom: 14px;
+    right: 16px;
     pointer-events: all;
-    background: rgba(255, 255, 255, 0.08);
-    border: 0.5px solid rgba(255, 255, 255, 0.15);
-    color: rgba(255, 255, 255, 0.6);
-    width: 34px;
-    height: 34px;
-    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.10);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    color: rgba(255, 255, 255, 0.65);
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-md);
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background 0.2s ease, color 0.2s ease;
-    font-size: 16px;
+    transition: all 0.2s ease;
+    font-size: 15px;
     cursor: pointer;
     z-index: 10;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
 }
 .dv-fullscreen-btn:hover {
-    background: rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.18);
     color: #fff;
+    border-color: rgba(255, 255, 255, 0.30);
 }
 
 
@@ -331,14 +335,19 @@ body {
 
 #dv-stats-panel {
     background: var(--surf);
-    border-top: 0.5px solid var(--border);
+    border-top: 1px solid var(--border);
     flex-shrink: 0;
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
 }
 
 /* Tighten .mc cards inside stats panel */
 #dv-stats-panel .mc {
-    padding: 10px 12px;
+    padding: 10px 14px;
     box-shadow: none;
+    border-radius: var(--radius-md);
+}
+#dv-stats-panel .mc::before {
+    height: 2px;
 }
 #dv-stats-panel .mc-val {
     font-size: var(--font-size-2xl);
@@ -348,46 +357,45 @@ body {
 
 /* Progress bar */
 .dv-progress-bar {
-    height: 6px;
-    background: var(--color-background-tertiary);
+    height: 5px;
+    background: var(--color-border-secondary);
     border-radius: 3px;
     overflow: hidden;
 }
 .dv-progress-bar .progress-bar {
-    background: #22c55e;
-    transition: width 0.4s ease;
+    background: linear-gradient(90deg, var(--green-500) 0%, var(--green-400) 100%);
+    transition: width 0.5s ease;
     border-radius: 3px;
 }
 .dv-progress-pct {
     font-family: var(--font-mono);
     font-size: var(--font-size-xs);
+    font-weight: 600;
     color: var(--muted);
 }
 
 /* End scan button inside stats panel */
 .dv-btn-end-scan-sm {
     font-size: var(--font-size-sm);
-    background: transparent;
-    border: 0.5px solid rgba(245, 158, 11, 0.4);
+    font-weight: 500;
+    background: rgba(245, 158, 11, 0.07);
+    border: 1px solid rgba(245, 158, 11, 0.40);
     color: #f59e0b;
-    border-radius: 8px;
-    padding: 8px 16px;
+    border-radius: var(--radius-md);
+    padding: 8px 18px;
     white-space: nowrap;
-    transition: border-color 0.2s ease, background 0.2s ease;
+    font-family: var(--font-sans);
+    transition: all 0.2s ease;
+    cursor: pointer;
 }
 .dv-btn-end-scan-sm:hover {
     border-color: #f59e0b;
-    background: var(--amber-bg);
+    background: rgba(245, 158, 11, 0.12);
 }
 
 
 /* ── 4. MODALS ──────────────────────────────────────────────── */
 
-/* components.css defines .modal { z-index: 1000 } for the custom page-modal
-   system used on sidebar pages. Bootstrap's own .modal-backdrop sits at
-   z-index: 1040, so without this override the backdrop renders above the
-   dialog, blocking all clicks. Restoring Bootstrap's default (1055) and
-   clearing the duplicate background fixes the stacking order. */
 #modal-connect,
 #modal-end-scan,
 #modal-scan-finished {
@@ -397,61 +405,61 @@ body {
 
 .dv-modal-content {
     background: var(--surf);
-    border: 0.5px solid var(--border);
-    border-radius: 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-xl);
 }
 .dv-modal-header {
-    border-bottom: 0.5px solid var(--border);
-    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    padding: 18px 22px;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
 }
 .dv-modal-header .modal-title {
     font-size: var(--font-size-md);
-    font-weight: 500;
+    font-weight: 600;
     color: var(--color-text-primary);
+    letter-spacing: -0.01em;
 }
-.dv-modal-close {
-    opacity: 0.5;
-}
-.dv-modal-body {
-    padding: 20px;
-}
+.dv-modal-close { opacity: 0.50; }
+.dv-modal-body  { padding: 22px; }
 .dv-modal-footer {
-    border-top: 0.5px solid var(--border);
-    padding: 14px 20px;
+    border-top: 1px solid var(--border);
+    padding: 14px 22px;
     gap: 10px;
+    background: var(--surf2);
+    border-radius: 0 0 var(--radius-xl) var(--radius-xl);
 }
 
 /* Input label */
 .dv-input-label {
-    font-size: var(--font-size-xs);
+    font-size: 11px;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.07em;
+    font-weight: 700;
     color: var(--muted);
     margin-bottom: 6px;
     display: block;
 }
 
-/* RTMP input field */
+/* RTMP input */
 .dv-input {
     background: var(--surf2);
-    border: 0.5px solid var(--border);
-    border-radius: 8px;
-    font-size: var(--font-size-base);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
     font-family: var(--font-mono);
     color: var(--color-text-primary);
-    padding: 9px 12px;
+    padding: 10px 12px;
     width: 100%;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 .dv-input:focus {
-    border-color: var(--color-border-primary);
-    box-shadow: none;
-    background: var(--surf2);
-    color: var(--color-text-primary);
+    border-color: var(--green);
+    box-shadow: 0 0 0 3px rgba(45, 106, 63, 0.15);
     outline: none;
+    background: var(--surf);
 }
-.dv-input.is-invalid {
-    border-color: #ef4444;
-}
+.dv-input.is-invalid { border-color: #ef4444; }
 
 .dv-input-error {
     font-size: var(--font-size-xs);
@@ -461,102 +469,111 @@ body {
 .dv-input-hint {
     font-size: var(--font-size-xs);
     color: var(--color-text-tertiary);
+    line-height: 1.5;
 }
 
 /* Connection error banner */
 .dv-error-banner {
     background: var(--red-bg);
-    border: 0.5px solid rgba(239, 68, 68, 0.3);
-    border-radius: 8px;
+    border: 1px solid rgba(239, 68, 68, 0.25);
+    border-left: 3px solid #ef4444;
+    border-radius: var(--radius-md);
     padding: 10px 14px;
     font-size: var(--font-size-sm);
     color: #ef4444;
     display: flex;
     align-items: center;
+    gap: 8px;
 }
 
 /* Modal action buttons */
 .dv-btn-primary {
-    background: transparent;
-    border: 0.5px solid rgba(34, 197, 94, 0.5);
+    background: rgba(34, 197, 94, 0.08);
+    border: 1px solid rgba(34, 197, 94, 0.45);
     color: #22c55e;
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     font-size: var(--font-size-sm);
+    font-weight: 500;
     padding: 8px 20px;
     display: inline-flex;
     align-items: center;
-    transition: background 0.2s ease, border-color 0.2s ease;
+    gap: 6px;
+    font-family: var(--font-sans);
+    transition: all 0.2s ease;
     cursor: pointer;
 }
 .dv-btn-primary:hover {
-    background: var(--green-bg);
+    background: rgba(34, 197, 94, 0.14);
     border-color: #22c55e;
-    color: #22c55e;
+    box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.12);
 }
-.dv-btn-primary:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
+.dv-btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .dv-btn-cancel {
     background: transparent;
-    border: 0.5px solid var(--border);
+    border: 1px solid var(--border);
     color: var(--muted);
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     font-size: var(--font-size-sm);
+    font-weight: 500;
     padding: 8px 20px;
-    transition: border-color 0.2s ease, color 0.2s ease;
+    font-family: var(--font-sans);
+    transition: all 0.2s ease;
     cursor: pointer;
 }
 .dv-btn-cancel:hover {
     border-color: var(--color-border-primary);
     color: var(--color-text-primary);
+    background: var(--surf2);
 }
 
 .dv-btn-danger {
-    background: transparent;
-    border: 0.5px solid rgba(245, 158, 11, 0.5);
+    background: rgba(245, 158, 11, 0.08);
+    border: 1px solid rgba(245, 158, 11, 0.45);
     color: #f59e0b;
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     font-size: var(--font-size-sm);
+    font-weight: 500;
     padding: 8px 20px;
     display: inline-flex;
     align-items: center;
-    transition: background 0.2s ease, border-color 0.2s ease;
+    gap: 6px;
+    font-family: var(--font-sans);
+    transition: all 0.2s ease;
     cursor: pointer;
 }
 .dv-btn-danger:hover {
-    background: var(--amber-bg);
+    background: rgba(245, 158, 11, 0.14);
     border-color: #f59e0b;
 }
-.dv-btn-danger:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
+.dv-btn-danger:disabled { opacity: 0.45; cursor: not-allowed; }
 
-/* Scan summary block (end scan modal) */
+/* Scan summary (end-scan modal) */
 .dv-scan-summary {
     background: var(--surf2);
-    border-radius: 8px;
-    padding: 14px;
-    border: 0.5px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    border: 1px solid var(--border);
 }
 .dv-summary-item {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 3px;
+    padding: 4px 0;
 }
 .dv-summary-label {
-    font-size: var(--font-size-xs);
+    font-size: 11px;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.07em;
+    font-weight: 700;
     color: var(--muted);
 }
 .dv-summary-val {
     font-family: var(--font-mono);
     font-size: var(--font-size-xl);
-    font-weight: 500;
+    font-weight: 600;
     color: var(--color-text-primary);
+    letter-spacing: -0.02em;
 }
 .dv-summary-item.green  .dv-summary-val { color: #22c55e; }
 .dv-summary-item.amber  .dv-summary-val { color: #f59e0b; }
@@ -567,11 +584,10 @@ body {
     font-size: var(--font-size-sm);
     color: var(--muted);
     margin: 0;
+    line-height: 1.6;
 }
 
-
-/* ── Prepare-status strip (auto-shown inside Connect modal) ─── */
-
+/* Prepare-status strip */
 .dv-prepare-spinner {
     color: #22c55e;
     flex-shrink: 0;
@@ -586,16 +602,16 @@ body {
 
 .dark-mode #dv-topbar {
     background: var(--surf);
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.30);
 }
 
-/* Bootstrap modal backdrop tint */
 .dark-mode .modal-backdrop {
     background-color: #000;
+    opacity: 0.70 !important;
 }
 
-/* dv-input focus visible ring override */
 .dark-mode .dv-input:focus {
-    border-color: var(--color-border-primary);
+    border-color: var(--green);
 }
 
 
@@ -607,7 +623,7 @@ body {
 
 @media (max-width: 767px) {
     .dv-page-title { display: none; }
-    #dv-stats-panel .col { flex: 0 0 50%; max-width: 50%; }
-    #dv-stats-panel .col-3 { flex: 0 0 100%; max-width: 100%; }
-    #dv-stats-panel .mc-val { font-size: var(--font-size-lg); }
+    #dv-stats-panel .col       { flex: 0 0 50%; max-width: 50%; }
+    #dv-stats-panel .col-3     { flex: 0 0 100%; max-width: 100%; }
+    #dv-stats-panel .mc-val    { font-size: var(--font-size-lg); }
 }
