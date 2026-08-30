@@ -1,0 +1,1456 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+    <link rel="dns-prefetch" href="https://firestore.googleapis.com">
+    <link rel="dns-prefetch" href="https://identitytoolkit.googleapis.com">
+    <script>
+      (function () {
+        try {
+          var s = JSON.parse(
+            localStorage.getItem("pinevision_settings") || "{}",
+          );
+          if (s.theme === "dark")
+            document.documentElement.classList.add("dark-mode");
+        } catch (e) {}
+      })();
+    </script>
+    <title>Farm Manager Dashboard - PineVision</title>
+    <link rel="stylesheet" href="../../bootstrap/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="../../css/tokens.css" />
+    <link rel="stylesheet" href="../../css/layout.css" />
+    <link rel="stylesheet" href="../../css/components.css" />
+    <style>
+      /* ── Hero metrics grid (6 cards) ── */
+      .mg {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: var(--grid-gap);
+        margin-bottom: var(--space-2xl);
+      }
+      @media (max-width: 1280px) {
+        .mg {
+          grid-template-columns: repeat(3, 1fr);
+        }
+      }
+      @media (max-width: 768px) {
+        .mg {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+
+      /* ── Layout grids ── */
+      .dash-grid {
+        display: grid;
+        grid-template-columns: 360px 1fr;
+        gap: var(--grid-gap);
+        margin-bottom: var(--space-2xl);
+        align-items: start;
+      }
+      .analytics-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: var(--grid-gap);
+        align-content: start;
+      }
+      .bottom-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: var(--grid-gap);
+      }
+
+      /* ── Page header ── */
+      .ph {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+      }
+
+      /* ── Metric card enhancements ── */
+      .mc {
+        transition:
+          box-shadow var(--transition-fast),
+          transform var(--transition-fast);
+        cursor: default;
+      }
+      .mc:hover {
+        box-shadow: var(--shadow-md);
+        transform: translateY(-2px);
+      }
+      .mc-icon {
+        margin-bottom: var(--space-md);
+      }
+      .mc-trend {
+        display: flex;
+        align-items: center;
+        gap: 3px;
+        font-size: 11px;
+        font-weight: var(--font-weight-medium);
+        margin-top: 4px;
+      }
+      .mc-trend.up {
+        color: var(--green);
+      }
+      .mc-trend.dn {
+        color: var(--red-mid);
+      }
+      .mc-trend.fl {
+        color: var(--color-text-secondary);
+      }
+
+      /* ── Sparkline cards ── */
+      .spark-card {
+        background: var(--color-background-primary);
+        border: 1px solid var(--color-border-secondary);
+        border-radius: var(--radius-lg);
+        padding: var(--space-lg);
+        transition:
+          box-shadow var(--transition-fast),
+          transform var(--transition-fast);
+      }
+      .spark-card:hover {
+        box-shadow: var(--shadow-md);
+        transform: translateY(-1px);
+      }
+      .spark-label {
+        font-size: 11px;
+        font-weight: var(--font-weight-semibold);
+        color: var(--color-text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        margin-bottom: 3px;
+      }
+      .spark-value {
+        font-size: var(--font-size-2xl);
+        font-weight: var(--font-weight-semibold);
+        color: var(--color-text-primary);
+        font-family: var(--font-mono);
+        line-height: 1;
+        margin-bottom: 3px;
+      }
+      .spark-sub {
+        font-size: var(--font-size-xs);
+        color: var(--color-text-secondary);
+        margin-bottom: var(--space-md);
+      }
+      .spark-sub .up {
+        color: var(--green);
+        font-weight: var(--font-weight-medium);
+      }
+      .spark-sub .dn {
+        color: var(--red-mid);
+        font-weight: var(--font-weight-medium);
+      }
+      .sparkline-wrap {
+        width: 100%;
+        height: 44px;
+      }
+      .sparkline-wrap svg {
+        width: 100%;
+        height: 44px;
+        display: block;
+        overflow: visible;
+      }
+
+      /* ── Activity feed ── */
+      .act-feed {
+        display: flex;
+        flex-direction: column;
+        padding: 0 var(--space-lg);
+      }
+      #activity-feed {
+        max-height: 253px;
+        overflow-y: auto;
+      }
+      .act-item {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--space-md);
+        padding: 10px 0;
+        border-bottom: 1px solid var(--color-border-secondary);
+      }
+      .act-item:last-child {
+        border-bottom: none;
+      }
+      .act-avatar {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        font-weight: var(--font-weight-semibold);
+        flex-shrink: 0;
+        text-transform: uppercase;
+        background: var(--color-background-tertiary);
+        color: var(--color-text-secondary);
+      }
+      .act-avatar.aa {
+        background: var(--yellow-bg);
+        color: var(--yellow);
+      }
+      .act-avatar.ac {
+        background: var(--green-bg);
+        color: var(--green);
+      }
+      .act-avatar.ae {
+        background: var(--red-bg);
+        color: var(--red);
+      }
+      .act-body {
+        flex: 1;
+        min-width: 0;
+      }
+      .act-row1 {
+        display: flex;
+        align-items: baseline;
+        gap: var(--space-sm);
+        flex-wrap: wrap;
+      }
+      .act-user {
+        font-size: var(--font-size-sm);
+        font-weight: var(--font-weight-semibold);
+        color: var(--color-text-primary);
+      }
+      .act-action {
+        font-size: var(--font-size-sm);
+        color: var(--color-text-secondary);
+      }
+      .act-detail {
+        font-size: 11px;
+        color: var(--color-text-secondary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        margin-top: 2px;
+      }
+      .act-right {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 4px;
+        flex-shrink: 0;
+      }
+      .act-time {
+        font-size: 11px;
+        color: var(--color-text-tertiary);
+        font-family: var(--font-mono);
+        white-space: nowrap;
+      }
+
+      /* ── Card header icon ── */
+      .card-hdr-icon {
+        display: flex;
+        align-items: center;
+        flex-shrink: 0;
+        color: var(--color-text-secondary);
+      }
+
+      /* ── Alert rows ── */
+      .al-rows-wrap {
+        padding: 0 var(--space-lg);
+      }
+      .al-row {
+        display: flex;
+        align-items: center;
+        gap: var(--space-md);
+        padding: 11px 0;
+        border-bottom: 1px solid var(--color-border-secondary);
+      }
+      .al-row:last-child {
+        border-bottom: none;
+      }
+      .al-bar {
+        width: 3px;
+        height: 36px;
+        border-radius: 2px;
+        flex-shrink: 0;
+      }
+      .al-bar.crit {
+        background: var(--red-mid);
+      }
+      .al-bar.warn {
+        background: var(--amber-mid);
+      }
+      .al-bar.ok {
+        background: var(--green-mid);
+      }
+      .al-info {
+        flex: 1;
+        min-width: 0;
+      }
+      .al-title {
+        font-size: var(--font-size-sm);
+        font-weight: var(--font-weight-medium);
+        color: var(--color-text-primary);
+        margin-bottom: 2px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .al-meta {
+        font-size: 11px;
+        color: var(--color-text-secondary);
+      }
+      .al-right {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 4px;
+        flex-shrink: 0;
+      }
+      .al-type-tag {
+        display: inline-block;
+        padding: 2px 7px;
+        border-radius: var(--radius-sm);
+        font-size: 10px;
+        font-weight: var(--font-weight-medium);
+        background: var(--color-background-tertiary);
+        color: var(--color-text-secondary);
+        white-space: nowrap;
+      }
+
+      /* ── Refresh spin ── */
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* ── Responsive ── */
+      @media (max-width: 960px) {
+        .dash-grid {
+          grid-template-columns: 1fr;
+        }
+        .bottom-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      @media (max-width: 640px) {
+        .analytics-grid {
+          grid-template-columns: 1fr 1fr;
+        }
+        .ph {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: var(--space-md);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-wrapper">
+      <!-- ── Sidebar ─────────────────────────────────────────────────── -->
+      <aside class="sidebar">
+        <div class="sidebar-brand">
+          <div class="sidebar-logo">
+            <img
+              src="/frontend/assets/images/pinevision-logo.svg"
+              alt="PineVision"
+              class="sidebar-logo-img"
+            />
+          </div>
+          <div class="sidebar-brand-text">
+            <div class="sidebar-brand-name">PineVision</div>
+            <div class="sidebar-brand-tagline">Farm Manager Panel</div>
+          </div>
+        </div>
+
+        <button
+          class="sidebar-collapse-btn"
+          onclick="app.toggleSidebar()"
+          aria-label="Toggle sidebar"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <polyline points="15,18 9,12 15,6" />
+          </svg>
+          <span class="nav-link-text">Collapse sidebar</span>
+        </button>
+
+        <nav class="sidebar-nav">
+          <div class="nav-section">
+            <div class="nav-section-title">Main</div>
+            <ul class="nav-links">
+              <li>
+                <a
+                  href="dashboard.html"
+                  class="nav-link active"
+                  data-tooltip="Dashboard"
+                >
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-dashboard.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Dashboard</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div class="nav-section">
+            <div class="nav-section-title">Monitoring</div>
+            <ul class="nav-links">
+              <li>
+                <a href="users.html" class="nav-link" data-tooltip="Users">
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-users.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Users</span>
+                </a>
+              </li>
+              <li>
+                <a
+                  href="auditlogs.html"
+                  class="nav-link"
+                  data-tooltip="Audit Logs"
+                >
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-clipboard.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Audit Logs</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div class="nav-section">
+            <div class="nav-section-title">Operations</div>
+            <ul class="nav-links">
+              <li>
+                <a
+                  href="flights-scans.html"
+                  class="nav-link"
+                  data-tooltip="Flights &amp; Scans"
+                >
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-flights.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Flights &amp; Scans</span>
+                </a>
+              </li>
+              <li>
+                <a href="alerts.html" class="nav-link" data-tooltip="Alerts">
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-bell.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Alerts</span>
+                  <span
+                    class="nav-badge"
+                    id="nav-badge-alerts"
+                    style="display: none"
+                  ></span>
+                </a>
+              </li>
+              <li>
+                <a href="reports.html" class="nav-link" data-tooltip="Reports">
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-reports.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Reports</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div class="nav-section">
+            <div class="nav-section-title">System</div>
+            <ul class="nav-links">
+              <li>
+                <a
+                  href="settings.html"
+                  class="nav-link"
+                  data-tooltip="Settings"
+                >
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-cog.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Settings</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div class="sidebar-user">
+            <div class="sidebar-user-avatar">A</div>
+            <div class="sidebar-user-info">
+              <div class="sidebar-user-name">Admin</div>
+              <div class="sidebar-user-role">admin</div>
+            </div>
+          </div>
+          <button class="btn-logout" onclick="openLogoutModal()">
+            <img src="/frontend/assets/icons/logout.svg" alt="" width="16" />
+            <span class="logout-text">Logout</span>
+          </button>
+        </div>
+      </aside>
+
+      <!-- ── Main Content ─────────────────────────────────────────────── -->
+      <main class="main-content">
+        <div
+          class="page-container"
+          style="
+            padding: var(--page-padding);
+            max-width: var(--page-max-width);
+            margin: 0 auto;
+          "
+        >
+          <!-- Page Header -->
+          <div class="ph">
+            <div>
+              <h1 class="page-title d-flex align-items-center gap-2">
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  style="color: var(--green); flex-shrink: 0"
+                >
+                  <rect x="3" y="3" width="7" height="7" />
+                  <rect x="14" y="3" width="7" height="7" />
+                  <rect x="14" y="14" width="7" height="7" />
+                  <rect x="3" y="14" width="7" height="7" /></svg
+                >Farm Manager Dashboard
+              </h1>
+              <p class="page-subtitle">
+                Farm management overview and control center
+              </p>
+            </div>
+            <div
+              style="display: flex; align-items: center; gap: var(--space-md)"
+              class="mb-3"
+            >
+              <span
+                id="last-updated"
+                style="
+                  font-size: 11px;
+                  color: var(--color-text-tertiary);
+                  font-family: var(--font-mono);
+                "
+              ></span>
+              <button
+                class="btn btn-secondary btn-sm"
+                onclick="refreshDashboard()"
+                id="refresh-btn"
+              >
+                <svg
+                  id="refresh-icon"
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <polyline points="23 4 23 10 17 10" />
+                  <polyline points="1 20 1 14 7 14" />
+                  <path
+                    d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"
+                  />
+                </svg>
+                <span>Refresh</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Hero Metrics -->
+          <div class="mg" id="system-stats"></div>
+
+          <!-- Main Grid: Compact Activity Feed + Analytics Sparklines 2×2 -->
+          <div class="dash-grid">
+            <!-- Live Activity Feed (compact, scrollable) -->
+            <div class="tcard" style="margin-bottom: 0; overflow: hidden">
+              <div class="thead-row">
+                <h3 class="thead-title d-flex align-items-center gap-2">
+                  <span class="card-hdr-icon">
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <line x1="8" y1="6" x2="21" y2="6" />
+                      <line x1="8" y1="12" x2="21" y2="12" />
+                      <line x1="8" y1="18" x2="21" y2="18" />
+                      <line x1="3" y1="6" x2="3.01" y2="6" />
+                      <line x1="3" y1="12" x2="3.01" y2="12" />
+                      <line x1="3" y1="18" x2="3.01" y2="18" />
+                    </svg>
+                  </span>
+                  Live Activity Feed
+                </h3>
+                <a href="auditlogs.html" class="btn btn-secondary btn-sm"
+                  >View All →</a
+                >
+              </div>
+              <div id="activity-feed"></div>
+            </div>
+
+            <!-- Analytics Sparklines 2×2 -->
+            <div
+              class="analytics-grid"
+              id="analytics-grid"
+              style="margin-bottom: 0"
+            ></div>
+          </div>
+
+          <!-- Bottom: Alerts + Users -->
+          <div class="bottom-grid">
+            <div class="tcard" style="margin-bottom: 0">
+              <div class="thead-row">
+                <h3 class="thead-title d-flex align-items-center gap-2">
+                  <span class="card-hdr-icon">
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                    </svg>
+                  </span>
+                  Recent Alerts
+                </h3>
+                <a href="alerts.html" class="btn btn-secondary btn-sm"
+                  >View All →</a
+                >
+              </div>
+              <div class="al-rows-wrap" id="alerts-container"></div>
+            </div>
+
+            <div class="tcard" style="margin-bottom: 0">
+              <div class="thead-row">
+                <h3 class="thead-title d-flex align-items-center gap-2">
+                  <span class="card-hdr-icon">
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                      <circle cx="9" cy="7" r="4" />
+                      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                    </svg>
+                  </span>
+                  User Statistics
+                </h3>
+                <a href="users.html" class="btn btn-secondary btn-sm"
+                  >Manage →</a
+                >
+              </div>
+              <div class="twrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Username</th>
+                      <th>Role</th>
+                      <th>Status</th>
+                      <th>Last Login</th>
+                    </tr>
+                  </thead>
+                  <tbody id="users-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+    <script src="../../bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="../../js/auth.js"></script>
+    <script src="../../js/data.js"></script>
+    <script src="../../js/utils.js"></script>
+    <script src="../../js/app.js"></script>
+    <script>
+      if (!auth.requireFarmManager()) {
+        /* redirects */
+      }
+
+      // Global data storage
+      var dashboardUsers = [];
+      var dashboardLogs = [];
+
+      window.initPage = async function () {
+        /*
+         * OPTIMIZATION: all independent Firebase queries run in parallel.
+         *
+         * Old flow (sequential):
+         *   loadFirebaseData()   → 2 queries (users + logs)
+         *   loadSystemStats()    → 1 query  (unresolved alerts)
+         *   loadAnalytics()      → 6 queries (hourly loop) + 1 duplicate = 7
+         *   loadRecentAlerts()   → 1 query
+         *   Total: ~11 sequential round-trips
+         *
+         * New flow (parallel):
+         *   Promise.all([users, logs, unresolved, recentAlerts, 6h-range]) → 5 parallel
+         *   JS bucketing replaces the 6-query hourly loop
+         *   Total: 1 parallel batch (wait = slowest single query, not their sum)
+         */
+        try {
+          console.log("📥 Loading dashboard data in parallel...");
+
+          var sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000);
+
+          var results = await Promise.all([
+            // [0] users — limit added; was fetching unbounded collection
+            firebase.firestore().collection("users").limit(50).get(),
+
+            // [1] recent activity logs
+            firebase.firestore()
+              .collection("activity_logs")
+              .orderBy("timestamp", "desc")
+              .limit(10)
+              .get(),
+
+            // [2] unresolved alerts count (shared between stats card + analytics)
+            firebase.firestore()
+              .collection("alerts")
+              .where("resolved", "==", false)
+              .get(),
+
+            // [3] most-recent alerts for the alerts panel
+            firebase.firestore()
+              .collection("alerts")
+              .orderBy("timestamp", "desc")
+              .limit(6)
+              .get(),
+
+            // [4] last-6-hours range — JS bucketing replaces the 6-query loop
+            firebase.firestore()
+              .collection("alerts")
+              .where(
+                "timestamp",
+                ">=",
+                firebase.firestore.Timestamp.fromDate(sixHoursAgo)
+              )
+              .get(),
+          ]);
+
+          var usersSnap        = results[0];
+          var logsSnap         = results[1];
+          var unresolvedSnap   = results[2];
+          var recentAlertsSnap = results[3];
+          var analyticsSnap    = results[4];
+
+          // ── Process users — Farm Managers never see Super Admin accounts ─────────────────────────
+          dashboardUsers = [];
+          usersSnap.forEach(function (doc) {
+            var d = doc.data();
+            if (d.role === "admin") return;
+            dashboardUsers.push({
+              id:        doc.id,
+              fullName:  d.fullName,
+              username:  d.username,
+              email:     d.email,
+              role:      d.role,
+              status:    d.status,
+              lastLogin: d.lastLogin ? d.lastLogin.toDate() : null,
+            });
+          });
+
+          // ── Process activity logs ─────────────────────────────────────
+          dashboardLogs = [];
+          logsSnap.forEach(function (doc) {
+            var d = doc.data();
+            dashboardLogs.push({
+              user:      d.user,
+              action:    d.action,
+              timestamp: d.timestamp ? d.timestamp.toDate() : new Date(),
+              status:    d.status,
+              details:   d.details || "",
+            });
+          });
+
+          console.log(
+            "✅ Loaded",
+            dashboardUsers.length,
+            "users,",
+            dashboardLogs.length,
+            "logs,",
+            unresolvedSnap.size,
+            "unresolved alerts"
+          );
+
+          var pendingAlerts = unresolvedSnap.size;
+
+          // ── Bucket analytics into 6 hourly bins in JS ─────────────────
+          // Replaces 6 sequential time-range queries (one per hour) with a
+          // single range query + client-side bucketing.
+          var alertBuckets = [0, 0, 0, 0, 0, 0];
+          analyticsSnap.forEach(function (doc) {
+            var ts = doc.data().timestamp;
+            if (ts) {
+              var hoursAgo = Math.floor(
+                (Date.now() - ts.toDate().getTime()) / (60 * 60 * 1000)
+              );
+              if (hoursAgo >= 0 && hoursAgo < 6) alertBuckets[5 - hoursAgo]++;
+            }
+          });
+
+          // ── Render all sections synchronously from in-memory data ─────
+          loadSystemStats(pendingAlerts);
+          loadRecentActivity();
+          loadAnalytics(alertBuckets, pendingAlerts);
+          loadRecentAlerts(recentAlertsSnap);
+          loadUserStats();
+          updateTimestamp();
+
+        } catch (error) {
+          console.error("❌ Error loading dashboard data:", error);
+        }
+      };
+
+      // loadFirebaseData() removed — data loading merged into initPage()
+      // using Promise.all for parallel execution.
+
+      function updateTimestamp() {
+        var el = document.getElementById("last-updated");
+        if (el)
+          el.textContent =
+            "Updated " +
+            new Date().toLocaleTimeString("en-US", {
+              hour: "2-digit",
+              minute: "2-digit",
+            });
+      }
+
+      function refreshDashboard() {
+        var btn = document.getElementById("refresh-btn");
+        var icon = document.getElementById("refresh-icon");
+        btn.disabled = true;
+        icon.classList.add("spinning");
+        setTimeout(async function () {
+          await window.initPage();
+          btn.disabled = false;
+          icon.classList.remove("spinning");
+          utils.showToast("Dashboard refreshed", "success");
+        }, 600);
+      }
+
+      // pendingAlerts is passed from initPage (already fetched via Promise.all),
+      // eliminating the duplicate unresolved-alerts query that used to live here.
+      function loadSystemStats(pendingAlerts) {
+        var clients = dashboardUsers.filter(function (u) {
+          return u.role === "client" || u.role === "farm_manager";
+        }).length;
+        var activeOps = dashboardUsers.filter(function (u) {
+          return u.status === "active";
+        }).length;
+        var totalUsers = dashboardUsers.length;
+
+        // Mock data for scans (keep for now)
+        var flightsToday = 6;
+        var totalScans = 6;
+        var successRate = 79;
+
+        var cards = [
+          {
+            label: "Total Clients",
+            value: clients,
+            sub: activeOps + " active",
+            color: "green",
+            trend: "up",
+            trendTxt: "+2 this month",
+            icon: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+          },
+          {
+            label: "Active Operators",
+            value: activeOps,
+            sub: "of " + clients + " clients",
+            color: "",
+            trend: "fl",
+            trendTxt: "No change",
+            icon: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>',
+          },
+          {
+            label: "Flights Today",
+            value: flightsToday,
+            sub: "Scan sessions",
+            color: "",
+            trend: "up",
+            trendTxt: "+" + flightsToday + " logged",
+            icon: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l4 8H8l4-8z"/><path d="M8 10v10h8V10"/><line x1="12" y1="10" x2="12" y2="20"/></svg>',
+          },
+          {
+            label: "Total Scans",
+            value: totalScans,
+            sub: "All time",
+            color: "",
+            trend: "up",
+            trendTxt: "Growing",
+            icon: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>',
+          },
+          {
+            label: "Pending Alerts",
+            value: pendingAlerts,
+            sub: "Requiring review",
+            color: pendingAlerts > 0 ? "red" : "green",
+            trend: pendingAlerts > 0 ? "dn" : "up",
+            trendTxt: pendingAlerts > 0 ? "Needs attention" : "All clear",
+            icon: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>',
+          },
+          {
+            label: "Scan Success Rate",
+            value: successRate + "%",
+            sub: "Avg bearing rate",
+            color:
+              successRate >= 75 ? "green" : successRate >= 60 ? "amber" : "red",
+            trend: successRate >= 75 ? "up" : "dn",
+            trendTxt: successRate >= 75 ? "Healthy" : "Below target",
+            icon: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
+          },
+        ];
+
+        var colorMap = {
+          green: { fg: "var(--green)", bg: "var(--green-bg)" },
+          amber: { fg: "var(--amber)", bg: "var(--amber-bg)" },
+          red: { fg: "var(--red)", bg: "var(--red-bg)" },
+          yellow: { fg: "var(--yellow)", bg: "var(--yellow-bg)" },
+          "": {
+            fg: "var(--color-text-secondary)",
+            bg: "var(--color-background-tertiary)",
+          },
+        };
+
+        var html = "";
+        cards.forEach(function (c) {
+          var cm = colorMap[c.color] || colorMap[""];
+          var trendArrow =
+            c.trend === "up" ? "↑" : c.trend === "dn" ? "↓" : "→";
+          html +=
+            '<div class="mc ' +
+            c.color +
+            '">' +
+            '<div class="mc-icon"><div style="width:34px;height:34px;border-radius:var(--radius-sm);background:' +
+            cm.bg +
+            ";display:flex;align-items:center;justify-content:center;color:" +
+            cm.fg +
+            ';">' +
+            c.icon +
+            "</div></div>" +
+            '<div class="mc-label">' +
+            c.label +
+            "</div>" +
+            '<div class="mc-val">' +
+            c.value +
+            "</div>" +
+            '<div class="mc-sub">' +
+            c.sub +
+            "</div>" +
+            '<div class="mc-trend ' +
+            c.trend +
+            '">' +
+            trendArrow +
+            " " +
+            c.trendTxt +
+            "</div>" +
+            "</div>";
+        });
+        document.getElementById("system-stats").innerHTML = html;
+      }
+
+      function loadRecentActivity() {
+        var labels = {
+          login: "logged in",
+          logout: "logged out",
+          view_users: "viewed users",
+          view_dashboard: "viewed dashboard",
+          login_failed: "login failed",
+          view_scan: "viewed a scan",
+          view_alerts: "viewed alerts",
+          view_blocks: "viewed blocks",
+          generate_report: "generated report",
+          upload_scan: "uploaded scan",
+          update_user: "updated user",
+          reset_password: "reset password",
+          toggle_status: "toggled status",
+        };
+
+        var html = '<div class="act-feed">';
+
+        if (dashboardLogs.length === 0) {
+          html +=
+            '<div style="padding:var(--space-xl);text-align:center;color:var(--color-text-secondary);">No recent activity</div>';
+        } else {
+          dashboardLogs.forEach(function (log) {
+            var ts = new Date(log.timestamp);
+            var timeStr = ts.toLocaleString("en-US", {
+              month: "short",
+              day: "2-digit",
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: true,
+            });
+            var initials = log.user.substring(0, 2).toUpperCase();
+            var isAdmin = log.user.toLowerCase().includes("admin");
+            var isError =
+              log.status === "error" || log.action === "login_failed";
+            var avCls = isError ? "ae" : isAdmin ? "aa" : "ac";
+            var badge =
+              log.status === "success"
+                ? '<span class="badge good"><span class="bdot"></span>OK</span>'
+                : '<span class="badge crit"><span class="bdot"></span>Err</span>';
+            var label = labels[log.action] || log.action.replace(/_/g, " ");
+
+            html +=
+              '<div class="act-item">' +
+              '<div class="act-avatar ' +
+              avCls +
+              '">' +
+              initials +
+              "</div>" +
+              '<div class="act-body">' +
+              '<div class="act-row1"><span class="act-user">' +
+              log.user +
+              '</span><span class="act-action">' +
+              label +
+              "</span></div>" +
+              '<div class="act-detail">' +
+              log.details +
+              "</div>" +
+              "</div>" +
+              '<div class="act-right"><span class="act-time">' +
+              timeStr +
+              "</span>" +
+              badge +
+              "</div>" +
+              "</div>";
+          });
+        }
+        html += "</div>";
+        document.getElementById("activity-feed").innerHTML = html;
+      }
+
+      // alertBuckets: 6-element array [oldest…newest] bucketed in initPage()
+      // from a single 6-hour range query instead of 6 separate hourly queries.
+      // totalAlerts: unresolved count, already fetched in initPage() — no duplicate query.
+      function loadAnalytics(alertBuckets, totalAlerts) {
+        var alertData   = alertBuckets;
+        var scanVolData = [2, 3, 3, 4, 5, 6];
+        var bearingData = [72, 74, 73, 76, 75, 79];
+        var sessionData = [3, 4, 5, 4, 6, 5];
+
+        var charts = [
+          {
+            label: "Scan Volume",
+            value: "6",
+            sub: '<span class="up">↑ +6</span> sessions logged',
+            data: scanVolData,
+            color: "#4caf78",
+          },
+          {
+            label: "Avg Bearing Rate",
+            value: "78.9%",
+            sub: '<span class="up">↑ Healthy</span>',
+            data: bearingData,
+            color: "#2d6a3f",
+          },
+          {
+            label: "Alert Frequency",
+            value: totalAlerts + "",
+            sub: '<span class="dn">↓ ' + totalAlerts + " active</span>",
+            data: alertData,
+            color: "#d94f4f",
+          }, // ← NOW REAL
+          {
+            label: "User Activity",
+            value: "5",
+            sub: '<span class="up">↑ Peak today</span>',
+            data: sessionData,
+            color: "#8c5c00",
+          },
+        ];
+
+        var html = "";
+        charts.forEach(function (c) {
+          html +=
+            '<div class="spark-card">' +
+            '<div class="spark-label">' +
+            c.label +
+            "</div>" +
+            '<div class="spark-value">' +
+            c.value +
+            "</div>" +
+            '<div class="spark-sub">' +
+            c.sub +
+            "</div>" +
+            '<div class="sparkline-wrap">' +
+            buildSparkSVG(c.data, c.color) +
+            "</div>" +
+            "</div>";
+        });
+        document.getElementById("analytics-grid").innerHTML = html;
+      }
+
+      function buildSparkSVG(data, color) {
+        var W = 200,
+          H = 40;
+        var max = Math.max.apply(null, data);
+        var min = Math.min.apply(null, data);
+        var range = max - min || 1;
+        var pts = data.map(function (v, i) {
+          return [
+            ((i / (data.length - 1)) * W).toFixed(1),
+            (H - 4 - ((v - min) / range) * (H - 8)).toFixed(1),
+          ];
+        });
+        var linePts = pts
+          .map(function (p) {
+            return p[0] + "," + p[1];
+          })
+          .join(" ");
+        var areaD =
+          "M0," +
+          H +
+          " " +
+          pts
+            .map(function (p) {
+              return "L" + p[0] + "," + p[1];
+            })
+            .join(" ") +
+          " L" +
+          W +
+          "," +
+          H +
+          " Z";
+        var uid = "sg" + Math.random().toString(36).slice(2, 7);
+        var last = pts[pts.length - 1];
+        return (
+          '<svg viewBox="0 0 ' +
+          W +
+          " " +
+          H +
+          '" preserveAspectRatio="none">' +
+          '<defs><linearGradient id="' +
+          uid +
+          '" x1="0" y1="0" x2="0" y2="1">' +
+          '<stop offset="0%" stop-color="' +
+          color +
+          '" stop-opacity="0.22"/>' +
+          '<stop offset="100%" stop-color="' +
+          color +
+          '" stop-opacity="0"/>' +
+          "</linearGradient></defs>" +
+          '<path d="' +
+          areaD +
+          '" fill="url(#' +
+          uid +
+          ')"/>' +
+          '<polyline points="' +
+          linePts +
+          '" fill="none" stroke="' +
+          color +
+          '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+          '<circle cx="' +
+          last[0] +
+          '" cy="' +
+          last[1] +
+          '" r="3" fill="' +
+          color +
+          '"/>' +
+          "</svg>"
+        );
+      }
+
+
+      // alertsSnapshot is passed from initPage (fetched in the parallel Promise.all).
+      function loadRecentAlerts(alertsSnapshot) {
+        try {
+
+          var html = "";
+
+          if (alertsSnapshot.empty) {
+            html =
+              '<div style="padding:var(--space-xl);text-align:center;color:var(--color-text-secondary);">No recent alerts</div>';
+          } else {
+            alertsSnapshot.forEach(function (doc) {
+              const alert = doc.data();
+              var ts = alert.timestamp ? alert.timestamp.toDate() : new Date();
+              var timeStr = ts.toLocaleString("en-US", {
+                month: "short",
+                day: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: true,
+              });
+
+              var badge = alert.resolved
+                ? '<span class="badge good"><span class="bdot"></span>Resolved</span>'
+                : alert.severity === "critical"
+                  ? '<span class="badge crit"><span class="bdot"></span>Critical</span>'
+                  : '<span class="badge warn"><span class="bdot"></span>Warning</span>';
+
+              var barClass = alert.severity === "critical" ? "crit" : "warn";
+
+              html +=
+                '<div class="al-row">' +
+                '<div class="al-bar ' +
+                barClass +
+                '"></div>' +
+                '<div class="al-info">' +
+                '<div class="al-title">' +
+                alert.title +
+                "</div>" +
+                '<div class="al-meta"><span class="al-type-tag">' +
+                alert.type +
+                "</span> · " +
+                alert.user +
+                " · " +
+                alert.ip +
+                "</div>" +
+                "</div>" +
+                '<div class="al-right">' +
+                badge +
+                '<span style="font-size:11px;color:var(--color-text-tertiary);font-family:var(--font-mono);">' +
+                timeStr +
+                "</span></div>" +
+                "</div>";
+            });
+          }
+
+          document.getElementById("alerts-container").innerHTML = html;
+
+          // Update pending alerts count
+          const unresolvedCount = alertsSnapshot.docs.filter(
+            (doc) => !doc.data().resolved,
+          ).length;
+          console.log(
+            "📊 Loaded",
+            alertsSnapshot.size,
+            "alerts,",
+            unresolvedCount,
+            "unresolved",
+          );
+        } catch (error) {
+          console.error("❌ Error loading alerts:", error);
+          document.getElementById("alerts-container").innerHTML =
+            '<div style="padding:var(--space-xl);text-align:center;color:var(--red);">Failed to load alerts</div>';
+        }
+      }
+
+      function loadUserStats() {
+        var html = "";
+        if (dashboardUsers.length === 0) {
+          html =
+            '<tr><td colspan="4" style="text-align:center;padding:var(--space-xl);color:var(--color-text-secondary);">No users found</td></tr>';
+        } else {
+          dashboardUsers.forEach(function (user) {
+            var loginStr = user.lastLogin
+              ? new Date(user.lastLogin).toLocaleString("en-US", {
+                  month: "short",
+                  day: "2-digit",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
+              : "Never";
+            var statusBadge =
+              user.status === "active"
+                ? '<span class="badge good"><span class="bdot"></span>Active</span>'
+                : '<span class="badge" style="background:var(--surf2);color:var(--muted);"><span class="bdot" style="background:var(--muted);"></span>Off</span>';
+            var roleBadge =
+              user.role === "farm_manager"
+                ? '<span class="badge" style="background:var(--amber-bg);color:var(--amber);"><span class="bdot" style="background:var(--amber-mid);"></span>Farm Manager</span>'
+                : '<span class="badge" style="background:var(--surf2);color:var(--muted);"><span class="bdot" style="background:var(--muted);"></span>User</span>';
+            html +=
+              "<tr>" +
+              "<td><strong>" +
+              user.username +
+              "</strong></td>" +
+              "<td>" +
+              roleBadge +
+              "</td>" +
+              "<td>" +
+              statusBadge +
+              "</td>" +
+              '<td style="font-family:var(--font-mono);font-size:var(--font-size-sm);">' +
+              loginStr +
+              "</td>" +
+              "</tr>";
+          });
+        }
+        document.getElementById("users-tbody").innerHTML = html;
+      }
+
+      function openLogoutModal() { auth.confirmLogout(); }
+      function closeLogoutModal() {
+        document.getElementById("logout-modal").style.display = "none";
+      }
+    </script>
+
+    <!-- Logout Confirmation Modal -->
+    <div
+      id="logout-modal"
+      style="
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: none;
+        align-items: center;
+        justify-content: center;
+      "
+    >
+      <!-- Backdrop -->
+      <div
+        onclick="closeLogoutModal()"
+        style="
+          position: absolute;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.45);
+          backdrop-filter: blur(2px);
+        "
+      ></div>
+      <!-- Dialog -->
+      <div
+        style="
+          position: relative;
+          background: var(--color-background-primary);
+          border: 1px solid var(--color-border-secondary);
+          border-radius: var(--radius-lg);
+          padding: var(--space-2xl);
+          width: 360px;
+          max-width: 90vw;
+          box-shadow: var(--shadow-md);
+          text-align: center;
+        "
+      >
+        <div
+          style="
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--red-bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto var(--space-lg);
+          "
+        >
+          <svg
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="var(--red)"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+        </div>
+        <h3
+          style="
+            font-size: var(--font-size-lg);
+            font-weight: var(--font-weight-semibold);
+            color: var(--color-text-primary);
+            margin-bottom: var(--space-sm);
+          "
+        >
+          Confirm Logout
+        </h3>
+        <p
+          style="
+            font-size: var(--font-size-sm);
+            color: var(--color-text-secondary);
+            margin-bottom: var(--space-xl);
+          "
+        >
+          Are you sure you want to log out of your session?
+        </p>
+        <div
+          style="display: flex; gap: var(--space-md); justify-content: center"
+        >
+          <button
+            onclick="closeLogoutModal()"
+            class="btn btn-secondary"
+            style="flex: 1"
+          >
+            Cancel
+          </button>
+          <button
+            onclick="auth.logout()"
+            class="btn btn-danger"
+            style="
+              flex: 1;
+              background: var(--red-mid);
+              color: #fff;
+              border-color: var(--red-mid);
+            "
+          >
+            Yes, Logout
+          </button>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

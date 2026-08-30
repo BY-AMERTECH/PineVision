@@ -1,0 +1,1925 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+    <link rel="dns-prefetch" href="https://firestore.googleapis.com">
+    <link rel="dns-prefetch" href="https://identitytoolkit.googleapis.com">
+    <script>
+      (function () {
+        try {
+          var s = JSON.parse(
+            localStorage.getItem("pinevision_settings") || "{}",
+          );
+          if (s.theme === "dark")
+            document.documentElement.classList.add("dark-mode");
+        } catch (e) {}
+      })();
+    </script>
+    <title>Activity Log - PineVision</title>
+    <link rel="stylesheet" href="../../bootstrap/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="../../css/tokens.css" />
+    <link rel="stylesheet" href="../../css/layout.css" />
+    <link rel="stylesheet" href="../../css/components.css" />
+    <link rel="stylesheet" href="../../css/responsive.css" />
+    <style>
+      /* ─── Page Header ─────────────────────────────────────────────── */
+      .ph {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: var(--space-md);
+        margin-bottom: var(--space-2xl);
+      }
+      @media (max-width: 768px) {
+        .ph {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+      }
+      .back-btn {
+        width: 38px;
+        height: 38px;
+        padding: 0;
+        flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .page-subtitle {
+        margin-bottom: 0;
+      }
+
+      /* ─── Filter Bar ──────────────────────────────────────────────── */
+      .filter-bar {
+        background: var(--color-background-primary);
+        border: 1px solid var(--color-border-secondary);
+        border-radius: var(--radius-lg);
+        padding: var(--space-lg);
+        margin-bottom: var(--space-xl);
+        box-shadow: var(--shadow-sm);
+      }
+      .filter-search {
+        display: flex;
+        align-items: center;
+        gap: var(--space-sm);
+        background: var(--color-background-secondary);
+        border: 1px solid var(--color-border-secondary);
+        border-radius: var(--radius-md);
+        padding: 7px var(--space-md);
+      }
+      .filter-search input {
+        border: none;
+        background: transparent;
+        outline: none;
+        font-size: var(--font-size-sm);
+        color: var(--color-text-primary);
+        font-family: var(--font-sans);
+        width: 100%;
+      }
+      .filter-search input::placeholder {
+        color: var(--color-text-tertiary);
+      }
+      .filter-ctrl {
+        padding: 7px var(--space-md);
+        background: var(--color-background-secondary);
+        border: 1px solid var(--color-border-secondary);
+        border-radius: var(--radius-md);
+        font-size: var(--font-size-sm);
+        color: var(--color-text-primary);
+        font-family: var(--font-sans);
+        outline: none;
+        cursor: pointer;
+        width: 100%;
+      }
+      .filter-ctrl:focus {
+        border-color: var(--green);
+      }
+      .filter-results {
+        font-size: var(--font-size-xs);
+        color: var(--color-text-secondary);
+        padding-top: var(--space-sm);
+      }
+
+      /* ─── Log Table ───────────────────────────────────────────────── */
+      .log-table {
+        table-layout: auto;
+      }
+      .log-table th {
+        cursor: pointer;
+        user-select: none;
+        white-space: nowrap;
+      }
+      .log-table th:hover {
+        background: var(--color-background-tertiary);
+      }
+      .sort-arrow {
+        opacity: 0.4;
+        margin-left: 4px;
+        font-size: 10px;
+      }
+      .sort-arrow.active {
+        opacity: 1;
+      }
+      .log-table td {
+        vertical-align: middle;
+      }
+      .log-row {
+        cursor: pointer;
+      }
+      .log-row:hover td {
+        background: var(--green-bg) !important;
+      }
+
+      /* ─── Action Pills ────────────────────────────────────────────── */
+      .action-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 8px;
+        border-radius: var(--radius-pill);
+        font-size: 11px;
+        font-weight: var(--font-weight-medium);
+        white-space: nowrap;
+      }
+      .action-login {
+        background: var(--green-bg);
+        color: var(--green);
+      }
+      .action-logout {
+        background: var(--color-background-secondary);
+        color: var(--color-text-secondary);
+      }
+      .action-view {
+        background: #e8f0ff;
+        color: #3a5fc8;
+      }
+      .dark-mode .action-view {
+        background: rgba(58, 95, 200, 0.15);
+        color: #7b9df8;
+      }
+      .action-update {
+        background: var(--amber-bg);
+        color: var(--amber);
+      }
+      .action-error {
+        background: var(--red-bg);
+        color: var(--red);
+      }
+      .action-upload {
+        background: var(--yellow-bg);
+        color: var(--yellow);
+      }
+      .action-generate {
+        background: #f0eaff;
+        color: #6a3fa8;
+      }
+      .dark-mode .action-generate {
+        background: rgba(106, 63, 168, 0.15);
+        color: #b89cf5;
+      }
+
+      /* ─── Severity Badge ──────────────────────────────────────────── */
+      .sev {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 7px;
+        border-radius: var(--radius-pill);
+        font-size: 10px;
+        font-weight: var(--font-weight-semibold);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        white-space: nowrap;
+      }
+      .sev-info {
+        background: var(--green-bg);
+        color: var(--green);
+      }
+      .sev-warning {
+        background: var(--amber-bg);
+        color: var(--amber);
+      }
+      .sev-critical {
+        background: var(--red-bg);
+        color: var(--red);
+      }
+
+      /* ─── User Cell ───────────────────────────────────────────────── */
+      .log-avatar {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        font-weight: var(--font-weight-semibold);
+        text-transform: uppercase;
+        flex-shrink: 0;
+      }
+      .log-avatar.aa {
+        background: var(--yellow-bg);
+        color: var(--yellow);
+      }
+      .log-avatar.ac {
+        background: var(--green-bg);
+        color: var(--green);
+      }
+      .log-avatar.ae {
+        background: var(--red-bg);
+        color: var(--red);
+      }
+      .user-cell {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .user-cell-name {
+        font-weight: var(--font-weight-medium);
+        font-size: var(--font-size-sm);
+        white-space: nowrap;
+      }
+
+      /* ─── Module Tag ──────────────────────────────────────────────── */
+      .module-tag {
+        display: inline-block;
+        padding: 2px 7px;
+        border-radius: var(--radius-sm);
+        font-size: 10px;
+        font-weight: var(--font-weight-medium);
+        background: var(--color-background-tertiary);
+        color: var(--color-text-secondary);
+        white-space: nowrap;
+      }
+
+      /* ─── Pagination ──────────────────────────────────────────────── */
+      .pagination-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: var(--space-md) var(--space-lg);
+        border-top: 1px solid var(--color-border-secondary);
+        flex-wrap: wrap;
+        gap: var(--space-sm);
+      }
+      .pag-info {
+        font-size: var(--font-size-xs);
+        color: var(--color-text-secondary);
+      }
+      .pag-btns {
+        display: flex;
+        gap: var(--space-xs);
+      }
+      .pag-btn {
+        width: 30px;
+        height: 30px;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--color-border-secondary);
+        background: var(--color-background-secondary);
+        color: var(--color-text-primary);
+        font-size: var(--font-size-xs);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all var(--transition-fast);
+      }
+      .pag-btn:hover:not(:disabled) {
+        background: var(--color-background-tertiary);
+        border-color: var(--green);
+      }
+      .pag-btn.active {
+        background: var(--green);
+        color: #fff;
+        border-color: var(--green);
+      }
+      .pag-btn:disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
+      }
+      .per-page-select {
+        padding: 4px 8px;
+        border-radius: var(--radius-sm);
+        font-size: var(--font-size-xs);
+        border: 1px solid var(--color-border-secondary);
+        background: var(--color-background-secondary);
+        color: var(--color-text-primary);
+        font-family: var(--font-sans);
+        cursor: pointer;
+        outline: none;
+      }
+
+      /* ─── Detail Offcanvas ────────────────────────────────────────── */
+      #detail-offcanvas {
+        --bs-offcanvas-width: min(480px, 96vw);
+        background: var(--color-background-primary) !important;
+        border-left: 1px solid var(--color-border-secondary) !important;
+        color: var(--color-text-primary);
+      }
+      .offcanvas-header {
+        padding: var(--space-xl);
+        border-bottom: 1px solid var(--color-border-secondary);
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+      }
+      .offcanvas-body {
+        padding: var(--space-xl);
+        overflow-y: auto;
+      }
+      .oc-title {
+        font-size: var(--font-size-lg);
+        font-weight: var(--font-weight-semibold);
+        color: var(--color-text-primary);
+      }
+      .oc-subtitle {
+        font-size: var(--font-size-sm);
+        color: var(--color-text-secondary);
+        margin-top: 2px;
+      }
+      .oc-close {
+        width: 30px;
+        height: 30px;
+        border-radius: var(--radius-sm);
+        background: var(--color-background-secondary);
+        border: 1px solid var(--color-border-secondary);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--color-text-secondary);
+        font-size: 18px;
+        line-height: 1;
+        transition: all var(--transition-fast);
+        flex-shrink: 0;
+      }
+      .oc-close:hover {
+        background: var(--color-background-tertiary);
+        color: var(--color-text-primary);
+      }
+      .det-section {
+        font-size: 11px;
+        font-weight: var(--font-weight-semibold);
+        color: var(--color-text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        margin: var(--space-xl) 0 var(--space-md);
+      }
+      .det-section:first-child {
+        margin-top: 0;
+      }
+      .det-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        padding: 8px 0;
+        border-bottom: 1px solid var(--color-border-secondary);
+        gap: var(--space-md);
+      }
+      .det-row:last-child {
+        border-bottom: none;
+      }
+      .det-label {
+        font-size: var(--font-size-xs);
+        color: var(--color-text-secondary);
+        flex-shrink: 0;
+        min-width: 110px;
+      }
+      .det-value {
+        font-size: var(--font-size-sm);
+        color: var(--color-text-primary);
+        font-weight: var(--font-weight-medium);
+        text-align: right;
+        word-break: break-all;
+      }
+      .det-mono {
+        font-family: var(--font-mono);
+      }
+      .security-notice {
+        background: var(--red-bg);
+        border: 1px solid rgba(139, 32, 32, 0.2);
+        border-radius: var(--radius-md);
+        padding: var(--space-md);
+        font-size: var(--font-size-xs);
+        color: var(--red);
+        line-height: 1.5;
+        margin-top: var(--space-lg);
+      }
+      .value-change-box {
+        background: var(--color-background-secondary);
+        border: 1px solid var(--color-border-secondary);
+        border-radius: var(--radius-md);
+        padding: var(--space-md);
+        margin-top: var(--space-md);
+      }
+      .value-change-row {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--space-md);
+        padding: 4px 0;
+      }
+      .value-change-lbl {
+        font-size: 11px;
+        color: var(--color-text-secondary);
+        min-width: 55px;
+        flex-shrink: 0;
+      }
+      .value-prev {
+        font-size: var(--font-size-xs);
+        font-family: var(--font-mono);
+        color: var(--red);
+        word-break: break-all;
+      }
+      .value-new {
+        font-size: var(--font-size-xs);
+        font-family: var(--font-mono);
+        color: var(--green);
+        word-break: break-all;
+      }
+
+      /* ─── Empty State ─────────────────────────────────────────────── */
+      .empty-rows td {
+        text-align: center;
+        padding: var(--space-4xl) var(--space-lg) !important;
+        color: var(--color-text-secondary);
+      }
+
+      /* ─── Table edge padding ──────────────────────────────────────── */
+      .log-table thead th:first-child,
+      .log-table tbody td:first-child {
+        padding-left: var(--space-xl);
+      }
+      .log-table thead th:last-child,
+      .log-table tbody td:last-child {
+        padding-right: var(--space-xl);
+      }
+      .log-table tbody td {
+        padding-top: 11px;
+        padding-bottom: 11px;
+      }
+      .pagination-bar {
+        padding-left: var(--space-xl);
+        padding-right: var(--space-xl);
+      }
+
+      /* ─── Responsive column visibility ───────────────────────────── */
+      @media (max-width: 1280px) {
+        .d-hide-xl {
+          display: none !important;
+        }
+      }
+      @media (max-width: 992px) {
+        .d-hide-lg {
+          display: none !important;
+        }
+      }
+      @media (max-width: 768px) {
+        .d-hide-md {
+          display: none !important;
+        }
+      }
+      @media (max-width: 576px) {
+        .d-hide-sm {
+          display: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-wrapper">
+      <!-- ── Sidebar ─────────────────────────────────────────────────── -->
+      <aside class="sidebar">
+        <div class="sidebar-brand">
+          <div class="sidebar-logo">
+            <img
+              src="/frontend/assets/images/pinevision-logo.svg"
+              alt="PineVision"
+              class="sidebar-logo-img"
+            />
+          </div>
+          <div class="sidebar-brand-text">
+            <div class="sidebar-brand-name">PineVision</div>
+            <div class="sidebar-brand-tagline">Farm Manager Panel</div>
+          </div>
+        </div>
+
+        <button
+          class="sidebar-collapse-btn"
+          onclick="app.toggleSidebar()"
+          aria-label="Toggle sidebar"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <polyline points="15,18 9,12 15,6" />
+          </svg>
+          <span class="nav-link-text">Collapse sidebar</span>
+        </button>
+
+        <nav class="sidebar-nav">
+          <div class="nav-section">
+            <div class="nav-section-title">Main</div>
+            <ul class="nav-links">
+              <li>
+                <a
+                  href="dashboard.html"
+                  class="nav-link"
+                  data-tooltip="Dashboard"
+                >
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-dashboard.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Dashboard</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div class="nav-section">
+            <div class="nav-section-title">Monitoring</div>
+            <ul class="nav-links">
+              <li>
+                <a
+                  href="users.html"
+                  class="nav-link active"
+                  data-tooltip="Users"
+                >
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-users.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Users</span>
+                </a>
+              </li>
+              <li>
+                <a
+                  href="auditlogs.html"
+                  class="nav-link"
+                  data-tooltip="Audit Logs"
+                >
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-clipboard.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Audit Logs</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div class="nav-section">
+            <div class="nav-section-title">Operations</div>
+            <ul class="nav-links">
+              <li>
+                <a
+                  href="flights-scans.html"
+                  class="nav-link"
+                  data-tooltip="Flights &amp; Scans"
+                >
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-flights.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Flights &amp; Scans</span>
+                </a>
+              </li>
+              <li>
+                <a href="alerts.html" class="nav-link" data-tooltip="Alerts">
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-bell.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Alerts</span>
+                  <span
+                    class="nav-badge"
+                    id="nav-badge-alerts"
+                    style="display: none"
+                  ></span>
+                </a>
+              </li>
+              <li>
+                <a href="reports.html" class="nav-link" data-tooltip="Reports">
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-reports.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Reports</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div class="nav-section">
+            <div class="nav-section-title">System</div>
+            <ul class="nav-links">
+              <li>
+                <a
+                  href="settings.html"
+                  class="nav-link"
+                  data-tooltip="Settings"
+                >
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-cog.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Settings</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div class="sidebar-user">
+            <div class="sidebar-user-avatar">A</div>
+            <div class="sidebar-user-info">
+              <div class="sidebar-user-name">Admin</div>
+              <div class="sidebar-user-role">admin</div>
+            </div>
+          </div>
+          <button class="btn-logout" onclick="openLogoutModal()">
+            <img src="/frontend/assets/icons/logout.svg" alt="" width="16" />
+            <span class="logout-text">Logout</span>
+          </button>
+        </div>
+      </aside>
+
+      <!-- ── Main Content ─────────────────────────────────────────────── -->
+      <main class="main-content">
+        <div
+          class="page-container"
+          style="
+            padding: var(--page-padding);
+            max-width: var(--page-max-width);
+            margin: 0 auto;
+          "
+        >
+          <!-- Page Header -->
+          <div class="ph">
+            <div class="d-flex align-items-center gap-3">
+              <a
+                href="auditlogs.html"
+                class="btn btn-secondary back-btn"
+                title="Back to Audit Logs"
+                aria-label="Back to Audit Logs"
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <polyline points="15 18 9 12 15 6" />
+                </svg>
+              </a>
+              <div>
+                <h1 class="page-title d-flex align-items-center gap-2">
+                  <svg
+                    width="22"
+                    height="22"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    style="color: var(--green); flex-shrink: 0"
+                  >
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg
+                  >Activity Log
+                </h1>
+                <p class="page-subtitle">
+                  Full record of all system activity with filtering and search
+                </p>
+              </div>
+            </div>
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                gap: var(--space-md);
+                flex-wrap: wrap;
+              "
+            >
+              <span
+                id="last-updated"
+                style="
+                  font-size: 11px;
+                  color: var(--color-text-tertiary);
+                  font-family: var(--font-mono);
+                "
+              ></span>
+              <button
+                class="btn btn-secondary btn-sm"
+                onclick="exportCSV()"
+                title="Export filtered logs as CSV"
+              >
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                Export
+              </button>
+              <button
+                class="btn btn-secondary btn-sm"
+                onclick="refreshLogs()"
+                id="refresh-btn"
+              >
+                <svg
+                  id="refresh-icon"
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <polyline points="23 4 23 10 17 10" />
+                  <polyline points="1 20 1 14 7 14" />
+                  <path
+                    d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"
+                  />
+                </svg>
+                Refresh
+              </button>
+            </div>
+          </div>
+
+          <!-- Filter Bar -->
+          <div class="filter-bar">
+            <div class="row g-2 align-items-center">
+              <div class="col-lg-3 col-md-12">
+                <div class="filter-search">
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    style="color: var(--color-text-tertiary); flex-shrink: 0"
+                  >
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                  <input
+                    type="text"
+                    id="search-input"
+                    placeholder="Search user, action, module, IP…"
+                    oninput="applyFilters()"
+                  />
+                </div>
+              </div>
+              <div class="col-lg col-md-4 col-sm-6">
+                <select
+                  class="filter-ctrl"
+                  id="filter-action"
+                  onchange="applyFilters()"
+                >
+                  <option value="">All Actions</option>
+                  <option value="login">Login</option>
+                  <option value="logout">Logout</option>
+                  <option value="view">View</option>
+                  <option value="update">Update</option>
+                  <option value="upload">Upload</option>
+                  <option value="generate">Generate</option>
+                  <option value="error">Failed</option>
+                </select>
+              </div>
+              <div class="col-lg col-md-4 col-sm-6">
+                <select
+                  class="filter-ctrl"
+                  id="filter-status"
+                  onchange="applyFilters()"
+                >
+                  <option value="">All Statuses</option>
+                  <option value="success">Success</option>
+                  <option value="error">Error</option>
+                </select>
+              </div>
+              <div class="col-lg col-md-4 col-sm-6">
+                <select
+                  class="filter-ctrl"
+                  id="filter-severity"
+                  onchange="applyFilters()"
+                >
+                  <option value="">All Severity</option>
+                  <option value="info">Info</option>
+                  <option value="warning">Warning</option>
+                  <option value="critical">Critical</option>
+                </select>
+              </div>
+              <div class="col-lg col-md-4 col-sm-6">
+                <select
+                  class="filter-ctrl"
+                  id="filter-module"
+                  onchange="applyFilters()"
+                >
+                  <option value="">All Modules</option>
+                </select>
+              </div>
+              <div class="col-lg col-md-4 col-sm-6">
+                <select
+                  class="filter-ctrl"
+                  id="filter-user"
+                  onchange="applyFilters()"
+                >
+                  <option value="">All Users</option>
+                </select>
+              </div>
+              <div class="col-lg col-md-4 col-sm-6">
+                <select
+                  class="filter-ctrl"
+                  id="filter-browser"
+                  onchange="applyFilters()"
+                >
+                  <option value="">All Browsers</option>
+                </select>
+              </div>
+              <div class="col-lg col-md-2 col-sm-6">
+                <input
+                  type="date"
+                  class="filter-ctrl"
+                  id="filter-date-from"
+                  onchange="applyFilters()"
+                  title="From date"
+                />
+              </div>
+              <div class="col-lg col-md-2 col-sm-6">
+                <input
+                  type="date"
+                  class="filter-ctrl"
+                  id="filter-date-to"
+                  onchange="applyFilters()"
+                  title="To date"
+                />
+              </div>
+              <div class="col-auto">
+                <button
+                  class="btn btn-secondary btn-sm"
+                  onclick="resetFilters()"
+                  style="white-space: nowrap"
+                >
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                  Reset
+                </button>
+              </div>
+            </div>
+            <div class="filter-results" id="filter-results"></div>
+          </div>
+
+          <!-- Activity Log Table -->
+          <div class="tcard mb-4">
+            <div class="thead-row">
+              <h3 class="thead-title">Activity Log Entries</h3>
+              <div
+                style="display: flex; align-items: center; gap: var(--space-sm)"
+              >
+                <label
+                  style="
+                    font-size: var(--font-size-xs);
+                    color: var(--color-text-secondary);
+                  "
+                  >Rows:</label
+                >
+                <select
+                  class="per-page-select"
+                  id="per-page-select"
+                  onchange="changePerPage(this.value)"
+                >
+                  <option value="10">10</option>
+                  <option value="25" selected>25</option>
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                </select>
+              </div>
+            </div>
+            <div class="twrap">
+              <table class="log-table table-sm">
+                <thead>
+                  <tr>
+                    <th style="width: 140px" onclick="sortTable('timestamp')">
+                      Timestamp<span
+                        class="sort-arrow active"
+                        id="sort-timestamp"
+                        >↓</span
+                      >
+                    </th>
+                    <th style="width: 130px" onclick="sortTable('user')">
+                      User<span class="sort-arrow" id="sort-user">↕</span>
+                    </th>
+                    <th style="width: 130px" onclick="sortTable('action')">
+                      Action<span class="sort-arrow" id="sort-action">↕</span>
+                    </th>
+                    <th
+                      class="d-hide-md"
+                      style="width: 120px"
+                      onclick="sortTable('module')"
+                    >
+                      Module<span class="sort-arrow" id="sort-module">↕</span>
+                    </th>
+                    <th class="d-hide-lg" onclick="sortTable('details')">
+                      Details<span class="sort-arrow" id="sort-details">↕</span>
+                    </th>
+                    <th style="width: 80px" onclick="sortTable('severity')">
+                      Severity<span class="sort-arrow" id="sort-severity"
+                        >↕</span
+                      >
+                    </th>
+                    <th style="width: 85px" onclick="sortTable('status')">
+                      Status<span class="sort-arrow" id="sort-status">↕</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody id="log-tbody"></tbody>
+              </table>
+            </div>
+            <div class="pagination-bar" id="pagination-bar"></div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- ── Detail Offcanvas ──────────────────────────────────────────── -->
+    <div
+      class="offcanvas offcanvas-end"
+      tabindex="-1"
+      id="detail-offcanvas"
+      aria-labelledby="oc-title-id"
+    >
+      <div class="offcanvas-header">
+        <div>
+          <div class="oc-title" id="oc-title-id">Log Entry Details</div>
+          <div class="oc-subtitle" id="oc-subtitle"></div>
+        </div>
+        <button class="oc-close" data-bs-dismiss="offcanvas" aria-label="Close">
+          ×
+        </button>
+      </div>
+      <div class="offcanvas-body" id="oc-body"></div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+    <script src="../../js/auth.js"></script>
+    <script src="../../js/data.js"></script>
+    <script src="../../js/utils.js"></script>
+    <script src="../../js/app.js"></script>
+    <script src="../../bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script>
+      if (!auth.requireFarmManager()) {
+        /* redirects */
+      }
+
+      /* ── Log data ──────────────────────────────────────────────── */
+      var EXTENDED_LOGS = [];
+
+      /* ── State ─────────────────────────────────────────────────── */
+      var allLogs = [];
+      var filteredLogs = [];
+      var currentPage = 1;
+      var perPage = 25;
+      var sortKey = "timestamp";
+      var sortDir = "desc";
+      var _offcanvas = null;
+
+      /* ── Init ──────────────────────────────────────────────────── */
+      window.initPage = async function () {
+        try {
+          console.log("📥 Loading activity logs from Firebase...");
+
+          // Fetch all activity logs from Firestore
+          const logsSnapshot = await firebase
+            .firestore()
+            .collection("activity_logs")
+            .orderBy("timestamp", "desc")
+            .limit(100)
+            .get();
+
+          EXTENDED_LOGS = [];
+          var idCounter = 1;
+
+          logsSnapshot.forEach(function (doc) {
+            const data = doc.data();
+
+            // Convert Firestore timestamp to ISO string
+            var timestamp = data.timestamp;
+            var timestampISO;
+            if (timestamp && timestamp.toDate) {
+              timestampISO = timestamp.toDate().toISOString();
+            } else if (timestamp) {
+              timestampISO = new Date(timestamp).toISOString();
+            } else {
+              timestampISO = new Date().toISOString();
+            }
+
+            // Map Firebase data to activity log format
+            EXTENDED_LOGS.push({
+              id: idCounter++,
+              timestamp: timestampISO,
+              user: data.user || "unknown",
+              role: data.role || "client",
+              action: data.action || "unknown",
+              module: getModuleFromAction(data.action),
+              details: getDetailsFromAction(data),
+              prev_value: data.prev_value || null,
+              new_value: data.new_value || null,
+              ip: data.ip || "—",
+              device: data.device || "Unknown",
+              severity: data.status === "error" ? "warning" : "info",
+              status: data.status || "success",
+            });
+          });
+
+          console.log(
+            "✅ Loaded " +
+              EXTENDED_LOGS.length +
+              " activity logs from Firebase",
+          );
+
+          allLogs = EXTENDED_LOGS.slice().sort(function (a, b) {
+            return new Date(b.timestamp) - new Date(a.timestamp);
+          });
+          filteredLogs = allLogs.slice();
+          updateTimestamp();
+          populateFilters();
+          applyURLParams();
+          renderTable();
+          _offcanvas = new bootstrap.Offcanvas(
+            document.getElementById("detail-offcanvas"),
+          );
+        } catch (error) {
+          console.error("❌ Error loading activity logs:", error);
+          allLogs = [];
+          filteredLogs = [];
+          updateTimestamp();
+          populateFilters();
+          renderTable();
+          _offcanvas = new bootstrap.Offcanvas(
+            document.getElementById("detail-offcanvas"),
+          );
+        }
+      };
+
+      // Helper function to determine module from action
+      function getModuleFromAction(action) {
+        if (
+          action === "login" ||
+          action === "login_failed" ||
+          action === "logout"
+        )
+          return "Authentication";
+        if (
+          action.startsWith("view_user") ||
+          action.startsWith("update_user") ||
+          action.startsWith("create_user")
+        )
+          return "User Management";
+        if (action.startsWith("view_dashboard")) return "Dashboard";
+        if (action.startsWith("view_blocks")) return "Blocks";
+        if (action.startsWith("view_scans")) return "Scan Operations";
+        if (action.startsWith("view_alerts")) return "Alerts";
+        if (action.startsWith("generate_report")) return "Reports";
+        if (action.startsWith("upload")) return "Scan Operations";
+        return "System";
+      }
+
+      // Helper function to generate details text
+      function getDetailsFromAction(data) {
+        if (data.action === "login") {
+          return "Successful login from " + (data.ip || "unknown IP");
+        }
+        if (data.action === "login_failed") {
+          return (
+            "Failed login attempt — " +
+            (data.errorCode || "invalid credentials")
+          );
+        }
+        if (data.action === "logout") {
+          return "Session ended normally";
+        }
+        if (data.action.startsWith("view_")) {
+          return (
+            "Accessed " +
+            data.action.replace("view_", "").replace(/_/g, " ") +
+            " page"
+          );
+        }
+        if (data.action.startsWith("update_user")) {
+          return "Updated user account";
+        }
+        return data.action.replace(/_/g, " ");
+      }
+
+      function updateTimestamp() {
+        var el = document.getElementById("last-updated");
+        if (el)
+          el.textContent =
+            "Updated " +
+            new Date().toLocaleTimeString("en-US", {
+              hour: "2-digit",
+              minute: "2-digit",
+            });
+      }
+
+      function applyURLParams() {
+        var params = new URLSearchParams(window.location.search);
+        var user = params.get("user");
+        if (user) {
+          var sel = document.getElementById("filter-user");
+          if (sel) sel.value = user;
+          applyFilters();
+          utils.showToast("Showing activity for " + user, "success");
+        }
+      }
+
+      /* ── Populate filter dropdowns ────────────────────────────── */
+      function populateFilters() {
+        var users = [
+          ...new Set(
+            allLogs.map(function (l) {
+              return l.user;
+            }),
+          ),
+        ].sort();
+        var userSel = document.getElementById("filter-user");
+        users.forEach(function (u) {
+          var o = document.createElement("option");
+          o.value = u;
+          o.textContent = u;
+          userSel.appendChild(o);
+        });
+        var modules = [
+          ...new Set(
+            allLogs.map(function (l) {
+              return l.module;
+            }),
+          ),
+        ].sort();
+        var modSel = document.getElementById("filter-module");
+        modules.forEach(function (m) {
+          var o = document.createElement("option");
+          o.value = m;
+          o.textContent = m;
+          modSel.appendChild(o);
+        });
+        var browsers = [
+          ...new Set(
+            allLogs.map(function (l) {
+              if (!l.device || l.device === "Unknown") return "Unknown";
+              return l.device.split(" ")[0];
+            }),
+          ),
+        ].sort();
+        var brwSel = document.getElementById("filter-browser");
+        browsers.forEach(function (b) {
+          var o = document.createElement("option");
+          o.value = b;
+          o.textContent = b;
+          brwSel.appendChild(o);
+        });
+      }
+
+      /* ── Filter & Sort ────────────────────────────────────────── */
+      function applyFilters() {
+        var search = (document.getElementById("search-input").value || "")
+          .toLowerCase()
+          .trim();
+        var status = document.getElementById("filter-status").value;
+        var action = document.getElementById("filter-action").value;
+        var severity = document.getElementById("filter-severity").value;
+        var module = document.getElementById("filter-module").value;
+        var user = document.getElementById("filter-user").value;
+        var browser = document.getElementById("filter-browser").value;
+        var dateFrom = document.getElementById("filter-date-from").value;
+        var dateTo = document.getElementById("filter-date-to").value;
+
+        filteredLogs = allLogs.filter(function (l) {
+          if (search) {
+            var hay = [
+              l.user,
+              l.action,
+              l.details,
+              l.ip,
+              l.role,
+              l.module,
+              l.device || "",
+            ]
+              .join(" ")
+              .toLowerCase();
+            if (hay.indexOf(search) === -1) return false;
+          }
+          if (status && l.status !== status) return false;
+          if (user && l.user !== user) return false;
+          if (severity && l.severity !== severity) return false;
+          if (module && l.module !== module) return false;
+          if (browser) {
+            var dev = l.device || "Unknown";
+            var devBrowser = dev === "Unknown" ? "Unknown" : dev.split(" ")[0];
+            if (devBrowser !== browser) return false;
+          }
+          if (action) {
+            if (action === "view" && !l.action.startsWith("view")) return false;
+            if (action === "update" && !l.action.startsWith("update"))
+              return false;
+            if (action === "generate" && !l.action.startsWith("generate"))
+              return false;
+            if (action === "error" && l.status !== "error") return false;
+            if (action === "login" && l.action !== "login") return false;
+            if (action === "logout" && l.action !== "logout") return false;
+            if (action === "upload" && !l.action.startsWith("upload"))
+              return false;
+          }
+          if (dateFrom && l.timestamp.slice(0, 10) < dateFrom) return false;
+          if (dateTo && l.timestamp.slice(0, 10) > dateTo) return false;
+          return true;
+        });
+
+        sortLogs();
+        currentPage = 1;
+        renderTable();
+      }
+
+      function resetFilters() {
+        [
+          "search-input",
+          "filter-status",
+          "filter-action",
+          "filter-severity",
+          "filter-module",
+          "filter-user",
+          "filter-browser",
+          "filter-date-from",
+          "filter-date-to",
+        ].forEach(function (id) {
+          var el = document.getElementById(id);
+          if (el) el.value = "";
+        });
+        filteredLogs = allLogs.slice();
+        currentPage = 1;
+        renderTable();
+      }
+
+      function sortTable(key) {
+        if (sortKey === key) {
+          sortDir = sortDir === "asc" ? "desc" : "asc";
+        } else {
+          sortKey = key;
+          sortDir = key === "timestamp" ? "desc" : "asc";
+        }
+        var keys = [
+          "timestamp",
+          "user",
+          "action",
+          "module",
+          "details",
+          "severity",
+          "status",
+        ];
+        keys.forEach(function (k) {
+          var el = document.getElementById("sort-" + k);
+          if (el) {
+            el.textContent = "↕";
+            el.classList.remove("active");
+          }
+        });
+        var active = document.getElementById("sort-" + key);
+        if (active) {
+          active.textContent = sortDir === "asc" ? "↑" : "↓";
+          active.classList.add("active");
+        }
+        sortLogs();
+        renderTable();
+      }
+
+      function sortLogs() {
+        filteredLogs.sort(function (a, b) {
+          var av = a[sortKey] || "",
+            bv = b[sortKey] || "";
+          if (sortKey === "timestamp") {
+            av = new Date(av);
+            bv = new Date(bv);
+          }
+          if (sortKey === "id") {
+            av = +av;
+            bv = +bv;
+          }
+          if (av < bv) return sortDir === "asc" ? -1 : 1;
+          if (av > bv) return sortDir === "asc" ? 1 : -1;
+          return 0;
+        });
+      }
+
+      /* ── Render Table ──────────────────────────────────────────── */
+      function renderTable() {
+        var start = (currentPage - 1) * perPage,
+          end = start + perPage;
+        var page = filteredLogs.slice(start, end);
+        var tbody = document.getElementById("log-tbody");
+
+        document.getElementById("filter-results").textContent =
+          "Showing " +
+          (filteredLogs.length === 0 ? 0 : start + 1) +
+          "–" +
+          Math.min(end, filteredLogs.length) +
+          " of " +
+          filteredLogs.length +
+          " entries" +
+          (filteredLogs.length < allLogs.length
+            ? " (filtered from " + allLogs.length + " total)"
+            : "");
+
+        if (!page.length) {
+          tbody.innerHTML =
+            '<tr class="empty-rows"><td colspan="7">' +
+            '<div style="display:flex;flex-direction:column;align-items:center;gap:var(--space-sm);">' +
+            '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-text-tertiary);"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>' +
+            '<span style="font-weight:var(--font-weight-medium);">No matching entries</span>' +
+            '<span style="font-size:var(--font-size-xs);">Try adjusting your filters</span>' +
+            "</div></td></tr>";
+          renderPagination();
+          return;
+        }
+
+        var html = "";
+        page.forEach(function (log) {
+          var ts = new Date(log.timestamp);
+          var timeStr = ts.toLocaleString("en-US", {
+            month: "short",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+          });
+          var initials = log.user.substring(0, 2).toUpperCase();
+          var isAdmin = log.role === "admin",
+            isError = log.status === "error";
+          var avCls = isError ? "ae" : isAdmin ? "aa" : "ac";
+          var actionCls = getActionClass(log.action, log.status);
+          var actionLbl = getActionLabel(log.action);
+          var sevBadge =
+            '<span class="sev sev-' +
+            log.severity +
+            '">' +
+            log.severity +
+            "</span>";
+          var statusBadge =
+            log.status === "success"
+              ? '<span class="badge good"><span class="bdot"></span>OK</span>'
+              : '<span class="badge crit"><span class="bdot"></span>Err</span>';
+
+          html +=
+            '<tr class="log-row" onclick="openDetail(' +
+            log.id +
+            ')" title="Click to view details">' +
+            '<td style="font-family:var(--font-mono);font-size:11px;white-space:nowrap;">' +
+            timeStr +
+            "</td>" +
+            '<td><div class="user-cell"><div class="log-avatar ' +
+            avCls +
+            '">' +
+            initials +
+            '</div><span class="user-cell-name">' +
+            log.user +
+            "</span></div></td>" +
+            '<td><span class="action-pill ' +
+            actionCls +
+            '">' +
+            actionLbl +
+            "</span></td>" +
+            '<td class="d-hide-md"><span class="module-tag">' +
+            log.module +
+            "</span></td>" +
+            '<td class="d-hide-lg" style="font-size:var(--font-size-xs);color:var(--color-text-secondary);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' +
+            log.details +
+            '">' +
+            log.details +
+            "</td>" +
+            "<td>" +
+            sevBadge +
+            "</td>" +
+            "<td>" +
+            statusBadge +
+            "</td>" +
+            "</tr>";
+        });
+        tbody.innerHTML = html;
+        renderPagination();
+      }
+
+      /* ── Pagination ────────────────────────────────────────────── */
+      function renderPagination() {
+        var totalPages = Math.max(1, Math.ceil(filteredLogs.length / perPage));
+        var bar = document.getElementById("pagination-bar");
+        var from =
+          filteredLogs.length === 0 ? 0 : (currentPage - 1) * perPage + 1;
+        var to = Math.min(currentPage * perPage, filteredLogs.length);
+        var range = getPagRange(currentPage, totalPages);
+        var pagesHtml = "";
+        range.forEach(function (p) {
+          if (p === "…") {
+            pagesHtml +=
+              '<span class="pag-btn" style="cursor:default;border:none;">…</span>';
+          } else {
+            pagesHtml +=
+              '<button class="pag-btn' +
+              (p === currentPage ? " active" : "") +
+              '" onclick="goPage(' +
+              p +
+              ')">' +
+              p +
+              "</button>";
+          }
+        });
+        bar.innerHTML =
+          '<div class="pag-info">Showing ' +
+          from +
+          "–" +
+          to +
+          " of " +
+          filteredLogs.length +
+          "</div>" +
+          '<div class="pag-btns">' +
+          '<button class="pag-btn" onclick="goPage(' +
+          (currentPage - 1) +
+          ')" ' +
+          (currentPage <= 1 ? "disabled" : "") +
+          ">‹</button>" +
+          pagesHtml +
+          '<button class="pag-btn" onclick="goPage(' +
+          (currentPage + 1) +
+          ')" ' +
+          (currentPage >= totalPages ? "disabled" : "") +
+          ">›</button>" +
+          "</div>";
+      }
+
+      function getPagRange(cur, total) {
+        if (total <= 7) {
+          var o = [];
+          for (var i = 1; i <= total; i++) o.push(i);
+          return o;
+        }
+        var r = [1];
+        if (cur > 3) r.push("…");
+        for (
+          var p = Math.max(2, cur - 1);
+          p <= Math.min(total - 1, cur + 1);
+          p++
+        )
+          r.push(p);
+        if (cur < total - 2) r.push("…");
+        r.push(total);
+        return r;
+      }
+
+      function goPage(p) {
+        var total = Math.ceil(filteredLogs.length / perPage);
+        if (p < 1 || p > total) return;
+        currentPage = p;
+        renderTable();
+        document
+          .querySelector(".tcard")
+          .scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+
+      function changePerPage(val) {
+        perPage = parseInt(val, 10);
+        currentPage = 1;
+        renderTable();
+      }
+
+      /* ── Action helpers ────────────────────────────────────────── */
+      function getActionClass(action, status) {
+        if (status === "error" || action === "login_failed")
+          return "action-error";
+        if (action === "login") return "action-login";
+        if (action === "logout") return "action-logout";
+        if (action.startsWith("view")) return "action-view";
+        if (
+          action.startsWith("update") ||
+          action.startsWith("create") ||
+          action.startsWith("delete")
+        )
+          return "action-update";
+        if (action.startsWith("upload")) return "action-upload";
+        if (action.startsWith("generate")) return "action-generate";
+        return "action-view";
+      }
+
+      function getActionLabel(action) {
+        var map = {
+          login: "→ Login",
+          logout: "← Logout",
+          login_failed: "✕ Failed Login",
+          view_dashboard: "👁 Dashboard",
+          view_users: "👁 Users",
+          view_blocks: "👁 Blocks",
+          view_scan: "👁 Scan",
+          view_alerts: "👁 Alerts",
+          update_user: "✎ Update User",
+          create_user: "+ Create User",
+          upload_scan: "↑ Upload Scan",
+          generate_report: "⊞ Report",
+        };
+        return map[action] || action.replace(/_/g, " ");
+      }
+
+      /* ── Detail Offcanvas ──────────────────────────────────────── */
+      function openDetail(id) {
+        var log = allLogs.find(function (l) {
+          return l.id === id;
+        });
+        if (!log) return;
+
+        var ts = new Date(log.timestamp);
+        var timeStr = ts.toLocaleString("en-US", {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: true,
+        });
+        var isInternal =
+          (log.ip || "").startsWith("192.168") ||
+          (log.ip || "").startsWith("10.") ||
+          (log.ip || "").startsWith("172.");
+
+        document.getElementById("oc-title-id").textContent =
+          "Log Entry #" + String(log.id).padStart(2, "0");
+        document.getElementById("oc-subtitle").textContent =
+          getActionLabel(log.action) + " · " + log.user;
+
+        var statusHtml =
+          log.status === "success"
+            ? '<span class="badge good"><span class="bdot"></span>Success</span>'
+            : '<span class="badge crit"><span class="bdot"></span>Error</span>';
+        var sevHtml =
+          '<span class="sev sev-' +
+          log.severity +
+          '">' +
+          log.severity +
+          "</span>";
+        var ipHtml =
+          '<span class="det-mono" style="' +
+          (isInternal ? "" : "color:var(--red);") +
+          '">' +
+          (log.ip || "—") +
+          "</span>" +
+          ' <span style="font-size:10px;color:' +
+          (isInternal ? "var(--green)" : "var(--red)") +
+          ';">' +
+          (isInternal ? "(Internal)" : "(External)") +
+          "</span>";
+
+        var body =
+          '<div class="det-section">Event Information</div>' +
+          detRow(
+            "Log ID",
+            '<span class="det-mono">#' +
+              String(log.id).padStart(2, "0") +
+              "</span>",
+          ) +
+          detRow(
+            "Timestamp",
+            '<span class="det-mono" style="font-size:12px;">' +
+              timeStr +
+              "</span>",
+          ) +
+          detRow("Status", statusHtml) +
+          detRow("Severity", sevHtml) +
+          detRow(
+            "Action",
+            '<span class="action-pill ' +
+              getActionClass(log.action, log.status) +
+              '">' +
+              getActionLabel(log.action) +
+              "</span>",
+          ) +
+          detRow(
+            "Module",
+            '<span class="module-tag">' + log.module + "</span>",
+          ) +
+          detRow(
+            "Details",
+            '<span style="font-size:var(--font-size-sm);text-align:right;">' +
+              log.details +
+              "</span>",
+          ) +
+          '<div class="det-section">User &amp; Session</div>' +
+          detRow("Username", "<strong>" + log.user + "</strong>") +
+          detRow(
+            "Role",
+            log.role === "admin"
+              ? '<span style="color:var(--amber);font-weight:var(--font-weight-medium);">Administrator</span>'
+              : log.user === "unknown"
+                ? '<span style="color:var(--red);">Unknown / Unauthenticated</span>'
+                : "Client",
+          ) +
+          detRow("IP Address", ipHtml) +
+          detRow(
+            "Network",
+            isInternal
+              ? "Internal LAN"
+              : '<span style="color:var(--red);">External / Public</span>',
+          ) +
+          detRow(
+            "Device",
+            '<span style="font-size:var(--font-size-sm);">' +
+              (log.device || "—") +
+              "</span>",
+          );
+
+        if (log.prev_value || log.new_value) {
+          body +=
+            '<div class="det-section">Data Changes</div>' +
+            '<div class="value-change-box">' +
+            (log.prev_value
+              ? '<div class="value-change-row"><span class="value-change-lbl">Before</span><span class="value-prev">' +
+                log.prev_value +
+                "</span></div>"
+              : "") +
+            (log.new_value
+              ? '<div class="value-change-row"><span class="value-change-lbl">After</span><span class="value-new">' +
+                log.new_value +
+                "</span></div>"
+              : "") +
+            "</div>";
+        }
+
+        if (log.status === "error") {
+          body +=
+            '<div class="security-notice">' +
+            (isInternal
+              ? "Failed authentication from an internal network address. Verify that credentials are not being shared or stored insecurely."
+              : "Failed authentication from an external IP address. Monitor this IP for repeated attempts and consider blocking if necessary.") +
+            "</div>";
+        }
+
+        document.getElementById("oc-body").innerHTML = body;
+        _offcanvas.show();
+      }
+
+      function detRow(label, valueHtml) {
+        return (
+          '<div class="det-row"><div class="det-label">' +
+          label +
+          '</div><div class="det-value">' +
+          valueHtml +
+          "</div></div>"
+        );
+      }
+
+      /* ── Export CSV ────────────────────────────────────────────── */
+      function exportCSV() {
+        var rows = [
+          [
+            "ID",
+            "Timestamp",
+            "User",
+            "Role",
+            "Action",
+            "Module",
+            "Details",
+            "Prev Value",
+            "New Value",
+            "IP Address",
+            "Device",
+            "Severity",
+            "Status",
+          ],
+        ];
+        filteredLogs.forEach(function (l) {
+          rows.push([
+            l.id,
+            new Date(l.timestamp).toLocaleString("en-US"),
+            l.user,
+            l.role,
+            l.action,
+            l.module,
+            '"' + (l.details || "").replace(/"/g, '""') + '"',
+            l.prev_value || "",
+            l.new_value || "",
+            l.ip || "",
+            l.device || "",
+            l.severity,
+            l.status,
+          ]);
+        });
+        var csv = rows
+          .map(function (r) {
+            return r.join(",");
+          })
+          .join("\n");
+        var blob = new Blob([csv], { type: "text/csv" });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url;
+        a.download =
+          "pinewatch-activity-" +
+          new Date().toISOString().slice(0, 10) +
+          ".csv";
+        a.click();
+        URL.revokeObjectURL(url);
+        utils.showToast(
+          "Exported " + filteredLogs.length + " log entries",
+          "success",
+        );
+      }
+
+      /* ── Refresh ───────────────────────────────────────────────── */
+      function refreshLogs() {
+        var btn = document.getElementById("refresh-btn"),
+          icon = document.getElementById("refresh-icon");
+        btn.disabled = true;
+        icon.classList.add("spinning");
+        setTimeout(function () {
+          window.initPage();
+          btn.disabled = false;
+          icon.classList.remove("spinning");
+          utils.showToast("Activity log refreshed", "success");
+        }, 600);
+      }
+
+      function openLogoutModal() { auth.confirmLogout(); }
+      function closeLogoutModal() {
+        document.getElementById("logout-modal").style.display = "none";
+      }
+    </script>
+    <!-- Logout Confirmation Modal -->
+    <div
+      id="logout-modal"
+      style="
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: none;
+        align-items: center;
+        justify-content: center;
+      "
+    >
+      <!-- Backdrop -->
+      <div
+        onclick="closeLogoutModal()"
+        style="
+          position: absolute;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.45);
+          backdrop-filter: blur(2px);
+        "
+      ></div>
+      <!-- Dialog -->
+      <div
+        style="
+          position: relative;
+          background: var(--color-background-primary);
+          border: 1px solid var(--color-border-secondary);
+          border-radius: var(--radius-lg);
+          padding: var(--space-2xl);
+          width: 360px;
+          max-width: 90vw;
+          box-shadow: var(--shadow-md);
+          text-align: center;
+        "
+      >
+        <div
+          style="
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--red-bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto var(--space-lg);
+          "
+        >
+          <svg
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="var(--red)"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+        </div>
+        <h3
+          style="
+            font-size: var(--font-size-lg);
+            font-weight: var(--font-weight-semibold);
+            color: var(--color-text-primary);
+            margin-bottom: var(--space-sm);
+          "
+        >
+          Confirm Logout
+        </h3>
+        <p
+          style="
+            font-size: var(--font-size-sm);
+            color: var(--color-text-secondary);
+            margin-bottom: var(--space-xl);
+          "
+        >
+          Are you sure you want to log out of your session?
+        </p>
+        <div
+          style="display: flex; gap: var(--space-md); justify-content: center"
+        >
+          <button
+            onclick="closeLogoutModal()"
+            class="btn btn-secondary"
+            style="flex: 1"
+          >
+            Cancel
+          </button>
+          <button
+            onclick="auth.logout()"
+            class="btn btn-danger"
+            style="
+              flex: 1;
+              background: var(--red-mid);
+              color: #fff;
+              border-color: var(--red-mid);
+            "
+          >
+            Yes, Logout
+          </button>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

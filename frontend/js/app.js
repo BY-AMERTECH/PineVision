@@ -153,6 +153,12 @@ const app = (function() {
     // USER INFO DISPLAY
     // ========================================
 
+    const ROLE_LABELS = {
+        'admin': 'Super Admin',
+        'farm_manager': 'Farm Manager',
+        'client': 'User'
+    };
+
     /**
      * Initialize user info in sidebar
      */
@@ -166,10 +172,10 @@ const app = (function() {
             el.textContent = session.fullName || session.username;
         });
 
-        // Update user role
+        // Update user role — show display label, not raw Firestore value
         const userRoleElements = document.querySelectorAll('.sidebar-user-role');
         userRoleElements.forEach(el => {
-            el.textContent = session.role;
+            el.textContent = ROLE_LABELS[session.role] || session.role;
         });
 
         // Update user avatar

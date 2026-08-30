@@ -1,0 +1,1533 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+    <link rel="dns-prefetch" href="https://firestore.googleapis.com">
+    <link rel="dns-prefetch" href="https://identitytoolkit.googleapis.com">
+    <script>
+      (function () {
+        try {
+          var s = JSON.parse(
+            localStorage.getItem("pinevision_settings") || "{}",
+          );
+          if (s.theme === "dark")
+            document.documentElement.classList.add("dark-mode");
+        } catch (e) {}
+      })();
+    </script>
+    <title>Account Alerts - PineVision</title>
+    <link rel="stylesheet" href="../../bootstrap/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="../../css/tokens.css" />
+    <link rel="stylesheet" href="../../css/layout.css" />
+    <link rel="stylesheet" href="../../css/components.css" />
+    <style>
+      /* ── Page Header ─────────────────────────────────────────────── */
+      .ph {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        flex-wrap: wrap;
+        gap: var(--space-md);
+        margin-bottom: var(--space-2xl);
+      }
+      @media (max-width: 768px) {
+        .ph {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+      }
+
+      /* ── Metric Cards Grid ───────────────────────────────────────── */
+      .al-metrics {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: var(--grid-gap);
+        margin-bottom: var(--space-xl);
+      }
+      @media (max-width: 960px) {
+        .al-metrics {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+      @media (max-width: 480px) {
+        .al-metrics {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+      .mc {
+        transition:
+          box-shadow var(--transition-fast),
+          transform var(--transition-fast);
+        cursor: default;
+      }
+      .mc:hover {
+        box-shadow: var(--shadow-md);
+        transform: translateY(-2px);
+      }
+      .mc-icon-box {
+        width: 32px;
+        height: 32px;
+        border-radius: var(--radius-sm);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: var(--space-sm);
+      }
+
+      /* ── Filter Bar ──────────────────────────────────────────────── */
+      .filter-bar {
+        display: flex;
+        align-items: center;
+        gap: var(--space-md);
+        padding: var(--space-md) var(--space-lg);
+        background: var(--surf);
+        border: 1px solid var(--color-border-secondary);
+        border-radius: var(--radius-lg);
+        margin-bottom: var(--space-xl);
+        flex-wrap: wrap;
+        box-shadow: var(--shadow-sm);
+      }
+      .filter-pill {
+        padding: 5px var(--space-md);
+        border-radius: var(--radius-pill);
+        font-size: var(--font-size-sm);
+        font-weight: var(--font-weight-medium);
+        border: 1px solid var(--color-border-secondary);
+        background: var(--surf2);
+        color: var(--color-text-secondary);
+        cursor: pointer;
+        transition: all var(--transition-fast);
+      }
+      .filter-pill:hover {
+        border-color: var(--green);
+        color: var(--green);
+        background: var(--green-bg);
+      }
+      .filter-pill.active {
+        background: var(--green);
+        border-color: var(--green);
+        color: #fff;
+      }
+      .filter-pill.active-crit {
+        background: var(--red-bg);
+        border-color: rgba(139, 32, 32, 0.3);
+        color: var(--red);
+      }
+      .filter-pill.active-warn {
+        background: var(--amber-bg);
+        border-color: rgba(140, 92, 0, 0.3);
+        color: var(--amber);
+      }
+      .filter-divider {
+        width: 1px;
+        height: 22px;
+        background: var(--color-border-secondary);
+        flex-shrink: 0;
+      }
+      .filter-select {
+        padding: 4px 8px;
+        border-radius: var(--radius-sm);
+        font-size: var(--font-size-sm);
+        border: 1px solid var(--color-border-secondary);
+        background: var(--surf2);
+        color: var(--color-text-primary);
+        cursor: pointer;
+        font-family: var(--font-sans);
+        outline: none;
+      }
+      .filter-select:focus {
+        border-color: var(--green);
+      }
+      .filter-input {
+        padding: 4px 10px;
+        border-radius: var(--radius-sm);
+        font-size: var(--font-size-sm);
+        border: 1px solid var(--color-border-secondary);
+        background: var(--surf2);
+        color: var(--color-text-primary);
+        font-family: var(--font-sans);
+        outline: none;
+        width: 140px;
+      }
+      .filter-input:focus {
+        border-color: var(--green);
+      }
+      .filter-input::placeholder {
+        color: var(--color-text-tertiary);
+      }
+
+      /* ── Alert Type Tag ──────────────────────────────────────────── */
+      .type-tag {
+        display: inline-block;
+        padding: 2px 7px;
+        border-radius: var(--radius-sm);
+        font-size: 10px;
+        font-weight: var(--font-weight-medium);
+        background: var(--color-background-tertiary);
+        color: var(--color-text-secondary);
+        white-space: nowrap;
+        margin-top: 3px;
+      }
+
+      /* ── User Cell ───────────────────────────────────────────────── */
+      .log-avatar {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        font-weight: var(--font-weight-semibold);
+        text-transform: uppercase;
+        flex-shrink: 0;
+      }
+      .log-avatar.aa {
+        background: var(--yellow-bg);
+        color: var(--yellow);
+      }
+      .log-avatar.ac {
+        background: var(--green-bg);
+        color: var(--green);
+      }
+      .log-avatar.ae {
+        background: var(--red-bg);
+        color: var(--red);
+      }
+      .user-cell {
+        display: flex;
+        align-items: center;
+        gap: var(--space-sm);
+      }
+      .user-cell-name {
+        font-weight: var(--font-weight-medium);
+        font-size: var(--font-size-sm);
+        line-height: 1.2;
+        white-space: nowrap;
+      }
+
+      /* ── Alert Table Row ─────────────────────────────────────────── */
+      .alert-row {
+        cursor: pointer;
+      }
+      .alert-row:hover td {
+        background: var(--green-bg) !important;
+      }
+
+      /* ── Inline Row Action Buttons ───────────────────────────────── */
+      .row-action-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        padding: 3px 9px;
+        font-size: 11px;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--color-border-secondary);
+        background: transparent;
+        color: var(--color-text-secondary);
+        cursor: pointer;
+        transition: all var(--transition-fast);
+        font-family: var(--font-sans);
+        white-space: nowrap;
+      }
+      .row-action-btn:hover {
+        border-color: var(--green);
+        color: var(--green);
+        background: var(--green-bg);
+      }
+      .row-action-btn.btn-resolve:hover {
+        border-color: var(--amber);
+        color: var(--amber);
+        background: var(--amber-bg);
+      }
+
+      /* ── Detail Offcanvas ────────────────────────────────────────── */
+      #detail-offcanvas {
+        --bs-offcanvas-width: min(500px, 96vw);
+        background: var(--color-background-primary) !important;
+        border-left: 1px solid var(--color-border-secondary) !important;
+        color: var(--color-text-primary);
+      }
+      .offcanvas-header {
+        padding: var(--space-xl);
+        border-bottom: 1px solid var(--color-border-secondary);
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+      }
+      .offcanvas-body {
+        padding: var(--space-xl);
+        overflow-y: auto;
+      }
+      .oc-title {
+        font-size: var(--font-size-lg);
+        font-weight: var(--font-weight-semibold);
+        color: var(--color-text-primary);
+      }
+      .oc-subtitle {
+        font-size: var(--font-size-sm);
+        color: var(--color-text-secondary);
+        margin-top: 2px;
+      }
+      .oc-close {
+        width: 30px;
+        height: 30px;
+        border-radius: var(--radius-sm);
+        background: var(--color-background-secondary);
+        border: 1px solid var(--color-border-secondary);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--color-text-secondary);
+        font-size: 18px;
+        line-height: 1;
+        transition: all var(--transition-fast);
+        flex-shrink: 0;
+      }
+      .oc-close:hover {
+        background: var(--color-background-tertiary);
+        color: var(--color-text-primary);
+      }
+      .det-section {
+        font-size: 11px;
+        font-weight: var(--font-weight-semibold);
+        color: var(--color-text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        margin: var(--space-xl) 0 var(--space-md);
+      }
+      .det-section:first-child {
+        margin-top: 0;
+      }
+      .det-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        padding: 8px 0;
+        border-bottom: 1px solid var(--color-border-secondary);
+        gap: var(--space-md);
+      }
+      .det-row:last-child {
+        border-bottom: none;
+      }
+      .det-label {
+        font-size: var(--font-size-xs);
+        color: var(--color-text-secondary);
+        flex-shrink: 0;
+        min-width: 110px;
+      }
+      .det-value {
+        font-size: var(--font-size-sm);
+        color: var(--color-text-primary);
+        font-weight: var(--font-weight-medium);
+        text-align: right;
+        word-break: break-all;
+      }
+      .det-mono {
+        font-family: var(--font-mono);
+      }
+      .security-notice {
+        background: var(--red-bg);
+        border: 1px solid rgba(139, 32, 32, 0.2);
+        border-radius: var(--radius-md);
+        padding: var(--space-md);
+        font-size: var(--font-size-xs);
+        color: var(--red);
+        line-height: 1.5;
+        margin-top: var(--space-lg);
+      }
+      .oc-actions {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-sm);
+      }
+      .oc-action-btn {
+        display: flex;
+        align-items: center;
+        gap: var(--space-sm);
+        padding: var(--space-sm) var(--space-md);
+        border-radius: var(--radius-md);
+        font-size: var(--font-size-sm);
+        font-weight: var(--font-weight-medium);
+        border: 1px solid var(--color-border-secondary);
+        background: var(--color-background-secondary);
+        color: var(--color-text-primary);
+        cursor: pointer;
+        transition: all var(--transition-fast);
+        font-family: var(--font-sans);
+        text-align: left;
+        width: 100%;
+      }
+      .oc-action-btn:hover {
+        background: var(--color-background-tertiary);
+        border-color: var(--color-border-primary);
+      }
+      .oc-action-btn.oc-danger:hover {
+        border-color: var(--red);
+        color: var(--red);
+        background: var(--red-bg);
+      }
+      .oc-action-btn.oc-success:hover {
+        border-color: var(--green);
+        color: var(--green);
+        background: var(--green-bg);
+      }
+      .oc-action-btn.oc-amber:hover {
+        border-color: var(--amber);
+        color: var(--amber);
+        background: var(--amber-bg);
+      }
+
+      /* ── Responsive Column Visibility ────────────────────────────── */
+      @media (max-width: 1280px) {
+        .d-hide-xl {
+          display: none !important;
+        }
+      }
+      @media (max-width: 992px) {
+        .d-hide-lg {
+          display: none !important;
+        }
+      }
+      @media (max-width: 768px) {
+        .d-hide-md {
+          display: none !important;
+        }
+      }
+      @media (max-width: 576px) {
+        .d-hide-sm {
+          display: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-wrapper">
+      <!-- ── Sidebar ───────────────────────────────────────────────────── -->
+      <aside class="sidebar">
+        <div class="sidebar-brand">
+          <div class="sidebar-logo">
+            <img
+              src="/frontend/assets/images/pinevision-logo.svg"
+              alt="PineVision"
+              class="sidebar-logo-img"
+            />
+          </div>
+          <div class="sidebar-brand-text">
+            <div class="sidebar-brand-name">PineVision</div>
+            <div class="sidebar-brand-tagline">Farm Manager Panel</div>
+          </div>
+        </div>
+
+        <button
+          class="sidebar-collapse-btn"
+          onclick="app.toggleSidebar()"
+          aria-label="Toggle sidebar"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <polyline points="15,18 9,12 15,6" />
+          </svg>
+          <span class="nav-link-text">Collapse sidebar</span>
+        </button>
+
+        <nav class="sidebar-nav">
+          <div class="nav-section">
+            <div class="nav-section-title">Main</div>
+            <ul class="nav-links">
+              <li>
+                <a
+                  href="dashboard.html"
+                  class="nav-link"
+                  data-tooltip="Dashboard"
+                >
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-dashboard.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Dashboard</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div class="nav-section">
+            <div class="nav-section-title">Monitoring</div>
+            <ul class="nav-links">
+              <li>
+                <a href="users.html" class="nav-link" data-tooltip="Users">
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-users.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Users</span>
+                </a>
+              </li>
+              <li>
+                <a
+                  href="auditlogs.html"
+                  class="nav-link"
+                  data-tooltip="Audit Logs"
+                >
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-clipboard.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Audit Logs</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div class="nav-section">
+            <div class="nav-section-title">Operations</div>
+            <ul class="nav-links">
+              <li>
+                <a
+                  href="flights-scans.html"
+                  class="nav-link"
+                  data-tooltip="Flights &amp; Scans"
+                >
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-flights.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Flights &amp; Scans</span>
+                </a>
+              </li>
+              <li>
+                <a
+                  href="alerts.html"
+                  class="nav-link active"
+                  data-tooltip="Alerts"
+                >
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-bell.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Alerts</span>
+                  <span
+                    class="nav-badge"
+                    id="nav-badge-alerts"
+                    style="display: none"
+                  ></span>
+                </a>
+              </li>
+              <li>
+                <a href="reports.html" class="nav-link" data-tooltip="Reports">
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-reports.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Reports</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div class="nav-section">
+            <div class="nav-section-title">System</div>
+            <ul class="nav-links">
+              <li>
+                <a
+                  href="settings.html"
+                  class="nav-link"
+                  data-tooltip="Settings"
+                >
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-cog.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Settings</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div class="sidebar-user">
+            <div class="sidebar-user-avatar">A</div>
+            <div class="sidebar-user-info">
+              <div class="sidebar-user-name">Admin</div>
+              <div class="sidebar-user-role">admin</div>
+            </div>
+          </div>
+          <button class="btn-logout" onclick="openLogoutModal()">
+            <img src="/frontend/assets/icons/logout.svg" alt="" width="16" />
+            <span class="logout-text">Logout</span>
+          </button>
+        </div>
+      </aside>
+
+      <!-- ── Main Content ───────────────────────────────────────────────── -->
+      <main class="main-content">
+        <div
+          class="page-container"
+          style="
+            padding: var(--page-padding);
+            max-width: var(--page-max-width);
+            margin: 0 auto;
+          "
+        >
+          <!-- Page Header -->
+          <div class="ph">
+            <div>
+              <h1 class="page-title d-flex align-items-center gap-2">
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  style="color: var(--green); flex-shrink: 0"
+                >
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0" /></svg
+                >Account Alerts
+              </h1>
+              <p class="page-subtitle">
+                Security notifications and user access events across all
+                platform accounts
+              </p>
+            </div>
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                gap: var(--space-md);
+                flex-wrap: wrap;
+              "
+            >
+              <span
+                id="last-updated"
+                style="
+                  font-size: 11px;
+                  color: var(--color-text-tertiary);
+                  font-family: var(--font-mono);
+                "
+              ></span>
+              <button
+                class="btn btn-secondary btn-sm"
+                onclick="refreshAlerts()"
+                id="refresh-btn"
+              >
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <polyline points="23 4 23 10 17 10" />
+                  <polyline points="1 20 1 14 7 14" />
+                  <path
+                    d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"
+                  />
+                </svg>
+                Refresh
+              </button>
+            </div>
+          </div>
+
+          <!-- Primary Metric Cards -->
+          <div class="al-metrics" id="alert-metrics"></div>
+
+          <!-- Secondary Stats Row -->
+          <div class="row g-3 mb-4" id="secondary-stats"></div>
+
+          <!-- Filter Bar -->
+          <div class="filter-bar" id="filter-bar">
+            <span
+              style="
+                font-size: var(--font-size-sm);
+                font-weight: var(--font-weight-medium);
+                color: var(--muted);
+              "
+              >Severity:</span
+            >
+            <button
+              class="filter-pill active"
+              onclick="setSeverityFilter('all', this)"
+            >
+              All
+            </button>
+            <button
+              class="filter-pill"
+              onclick="setSeverityFilter('crit', this)"
+            >
+              Critical
+            </button>
+            <button
+              class="filter-pill"
+              onclick="setSeverityFilter('warn', this)"
+            >
+              Warning
+            </button>
+            <button
+              class="filter-pill"
+              onclick="setSeverityFilter('resolved', this)"
+            >
+              Resolved
+            </button>
+            <div class="filter-divider"></div>
+            <select
+              class="filter-select"
+              id="type-filter"
+              onchange="applyFilters()"
+              aria-label="Filter by type"
+            >
+              <option value="">All Types</option>
+              <option value="failed_login">Failed Login</option>
+              <option value="suspicious_login">Suspicious Login</option>
+              <option value="unauthorized_access">Unauthorized Access</option>
+              <option value="account_lockout">Account Lockout</option>
+              <option value="password_change">Password Change</option>
+              <option value="role_change">Role / Permission Change</option>
+              <option value="multi_device">Multi-Device Session</option>
+              <option value="session_expiry">Session Warning</option>
+              <option value="api_error">API / Auth Error</option>
+              <option value="account_registration">New Registration</option>
+            </select>
+            <input
+              class="filter-input"
+              id="user-filter"
+              type="text"
+              placeholder="Search user…"
+              oninput="applyFilters()"
+              aria-label="Filter by user"
+            />
+            <span
+              id="alert-count-label"
+              style="
+                margin-left: auto;
+                font-size: 11px;
+                color: var(--muted);
+                font-family: var(--font-mono);
+              "
+            ></span>
+          </div>
+
+          <!-- Alerts Table -->
+          <div id="alerts-content"></div>
+        </div>
+      </main>
+
+      <!-- ── Detail Offcanvas ───────────────────────────────────────────── -->
+      <div
+        class="offcanvas offcanvas-end"
+        tabindex="-1"
+        id="detail-offcanvas"
+        aria-labelledby="oc-title"
+      >
+        <div class="offcanvas-header">
+          <div>
+            <div class="oc-title" id="oc-title">Alert Detail</div>
+            <div class="oc-subtitle" id="oc-subtitle"></div>
+          </div>
+          <button
+            class="oc-close"
+            data-bs-dismiss="offcanvas"
+            aria-label="Close"
+          >
+            &#215;
+          </button>
+        </div>
+        <div class="offcanvas-body" id="oc-body"></div>
+      </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+    <script src="../../bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="../../js/auth.js"></script>
+    <script src="../../js/data.js"></script>
+    <script src="../../js/utils.js"></script>
+    <script src="../../js/app.js"></script>
+    <script>
+      if (!auth.requireFarmManager()) {
+      }
+
+      /* ── Firebase Setup ─────────────────────────────────────────────────── */
+      const firebaseConfig = {
+        apiKey: "AIzaSyBQT2B0OHvBeoDgEWGt9dnMfpeu_D1T34c",
+        authDomain: "pinevision-632aa.firebaseapp.com",
+        projectId: "pinevision-632aa",
+        storageBucket: "pinevision-632aa.firebasestorage.app",
+        messagingSenderId: "409081336673",
+        appId: "1:409081336673:web:bf1ae3924437753f60eb20",
+      };
+      if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+      const db = firebase.firestore();
+
+      /* ── Live Data ──────────────────────────────────────────────────────── */
+      var ACCOUNT_ALERTS = []; // populated from Firestore
+
+      /* ── Alert Type Labels ──────────────────────────────────────────────── */
+      var TYPE_LABELS = {
+        failed_login: "Failed Login",
+        account_lockout: "Account Lockout",
+        unauthorized_access: "Unauthorized Access",
+        suspicious_login: "Suspicious Login",
+        multi_device: "Multi-Device Session",
+        session_expiry: "Session Warning",
+        api_error: "API / Auth Error",
+        password_change: "Password Change",
+        role_change: "Role Change",
+        account_registration: "New Registration",
+        // Firestore stores these exact strings from auth.js:
+        "Failed Login": "Failed Login",
+        "Multiple Failed Login Attempts": "Failed Login",
+      };
+
+      /* ── Filter State ────────────────────────────────────────────────────── */
+      var currentSeverity = "all";
+
+      /* ── Map Firestore doc → ACCOUNT_ALERTS shape ───────────────────────── */
+      function mapAlert(doc) {
+        var d = doc.data();
+        var ts = d.timestamp
+          ? d.timestamp.toDate
+            ? d.timestamp.toDate().toISOString()
+            : new Date(d.timestamp).toISOString()
+          : new Date().toISOString();
+
+        // Normalise severity: Firestore stores "critical"/"warning", page uses "crit"/"warn"
+        var sev = (d.severity || "warn").toLowerCase();
+        if (sev === "critical") sev = "crit";
+        if (sev === "warning") sev = "warn";
+
+        // Normalise type: Firestore stores "Failed Login" string from auth.js
+        var rawType = (d.type || "").toLowerCase().replace(/\s+/g, "_");
+        // map common variants
+        var typeMap = {
+          failed_login: "failed_login",
+          multiple_failed_login_attempts: "failed_login",
+        };
+        var type = typeMap[rawType] || rawType;
+
+        return {
+          id: doc.id,
+          severity: sev,
+          type: type,
+          title: d.title || d.type || "Alert",
+          user: d.user || "unknown",
+          ip: d.ip || "N/A",
+          device: d.device || "Unknown",
+          timestamp: ts,
+          status: d.resolved ? "resolved" : "active",
+          details: d.details || "",
+        };
+      }
+
+      /* ── Load Alerts from Firestore (real-time) ─────────────────────────── */
+      function loadAlerts() {
+        showLoadingState();
+
+        db.collection("alerts")
+          .orderBy("timestamp", "desc")
+          .limit(200)
+          .onSnapshot(
+            function (snapshot) {
+              ACCOUNT_ALERTS = snapshot.docs.map(mapAlert);
+              renderMetrics();
+              renderSecondaryStats();
+              applyFilters();
+              updateNavBadge();
+              document.getElementById("last-updated").textContent =
+                "Updated " +
+                new Date().toLocaleTimeString("en-US", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  hour12: true,
+                });
+            },
+            function (error) {
+              console.error("Firestore error:", error);
+              document.getElementById("alerts-content").innerHTML =
+                '<div class="card"><div class="empty-state">' +
+                '<div class="empty-state-title">Failed to load alerts</div>' +
+                '<div class="empty-state-text">' +
+                error.message +
+                "</div>" +
+                "</div></div>";
+            },
+          );
+      }
+
+      function showLoadingState() {
+        document.getElementById("alerts-content").innerHTML =
+          '<div class="card"><div class="empty-state">' +
+          '<div class="empty-state-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>' +
+          '<div class="empty-state-title">Loading alerts…</div>' +
+          "</div></div>";
+      }
+
+      /* ── Init ────────────────────────────────────────────────────────────── */
+      window.initPage = function () {
+        loadAlerts(); // replaces the old renderMetrics() / applyFilters() calls
+      };
+
+      /* ── Nav Badge ───────────────────────────────────────────────────────── */
+      function updateNavBadge() {
+        var active = ACCOUNT_ALERTS.filter(function (a) {
+          return a.status === "active";
+        }).length;
+        var badge = document.getElementById("nav-badge-alerts");
+        if (badge && active > 0) {
+          badge.textContent = active > 99 ? "99+" : active;
+          badge.style.display = "";
+        } else if (badge) {
+          badge.style.display = "none";
+        }
+      }
+
+      /* ── Primary Metric Cards ────────────────────────────────────────────── */
+      function renderMetrics() {
+        var critCount = ACCOUNT_ALERTS.filter(function (a) {
+          return a.severity === "crit" && a.status === "active";
+        }).length;
+        var warnCount = ACCOUNT_ALERTS.filter(function (a) {
+          return a.severity === "warn" && a.status === "active";
+        }).length;
+        var resolvedCount = ACCOUNT_ALERTS.filter(function (a) {
+          return a.status === "resolved";
+        }).length;
+        var totalActive = critCount + warnCount;
+
+        var palette = {
+          red: { fg: "var(--red)", bg: "var(--red-bg)" },
+          amber: { fg: "var(--amber)", bg: "var(--amber-bg)" },
+          green: { fg: "var(--green)", bg: "var(--green-bg)" },
+          none: {
+            fg: "var(--color-text-secondary)",
+            bg: "var(--color-background-tertiary)",
+          },
+        };
+
+        var cards = [
+          {
+            label: "Active Alerts",
+            value: totalActive,
+            sub: "Requiring attention",
+            color: totalActive > 0 ? "red" : "none",
+            icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>',
+          },
+          {
+            label: "Critical",
+            value: critCount,
+            sub: "Immediate action needed",
+            color: critCount > 0 ? "red" : "none",
+            icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+          },
+          {
+            label: "Warning",
+            value: warnCount,
+            sub: "Monitor closely",
+            color: warnCount > 0 ? "amber" : "none",
+            icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+          },
+          {
+            label: "Resolved",
+            value: resolvedCount,
+            sub: "Issues cleared",
+            color: "green",
+            icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+          },
+        ];
+
+        var html = "";
+        cards.forEach(function (c) {
+          var p = palette[c.color];
+          html +=
+            '<div class="mc">' +
+            '<div class="mc-icon-box" style="background:' +
+            p.bg +
+            ";color:" +
+            p.fg +
+            ';">' +
+            c.icon +
+            "</div>" +
+            '<div class="mc-label">' +
+            c.label +
+            "</div>" +
+            '<div class="mc-val">' +
+            c.value +
+            "</div>" +
+            '<div class="mc-sub">' +
+            c.sub +
+            "</div>" +
+            "</div>";
+        });
+        document.getElementById("alert-metrics").innerHTML = html;
+      }
+
+      /* ── Secondary Stats Row ─────────────────────────────────────────────── */
+      function renderSecondaryStats() {
+        var failedLogins = ACCOUNT_ALERTS.filter(function (a) {
+          return (
+            (a.type === "failed_login" || a.type === "account_lockout") &&
+            a.status === "active"
+          );
+        }).length;
+        var suspicious = ACCOUNT_ALERTS.filter(function (a) {
+          return (
+            (a.type === "suspicious_login" || a.type === "multi_device") &&
+            a.status === "active"
+          );
+        }).length;
+        var authErrors = ACCOUNT_ALERTS.filter(function (a) {
+          return a.type === "api_error" && a.status === "active";
+        }).length;
+        var resolved = ACCOUNT_ALERTS.filter(function (a) {
+          return a.status === "resolved";
+        }).length;
+
+        var stats = [
+          {
+            label: "Failed Logins (Active)",
+            value: failedLogins,
+            fg: "var(--red)",
+            bg: "var(--red-bg)",
+            icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
+          },
+          {
+            label: "Suspicious Activity",
+            value: suspicious,
+            fg: "var(--amber)",
+            bg: "var(--amber-bg)",
+            icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>',
+          },
+          {
+            label: "API Auth Errors",
+            value: authErrors,
+            fg: "var(--red)",
+            bg: "var(--red-bg)",
+            icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+          },
+          {
+            label: "Resolved Events",
+            value: resolved,
+            fg: "var(--green)",
+            bg: "var(--green-bg)",
+            icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+          },
+        ];
+
+        var html = "";
+        stats.forEach(function (s) {
+          html +=
+            '<div class="col-6 col-md-3">' +
+            '<div class="mc" style="padding:var(--space-md);flex-direction:row;align-items:center;gap:var(--space-md);">' +
+            '<div style="width:32px;height:32px;border-radius:var(--radius-sm);background:' +
+            s.bg +
+            ";display:flex;align-items:center;justify-content:center;color:" +
+            s.fg +
+            ';flex-shrink:0;">' +
+            s.icon +
+            "</div>" +
+            '<div><div style="font-size:var(--font-size-xs);color:var(--color-text-secondary);margin-bottom:2px;">' +
+            s.label +
+            "</div>" +
+            '<div style="font-size:var(--font-size-xl);font-weight:var(--font-weight-semibold);color:var(--color-text-primary);line-height:1;">' +
+            s.value +
+            "</div></div>" +
+            "</div></div>";
+        });
+        document.getElementById("secondary-stats").innerHTML = html;
+      }
+
+      /* ── Severity Filter Pills ───────────────────────────────────────────── */
+      function setSeverityFilter(sev, btn) {
+        currentSeverity = sev;
+        document.querySelectorAll(".filter-pill").forEach(function (b) {
+          b.className = "filter-pill";
+        });
+        if (sev === "crit") btn.className = "filter-pill active-crit";
+        else if (sev === "warn") btn.className = "filter-pill active-warn";
+        else btn.className = "filter-pill active";
+        applyFilters();
+      }
+
+      /* ── Apply All Filters ───────────────────────────────────────────────── */
+      function applyFilters() {
+        var typeVal =
+          (document.getElementById("type-filter") || {}).value || "";
+        var userVal = (
+          (document.getElementById("user-filter") || {}).value || ""
+        )
+          .toLowerCase()
+          .trim();
+
+        var filtered = ACCOUNT_ALERTS.filter(function (a) {
+          if (
+            currentSeverity === "crit" &&
+            !(a.severity === "crit" && a.status === "active")
+          )
+            return false;
+          if (
+            currentSeverity === "warn" &&
+            !(a.severity === "warn" && a.status === "active")
+          )
+            return false;
+          if (currentSeverity === "resolved" && a.status !== "resolved")
+            return false;
+          if (typeVal && a.type !== typeVal) return false;
+          if (userVal && a.user.toLowerCase().indexOf(userVal) === -1)
+            return false;
+          return true;
+        });
+
+        renderAlertsTable(filtered);
+      }
+
+      /* ── Render Alerts Table ─────────────────────────────────────────────── */
+      function renderAlertsTable(alerts) {
+        var countEl = document.getElementById("alert-count-label");
+        if (countEl)
+          countEl.textContent =
+            alerts.length + " alert" + (alerts.length !== 1 ? "s" : "");
+
+        if (!alerts.length) {
+          document.getElementById("alerts-content").innerHTML =
+            '<div class="card"><div class="empty-state">' +
+            '<div class="empty-state-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>' +
+            '<div class="empty-state-title">No Alerts Found</div>' +
+            '<div class="empty-state-text">No account alerts match the current filters</div>' +
+            "</div></div>";
+          return;
+        }
+
+        var html =
+          '<div class="tcard">' +
+          '<div class="thead-row"><h3 class="thead-title">Account Alerts</h3>' +
+          '<span style="font-size:11px;color:var(--color-text-secondary);">' +
+          alerts.length +
+          " result" +
+          (alerts.length !== 1 ? "s" : "") +
+          "</span></div>" +
+          '<div class="twrap"><table style="table-layout:auto;"><thead><tr>' +
+          "<th>Severity</th>" +
+          "<th>Alert</th>" +
+          '<th class="d-hide-sm">User</th>' +
+          '<th class="d-hide-md">Device / IP</th>' +
+          '<th class="d-hide-sm">Detected</th>' +
+          "<th>Status</th>" +
+          "<th>Actions</th>" +
+          "</tr></thead><tbody>";
+
+        alerts.forEach(function (a) {
+          var sevBadge =
+            a.severity === "crit"
+              ? '<span class="badge crit"><span class="bdot"></span>Critical</span>'
+              : a.severity === "warn"
+                ? '<span class="badge warn"><span class="bdot"></span>Warning</span>'
+                : '<span class="badge good"><span class="bdot"></span>Info</span>';
+
+          var statusBadge =
+            a.status === "resolved"
+              ? '<span class="badge good"><span class="bdot"></span>Resolved</span>'
+              : a.severity === "crit"
+                ? '<span class="badge crit"><span class="bdot"></span>Active</span>'
+                : '<span class="badge warn"><span class="bdot"></span>Active</span>';
+
+          var initials =
+            a.user === "unknown" ? "?" : a.user.substring(0, 2).toUpperCase();
+          var avCls =
+            a.severity === "crit" ? "ae" : a.severity === "warn" ? "aa" : "ac";
+          var typeLabel = TYPE_LABELS[a.type] || a.type;
+          var ts = new Date(a.timestamp);
+          var timeStr = ts.toLocaleString("en-US", {
+            month: "short",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+          });
+
+          var resolveBtn =
+            a.status === "active"
+              ? '<button class="row-action-btn btn-resolve" onclick="event.stopPropagation();markResolved(\'' +
+                a.id +
+                '\')" title="Mark Resolved">Resolve</button>'
+              : "";
+
+          html +=
+            '<tr class="alert-row" onclick="openDetail(\'' +
+            a.id +
+            "')\">" +
+            '<td style="white-space:nowrap;">' +
+            sevBadge +
+            "</td>" +
+            '<td style="min-width:180px;">' +
+            '<div style="font-weight:var(--font-weight-medium);font-size:var(--font-size-sm);line-height:1.3;">' +
+            a.title +
+            "</div>" +
+            '<span class="type-tag">' +
+            typeLabel +
+            "</span>" +
+            "</td>" +
+            '<td class="d-hide-sm" style="white-space:nowrap;">' +
+            '<div class="user-cell">' +
+            '<div class="log-avatar ' +
+            avCls +
+            '">' +
+            initials +
+            "</div>" +
+            '<span class="user-cell-name">' +
+            a.user +
+            "</span>" +
+            "</div>" +
+            "</td>" +
+            '<td class="d-hide-md" style="max-width:200px;">' +
+            '<div style="font-size:var(--font-size-xs);color:var(--color-text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' +
+            a.device +
+            "</div>" +
+            '<div style="font-size:10px;font-family:var(--font-mono);color:var(--color-text-tertiary);">' +
+            a.ip +
+            "</div>" +
+            "</td>" +
+            '<td class="d-hide-sm" style="font-size:11px;font-family:var(--font-mono);color:var(--color-text-secondary);white-space:nowrap;">' +
+            timeStr +
+            "</td>" +
+            '<td style="white-space:nowrap;">' +
+            statusBadge +
+            "</td>" +
+            '<td style="white-space:nowrap;">' +
+            '<div style="display:flex;gap:4px;align-items:center;">' +
+            '<button class="row-action-btn" onclick="event.stopPropagation();openDetail(\'' +
+            a.id +
+            '\')" title="View Details">' +
+            '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>' +
+            " Details" +
+            "</button>" +
+            resolveBtn +
+            "</div>" +
+            "</td>" +
+            "</tr>";
+        });
+
+        html += "</tbody></table></div></div>";
+        document.getElementById("alerts-content").innerHTML = html;
+      }
+
+      /* ── Open Detail Offcanvas ───────────────────────────────────────────── */
+      function openDetail(id) {
+        var a = ACCOUNT_ALERTS.find(function (x) {
+          return x.id === id;
+        });
+        if (!a) return;
+
+        var typeLabel = TYPE_LABELS[a.type] || a.type;
+        var ts = new Date(a.timestamp).toLocaleString("en-US", {
+          year: "numeric",
+          month: "short",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: true,
+        });
+
+        document.getElementById("oc-title").textContent = a.title;
+        document.getElementById("oc-subtitle").textContent =
+          typeLabel + " · " + (a.status === "resolved" ? "Resolved" : "Active");
+
+        var sevBadge =
+          a.severity === "crit"
+            ? '<span class="badge crit"><span class="bdot"></span>Critical</span>'
+            : a.severity === "warn"
+              ? '<span class="badge warn"><span class="bdot"></span>Warning</span>'
+              : '<span class="badge good"><span class="bdot"></span>Info</span>';
+
+        var statusBadge =
+          a.status === "resolved"
+            ? '<span class="badge good"><span class="bdot"></span>Resolved</span>'
+            : a.severity === "crit"
+              ? '<span class="badge crit"><span class="bdot"></span>Active</span>'
+              : '<span class="badge warn"><span class="bdot"></span>Active</span>';
+
+        var secNotice =
+          a.status === "active" && a.severity === "crit"
+            ? '<div class="security-notice">This is a critical security event. Review immediately and take appropriate action to protect platform integrity and user accounts.</div>'
+            : "";
+
+        var actionsHtml = '<div class="oc-actions">';
+        if (a.status === "active") {
+          actionsHtml +=
+            '<button class="oc-action-btn oc-success" onclick="markResolved(\'' +
+            a.id +
+            "')\">" +
+            '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' +
+            "Mark as Resolved</button>";
+        }
+        if (a.user !== "unknown") {
+          actionsHtml +=
+            '<button class="oc-action-btn oc-danger" onclick="suspendUser(\'' +
+            a.user +
+            "')\">" +
+            '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>' +
+            "Suspend User (" +
+            a.user +
+            ")</button>";
+          actionsHtml +=
+            '<button class="oc-action-btn oc-amber" onclick="resetPassword(\'' +
+            a.user +
+            "')\">" +
+            '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>' +
+            "Reset Password</button>";
+        }
+        actionsHtml += "</div>";
+
+        document.getElementById("oc-body").innerHTML =
+          '<div class="det-section">Event Details</div>' +
+          '<div class="det-row"><span class="det-label">Severity</span><span class="det-value">' +
+          sevBadge +
+          "</span></div>" +
+          '<div class="det-row"><span class="det-label">Alert Type</span><span class="det-value"><span class="type-tag">' +
+          typeLabel +
+          "</span></span></div>" +
+          '<div class="det-row"><span class="det-label">Status</span><span class="det-value">' +
+          statusBadge +
+          "</span></div>" +
+          '<div class="det-row"><span class="det-label">Detected</span><span class="det-value det-mono">' +
+          ts +
+          "</span></div>" +
+          '<div class="det-section">Access Information</div>' +
+          '<div class="det-row"><span class="det-label">User Account</span><span class="det-value">' +
+          a.user +
+          "</span></div>" +
+          '<div class="det-row"><span class="det-label">IP Address</span><span class="det-value det-mono">' +
+          a.ip +
+          "</span></div>" +
+          '<div class="det-row"><span class="det-label">Device</span><span class="det-value">' +
+          a.device +
+          "</span></div>" +
+          '<div class="det-section">Description</div>' +
+          '<p style="font-size:var(--font-size-sm);color:var(--color-text-primary);line-height:1.6;margin:0;">' +
+          a.details +
+          "</p>" +
+          secNotice +
+          '<div class="det-section">Actions</div>' +
+          actionsHtml;
+
+        var oc = bootstrap.Offcanvas.getOrCreateInstance(
+          document.getElementById("detail-offcanvas"),
+        );
+        oc.show();
+      }
+
+      /* ── Action Handlers ─────────────────────────────────────────────────── */
+      function markResolved(id) {
+        // Update Firestore — the onSnapshot listener will re-render automatically
+        db.collection("alerts")
+          .doc(id)
+          .update({ resolved: true })
+          .then(function () {
+            if (typeof utils !== "undefined")
+              utils.showToast("Alert marked as resolved.", "success");
+            var oc = bootstrap.Offcanvas.getInstance(
+              document.getElementById("detail-offcanvas"),
+            );
+            if (oc) oc.hide();
+          })
+          .catch(function (err) {
+            console.error("Failed to resolve alert:", err);
+            if (typeof utils !== "undefined")
+              utils.showToast("Failed to update alert.", "error");
+          });
+      }
+
+      function suspendUser(username) {
+        if (typeof utils !== "undefined")
+          utils.showToast(
+            'User "' + username + '" has been suspended.',
+            "success",
+          );
+        var oc = bootstrap.Offcanvas.getInstance(
+          document.getElementById("detail-offcanvas"),
+        );
+        if (oc) oc.hide();
+      }
+
+      function resetPassword(username) {
+        if (typeof utils !== "undefined")
+          utils.showToast(
+            'Password reset initiated for "' + username + '".',
+            "success",
+          );
+        var oc = bootstrap.Offcanvas.getInstance(
+          document.getElementById("detail-offcanvas"),
+        );
+        if (oc) oc.hide();
+      }
+
+      function refreshAlerts() {
+        // onSnapshot keeps data live — just show a toast
+        document.getElementById("last-updated").textContent =
+          "Updated " +
+          new Date().toLocaleTimeString("en-US", {
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+          });
+        if (typeof utils !== "undefined")
+          utils.showToast("Alerts refreshed.", "success");
+      }
+
+      function openLogoutModal() { auth.confirmLogout(); }
+      function closeLogoutModal() {
+        document.getElementById("logout-modal").style.display = "none";
+      }
+    </script>
+
+    <!-- Logout Confirmation Modal -->
+    <div
+      id="logout-modal"
+      style="
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: none;
+        align-items: center;
+        justify-content: center;
+      "
+    >
+      <!-- Backdrop -->
+      <div
+        onclick="closeLogoutModal()"
+        style="
+          position: absolute;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.45);
+          backdrop-filter: blur(2px);
+        "
+      ></div>
+      <!-- Dialog -->
+      <div
+        style="
+          position: relative;
+          background: var(--color-background-primary);
+          border: 1px solid var(--color-border-secondary);
+          border-radius: var(--radius-lg);
+          padding: var(--space-2xl);
+          width: 360px;
+          max-width: 90vw;
+          box-shadow: var(--shadow-md);
+          text-align: center;
+        "
+      >
+        <div
+          style="
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--red-bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto var(--space-lg);
+          "
+        >
+          <svg
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="var(--red)"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+        </div>
+        <h3
+          style="
+            font-size: var(--font-size-lg);
+            font-weight: var(--font-weight-semibold);
+            color: var(--color-text-primary);
+            margin-bottom: var(--space-sm);
+          "
+        >
+          Confirm Logout
+        </h3>
+        <p
+          style="
+            font-size: var(--font-size-sm);
+            color: var(--color-text-secondary);
+            margin-bottom: var(--space-xl);
+          "
+        >
+          Are you sure you want to log out of your session?
+        </p>
+        <div
+          style="display: flex; gap: var(--space-md); justify-content: center"
+        >
+          <button
+            onclick="closeLogoutModal()"
+            class="btn btn-secondary"
+            style="flex: 1"
+          >
+            Cancel
+          </button>
+          <button
+            onclick="auth.logout()"
+            class="btn btn-danger"
+            style="
+              flex: 1;
+              background: var(--red-mid);
+              color: #fff;
+              border-color: var(--red-mid);
+            "
+          >
+            Yes, Logout
+          </button>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

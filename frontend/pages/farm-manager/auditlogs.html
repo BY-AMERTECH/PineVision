@@ -1,0 +1,2027 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+    <link rel="dns-prefetch" href="https://firestore.googleapis.com">
+    <link rel="dns-prefetch" href="https://identitytoolkit.googleapis.com">
+    <script>
+      (function () {
+        try {
+          var s = JSON.parse(
+            localStorage.getItem("pinevision_settings") || "{}",
+          );
+          if (s.theme === "dark")
+            document.documentElement.classList.add("dark-mode");
+        } catch (e) {}
+      })();
+    </script>
+    <title>Audit Logs - PineVision</title>
+    <link rel="stylesheet" href="../../bootstrap/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="../../css/tokens.css" />
+    <link rel="stylesheet" href="../../css/layout.css" />
+    <link rel="stylesheet" href="../../css/components.css" />
+    <link rel="stylesheet" href="../../css/responsive.css" />
+
+    <style>
+      /* ─── Page Header ─────────────────────────────────────────── */
+      .ph {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        flex-wrap: wrap;
+        gap: var(--space-md);
+        margin-bottom: var(--space-2xl);
+      }
+
+      /* ─── Metric Cards ────────────────────────────────────────── */
+      .mc {
+        transition:
+          box-shadow var(--transition-fast),
+          transform var(--transition-fast);
+        cursor: default;
+      }
+      .mc:hover {
+        box-shadow: var(--shadow-md);
+        transform: translateY(-2px);
+      }
+      .mc-icon-box {
+        width: 34px;
+        height: 34px;
+        border-radius: var(--radius-sm);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: var(--space-sm);
+      }
+      .mc-trend {
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        font-size: 11px;
+        font-weight: var(--font-weight-medium);
+        margin-left: var(--space-xs);
+      }
+      .mc-trend.up {
+        color: var(--green);
+      }
+      .mc-trend.dn {
+        color: var(--red-mid);
+      }
+      .mc-trend.fl {
+        color: var(--color-text-secondary);
+      }
+
+      /* ─── Chart Panels ────────────────────────────────────────── */
+      .chart-panel {
+        background: var(--color-background-primary);
+        border: 1px solid var(--color-border-secondary);
+        border-radius: var(--radius-lg);
+        padding: var(--space-lg);
+        box-shadow: var(--shadow-sm);
+        display: flex;
+        flex-direction: column;
+      }
+      .chart-panel-title {
+        font-size: 11px;
+        font-weight: var(--font-weight-semibold);
+        color: var(--color-text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        margin-bottom: var(--space-sm);
+      }
+      .chart-panel-value {
+        font-size: var(--font-size-2xl);
+        font-weight: var(--font-weight-semibold);
+        color: var(--color-text-primary);
+        font-family: var(--font-mono);
+        line-height: 1;
+        margin-bottom: 3px;
+      }
+      .chart-panel-sub {
+        font-size: var(--font-size-xs);
+        color: var(--color-text-secondary);
+        margin-bottom: var(--space-md);
+      }
+      .chart-panel-sub .up {
+        color: var(--green);
+        font-weight: var(--font-weight-medium);
+      }
+      .chart-panel-sub .dn {
+        color: var(--red-mid);
+        font-weight: var(--font-weight-medium);
+      }
+      .sparkline-wrap {
+        width: 100%;
+        height: 44px;
+        margin-top: auto;
+      }
+      .sparkline-wrap svg {
+        width: 100%;
+        height: 44px;
+        display: block;
+        overflow: visible;
+      }
+      .bar-chart {
+        display: flex;
+        align-items: flex-end;
+        gap: 5px;
+        height: 60px;
+        margin-top: auto;
+      }
+      .bar-item {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+      }
+      .bar-fill {
+        width: 100%;
+        border-radius: 3px 3px 0 0;
+        transition: height 0.4s ease;
+        min-height: 3px;
+      }
+      .bar-label {
+        font-size: 9px;
+        color: var(--color-text-tertiary);
+        text-align: center;
+        white-space: nowrap;
+      }
+
+      /* ─── Filter Bar ──────────────────────────────────────────── */
+
+      /* ─── Log Table ───────────────────────────────────────────── */
+      .log-table {
+        table-layout: auto;
+      }
+      .log-table th {
+        cursor: pointer;
+        user-select: none;
+        white-space: nowrap;
+      }
+      .log-table th:hover {
+        background: var(--color-background-tertiary);
+      }
+      .sort-arrow {
+        opacity: 0.4;
+        margin-left: 4px;
+        font-size: 10px;
+      }
+      .sort-arrow.active {
+        opacity: 1;
+      }
+      .log-table td {
+        vertical-align: middle;
+      }
+      .log-row {
+        cursor: pointer;
+      }
+      .log-row:hover td {
+        background: var(--green-bg) !important;
+      }
+
+      /* ─── Action Pills ────────────────────────────────────────── */
+      .action-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 8px;
+        border-radius: var(--radius-pill);
+        font-size: 11px;
+        font-weight: var(--font-weight-medium);
+        white-space: nowrap;
+      }
+      .action-login {
+        background: var(--green-bg);
+        color: var(--green);
+      }
+      .action-logout {
+        background: var(--color-background-secondary);
+        color: var(--color-text-secondary);
+      }
+      .action-view {
+        background: #e8f0ff;
+        color: #3a5fc8;
+      }
+      .dark-mode .action-view {
+        background: rgba(58, 95, 200, 0.15);
+        color: #7b9df8;
+      }
+      .action-update {
+        background: var(--amber-bg);
+        color: var(--amber);
+      }
+      .action-error {
+        background: var(--red-bg);
+        color: var(--red);
+      }
+      .action-upload {
+        background: var(--yellow-bg);
+        color: var(--yellow);
+      }
+      .action-generate {
+        background: #f0eaff;
+        color: #6a3fa8;
+      }
+      .dark-mode .action-generate {
+        background: rgba(106, 63, 168, 0.15);
+        color: #b89cf5;
+      }
+
+      /* ─── Severity Badge ──────────────────────────────────────── */
+      .sev {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 7px;
+        border-radius: var(--radius-pill);
+        font-size: 10px;
+        font-weight: var(--font-weight-semibold);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        white-space: nowrap;
+      }
+      .sev-info {
+        background: var(--green-bg);
+        color: var(--green);
+      }
+      .sev-warning {
+        background: var(--amber-bg);
+        color: var(--amber);
+      }
+      .sev-critical {
+        background: var(--red-bg);
+        color: var(--red);
+      }
+
+      /* ─── User Cell ───────────────────────────────────────────── */
+      .log-avatar {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        font-weight: var(--font-weight-semibold);
+        text-transform: uppercase;
+        flex-shrink: 0;
+      }
+      .log-avatar.aa {
+        background: var(--yellow-bg);
+        color: var(--yellow);
+      }
+      .log-avatar.ac {
+        background: var(--green-bg);
+        color: var(--green);
+      }
+      .log-avatar.ae {
+        background: var(--red-bg);
+        color: var(--red);
+      }
+      .user-cell {
+        display: flex;
+        align-items: center;
+        gap: var(--space-sm);
+      }
+      .user-cell-name {
+        font-weight: var(--font-weight-medium);
+        font-size: var(--font-size-sm);
+        line-height: 1.2;
+        white-space: nowrap;
+      }
+      .user-cell-role {
+        font-size: 10px;
+        color: var(--color-text-secondary);
+      }
+
+      /* ─── Module Tag ──────────────────────────────────────────── */
+      .module-tag {
+        display: inline-block;
+        padding: 2px 7px;
+        border-radius: var(--radius-sm);
+        font-size: 10px;
+        font-weight: var(--font-weight-medium);
+        background: var(--color-background-tertiary);
+        color: var(--color-text-secondary);
+        white-space: nowrap;
+      }
+
+      /* ─── Side Panels (Timeline + Sessions) ──────────────────── */
+      .side-panel {
+        background: var(--color-background-primary);
+        border: 1px solid var(--color-border-secondary);
+        border-radius: var(--radius-lg);
+        padding: var(--space-lg);
+        box-shadow: var(--shadow-sm);
+      }
+      .side-panel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: var(--space-lg);
+        padding-bottom: var(--space-md);
+        border-bottom: 1px solid var(--color-border-secondary);
+      }
+      .side-panel-title {
+        font-size: 11px;
+        font-weight: var(--font-weight-semibold);
+        color: var(--color-text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .side-panel-badge {
+        font-size: 11px;
+        color: var(--color-text-tertiary);
+        font-family: var(--font-mono);
+        background: var(--color-background-tertiary);
+        padding: 1px 7px;
+        border-radius: var(--radius-pill);
+      }
+
+      /* ─── Timeline ────────────────────────────────────────────── */
+      .timeline {
+        position: relative;
+        padding-left: 22px;
+      }
+      .timeline::before {
+        content: "";
+        position: absolute;
+        left: 7px;
+        top: 6px;
+        bottom: 6px;
+        width: 1px;
+        background: var(--color-border-secondary);
+      }
+      .tl-item {
+        position: relative;
+        padding-bottom: var(--space-lg);
+      }
+      .tl-item:last-child {
+        padding-bottom: 0;
+      }
+      .tl-dot {
+        position: absolute;
+        left: -18px;
+        top: 5px;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        border: 2px solid var(--color-background-primary);
+      }
+      .tl-dot.dot-success {
+        background: var(--green-mid);
+      }
+      .tl-dot.dot-warning {
+        background: var(--amber-mid);
+      }
+      .tl-dot.dot-critical {
+        background: var(--red-mid);
+      }
+      .tl-dot.dot-info {
+        background: #5b8def;
+      }
+      .tl-time {
+        font-size: 10px;
+        color: var(--color-text-tertiary);
+        font-family: var(--font-mono);
+        display: block;
+      }
+      .tl-desc {
+        font-size: var(--font-size-xs);
+        color: var(--color-text-primary);
+        margin: 2px 0;
+        font-weight: var(--font-weight-medium);
+        line-height: 1.35;
+        display: block;
+      }
+      .tl-user {
+        font-size: 10px;
+        color: var(--color-text-secondary);
+        display: block;
+      }
+
+      /* ─── Sessions ────────────────────────────────────────────── */
+      .session-row {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--space-md);
+        padding: var(--space-md) 0;
+        border-bottom: 1px solid var(--color-border-secondary);
+      }
+      .session-row:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+      }
+      .session-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        font-weight: var(--font-weight-semibold);
+        text-transform: uppercase;
+        flex-shrink: 0;
+      }
+      .session-info {
+        flex: 1;
+        min-width: 0;
+      }
+      .session-name {
+        font-size: var(--font-size-sm);
+        font-weight: var(--font-weight-medium);
+        color: var(--color-text-primary);
+      }
+      .session-device {
+        font-size: 11px;
+        color: var(--color-text-secondary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .session-meta {
+        font-size: 10px;
+        color: var(--color-text-tertiary);
+        font-family: var(--font-mono);
+        margin-top: 2px;
+      }
+      .session-live {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 10px;
+        color: var(--green);
+        flex-shrink: 0;
+      }
+      .live-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--green-mid);
+        animation: pulse 2s ease-in-out infinite;
+        flex-shrink: 0;
+      }
+      .session-revoke {
+        padding: 3px 8px;
+        font-size: 10px;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--color-border-secondary);
+        background: transparent;
+        color: var(--color-text-secondary);
+        cursor: pointer;
+        transition: all var(--transition-fast);
+        font-family: var(--font-sans);
+      }
+      .session-revoke:hover {
+        border-color: var(--red);
+        color: var(--red);
+        background: var(--red-bg);
+      }
+
+      /* ─── Detail Offcanvas ────────────────────────────────────── */
+      #detail-offcanvas {
+        --bs-offcanvas-width: min(480px, 96vw);
+        background: var(--color-background-primary) !important;
+        border-left: 1px solid var(--color-border-secondary) !important;
+        color: var(--color-text-primary);
+      }
+      .offcanvas-header {
+        padding: var(--space-xl);
+        border-bottom: 1px solid var(--color-border-secondary);
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+      }
+      .offcanvas-body {
+        padding: var(--space-xl);
+        overflow-y: auto;
+      }
+      .oc-title {
+        font-size: var(--font-size-lg);
+        font-weight: var(--font-weight-semibold);
+        color: var(--color-text-primary);
+      }
+      .oc-subtitle {
+        font-size: var(--font-size-sm);
+        color: var(--color-text-secondary);
+        margin-top: 2px;
+      }
+      .oc-close {
+        width: 30px;
+        height: 30px;
+        border-radius: var(--radius-sm);
+        background: var(--color-background-secondary);
+        border: 1px solid var(--color-border-secondary);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--color-text-secondary);
+        font-size: 18px;
+        line-height: 1;
+        transition: all var(--transition-fast);
+        flex-shrink: 0;
+      }
+      .oc-close:hover {
+        background: var(--color-background-tertiary);
+        color: var(--color-text-primary);
+      }
+      .det-section {
+        font-size: 11px;
+        font-weight: var(--font-weight-semibold);
+        color: var(--color-text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        margin: var(--space-xl) 0 var(--space-md);
+      }
+      .det-section:first-child {
+        margin-top: 0;
+      }
+      .det-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        padding: 8px 0;
+        border-bottom: 1px solid var(--color-border-secondary);
+        gap: var(--space-md);
+      }
+      .det-row:last-child {
+        border-bottom: none;
+      }
+      .det-label {
+        font-size: var(--font-size-xs);
+        color: var(--color-text-secondary);
+        flex-shrink: 0;
+        min-width: 110px;
+      }
+      .det-value {
+        font-size: var(--font-size-sm);
+        color: var(--color-text-primary);
+        font-weight: var(--font-weight-medium);
+        text-align: right;
+        word-break: break-all;
+      }
+      .det-mono {
+        font-family: var(--font-mono);
+      }
+      .security-notice {
+        background: var(--red-bg);
+        border: 1px solid rgba(139, 32, 32, 0.2);
+        border-radius: var(--radius-md);
+        padding: var(--space-md);
+        font-size: var(--font-size-xs);
+        color: var(--red);
+        line-height: 1.5;
+        margin-top: var(--space-lg);
+      }
+      .value-change-box {
+        background: var(--color-background-secondary);
+        border: 1px solid var(--color-border-secondary);
+        border-radius: var(--radius-md);
+        padding: var(--space-md);
+        margin-top: var(--space-md);
+      }
+      .value-change-row {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--space-md);
+        padding: 4px 0;
+      }
+      .value-change-lbl {
+        font-size: 11px;
+        color: var(--color-text-secondary);
+        min-width: 55px;
+        flex-shrink: 0;
+      }
+      .value-prev {
+        font-size: var(--font-size-xs);
+        font-family: var(--font-mono);
+        color: var(--red);
+        word-break: break-all;
+      }
+      .value-new {
+        font-size: var(--font-size-xs);
+        font-family: var(--font-mono);
+        color: var(--green);
+        word-break: break-all;
+      }
+
+      /* ─── Empty State ─────────────────────────────────────────── */
+      .empty-rows td {
+        text-align: center;
+        padding: var(--space-4xl) var(--space-lg) !important;
+        color: var(--color-text-secondary);
+      }
+
+      /* ─── Responsive column visibility ───────────────────────── */
+      @media (max-width: 1280px) {
+        .d-hide-xl {
+          display: none !important;
+        }
+      }
+      @media (max-width: 992px) {
+        .d-hide-lg {
+          display: none !important;
+        }
+      }
+      @media (max-width: 768px) {
+        .d-hide-md {
+          display: none !important;
+        }
+        .ph {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+      }
+      @media (max-width: 576px) {
+        .d-hide-sm {
+          display: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-wrapper">
+      <!-- ── Sidebar ───────────────────────────────────────────────── -->
+      <aside class="sidebar">
+        <div class="sidebar-brand">
+          <div class="sidebar-logo">
+            <img
+              src="/frontend/assets/images/pinevision-logo.svg"
+              alt="PineVision"
+              class="sidebar-logo-img"
+            />
+          </div>
+          <div class="sidebar-brand-text">
+            <div class="sidebar-brand-name">PineVision</div>
+            <div class="sidebar-brand-tagline">Farm Manager Panel</div>
+          </div>
+        </div>
+
+        <button
+          class="sidebar-collapse-btn"
+          onclick="app.toggleSidebar()"
+          aria-label="Toggle sidebar"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <polyline points="15,18 9,12 15,6" />
+          </svg>
+          <span class="nav-link-text">Collapse sidebar</span>
+        </button>
+
+        <nav class="sidebar-nav">
+          <div class="nav-section">
+            <div class="nav-section-title">Main</div>
+            <ul class="nav-links">
+              <li>
+                <a
+                  href="dashboard.html"
+                  class="nav-link"
+                  data-tooltip="Dashboard"
+                >
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-dashboard.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Dashboard</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div class="nav-section">
+            <div class="nav-section-title">Monitoring</div>
+            <ul class="nav-links">
+              <li>
+                <a href="users.html" class="nav-link" data-tooltip="Users">
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-users.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Users</span>
+                </a>
+              </li>
+              <li>
+                <a
+                  href="auditlogs.html"
+                  class="nav-link active"
+                  data-tooltip="Audit Logs"
+                >
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-clipboard.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Audit Logs</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div class="nav-section">
+            <div class="nav-section-title">Operations</div>
+            <ul class="nav-links">
+              <li>
+                <a
+                  href="flights-scans.html"
+                  class="nav-link"
+                  data-tooltip="Flights &amp; Scans"
+                >
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-flights.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Flights &amp; Scans</span>
+                </a>
+              </li>
+              <li>
+                <a href="alerts.html" class="nav-link" data-tooltip="Alerts">
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-bell.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Alerts</span>
+                  <span
+                    class="nav-badge"
+                    id="nav-badge-alerts"
+                    style="display: none"
+                  ></span>
+                </a>
+              </li>
+              <li>
+                <a href="reports.html" class="nav-link" data-tooltip="Reports">
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-reports.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Reports</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div class="nav-section">
+            <div class="nav-section-title">System</div>
+            <ul class="nav-links">
+              <li>
+                <a
+                  href="settings.html"
+                  class="nav-link"
+                  data-tooltip="Settings"
+                >
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-cog.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Settings</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div class="sidebar-user">
+            <div class="sidebar-user-avatar">A</div>
+            <div class="sidebar-user-info">
+              <div class="sidebar-user-name">Admin</div>
+              <div class="sidebar-user-role">admin</div>
+            </div>
+          </div>
+          <button class="btn-logout" onclick="openLogoutModal()">
+            <img src="/frontend/assets/icons/logout.svg" alt="" width="16" />
+            <span class="logout-text">Logout</span>
+          </button>
+        </div>
+      </aside>
+
+      <!-- ── Main Content ───────────────────────────────────────────── -->
+      <main class="main-content">
+        <div
+          class="page-container"
+          style="
+            padding: var(--page-padding);
+            max-width: var(--page-max-width);
+            margin: 0 auto;
+          "
+        >
+          <!-- Page Header -->
+          <div class="ph">
+            <div>
+              <h1 class="page-title d-flex align-items-center gap-2">
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  style="color: var(--green); flex-shrink: 0"
+                >
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg
+                >Audit Logs
+              </h1>
+              <p class="page-subtitle">
+                Complete record of all system activity, access events, and user
+                actions
+              </p>
+            </div>
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                gap: var(--space-md);
+                flex-wrap: wrap;
+              "
+            >
+              <span
+                id="last-updated"
+                style="
+                  font-size: 11px;
+                  color: var(--color-text-tertiary);
+                  font-family: var(--font-mono);
+                "
+              ></span>
+              <a href="activity.html" class="btn btn-secondary btn-sm">
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path
+                    d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+                  />
+                  <polyline points="14 2 14 8 20 8" />
+                </svg>
+                Full Activity Log
+              </a>
+              <button
+                class="btn btn-secondary btn-sm"
+                onclick="refreshLogs()"
+                id="refresh-btn"
+              >
+                <svg
+                  id="refresh-icon"
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <polyline points="23 4 23 10 17 10" />
+                  <polyline points="1 20 1 14 7 14" />
+                  <path
+                    d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"
+                  />
+                </svg>
+                Refresh
+              </button>
+            </div>
+          </div>
+
+          <!-- Metric Cards (6 cards, Bootstrap grid) -->
+          <div class="row g-3 mb-4 align-items-stretch" id="log-stats"></div>
+
+          <!-- Charts Row (3 panels, Bootstrap grid) -->
+          <div class="row g-3 mb-4 align-items-stretch" id="charts-row"></div>
+
+          <!-- Bottom Row: Timeline (left) + Recent Activity & Sessions (right) -->
+          <div class="row g-3 mb-4 align-items-stretch">
+            <!-- Left: Activity Timeline -->
+            <div class="col-lg-7 d-flex">
+              <div class="side-panel w-100">
+                <div class="side-panel-header">
+                  <span class="side-panel-title">Activity Timeline</span>
+                  <span class="side-panel-badge" id="timeline-count"
+                    >0 events</span
+                  >
+                </div>
+                <div class="timeline" id="timeline-list"></div>
+              </div>
+            </div>
+
+            <!-- Right: Recent Activity + Active Sessions stacked -->
+            <div class="col-lg-5 d-flex flex-column gap-3">
+              <!-- Recent Activity table (5 rows) -->
+              <div class="tcard" style="margin-bottom: 0">
+                <div class="thead-row">
+                  <h3 class="thead-title">Recent Activity</h3>
+                  <a
+                    href="activity.html"
+                    class="btn btn-secondary btn-sm"
+                    style="white-space: nowrap"
+                  >
+                    See More →
+                  </a>
+                </div>
+                <div class="twrap">
+                  <table class="log-table">
+                    <thead>
+                      <tr>
+                        <th style="width: 145px">Timestamp</th>
+                        <th style="width: 120px">User</th>
+                        <th>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody id="log-tbody"></tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Active Sessions -->
+              <div class="side-panel flex-grow-1">
+                <div class="side-panel-header">
+                  <span class="side-panel-title">Active Sessions</span>
+                  <span class="side-panel-badge" id="session-count"
+                    >0 active</span
+                  >
+                </div>
+                <div id="sessions-list"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- ── Detail Offcanvas (Bootstrap) ─────────────────────────────── -->
+    <div
+      class="offcanvas offcanvas-end"
+      tabindex="-1"
+      id="detail-offcanvas"
+      aria-labelledby="oc-title-id"
+    >
+      <div class="offcanvas-header">
+        <div>
+          <div class="oc-title" id="oc-title-id">Log Entry Details</div>
+          <div class="oc-subtitle" id="oc-subtitle"></div>
+        </div>
+        <button class="oc-close" data-bs-dismiss="offcanvas" aria-label="Close">
+          ×
+        </button>
+      </div>
+      <div class="offcanvas-body" id="oc-body"></div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+    <script src="../../js/auth.js"></script>
+    <script src="../../js/data.js"></script>
+    <script src="../../js/utils.js"></script>
+    <script src="../../js/app.js"></script>
+    <script src="../../bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script>
+      if (!auth.requireFarmManager()) {
+        /* redirects */
+      }
+
+      /* ── Enhanced log data ─────────────────────────────────────── */
+      var EXTENDED_LOGS = [];
+
+      var ACTIVE_SESSIONS = [];
+
+      /* ── State ─────────────────────────────────────────────────── */
+      var allLogs = [];
+      var _offcanvas = null;
+
+      /* ── Init ──────────────────────────────────────────────────── */
+      window.initPage = async function () {
+        try {
+          console.log("📥 Loading activity logs from Firebase...");
+
+          // Fetch all activity logs from Firestore
+          const logsSnapshot = await firebase
+            .firestore()
+            .collection("activity_logs")
+            .orderBy("timestamp", "desc")
+            .limit(50)
+            .get();
+
+          EXTENDED_LOGS = [];
+          var idCounter = 1;
+
+          logsSnapshot.forEach(function (doc) {
+            const data = doc.data();
+
+            // Convert Firestore timestamp to ISO string
+            var timestamp = data.timestamp;
+            var timestampISO;
+            if (timestamp && timestamp.toDate) {
+              timestampISO = timestamp.toDate().toISOString();
+            } else if (timestamp) {
+              timestampISO = new Date(timestamp).toISOString();
+            } else {
+              timestampISO = new Date().toISOString();
+            }
+
+            // Map Firebase data to audit log format
+            EXTENDED_LOGS.push({
+              id: idCounter++,
+              timestamp: timestampISO,
+              user: data.user || "unknown",
+              role: data.role || "client",
+              action: data.action || "unknown",
+              module: getModuleFromAction(data.action),
+              details: getDetailsFromAction(data),
+              prev_value: data.prev_value || null,
+              new_value: data.new_value || null,
+              ip: data.ip || "—",
+              device: data.device || "Unknown",
+              severity: data.status === "error" ? "warning" : "info",
+              status: data.status || "success",
+            });
+          });
+
+          console.log(
+            "✅ Loaded " +
+              EXTENDED_LOGS.length +
+              " activity logs from Firebase",
+          );
+
+          allLogs = EXTENDED_LOGS.slice().sort(function (a, b) {
+            return new Date(b.timestamp) - new Date(a.timestamp);
+          });
+
+          updateTimestamp();
+          loadStats();
+          loadCharts();
+          renderTable();
+          renderTimeline();
+          renderSessions();
+          _offcanvas = new bootstrap.Offcanvas(
+            document.getElementById("detail-offcanvas"),
+          );
+        } catch (error) {
+          console.error("❌ Error loading activity logs:", error);
+          allLogs = [];
+          updateTimestamp();
+          loadStats();
+          loadCharts();
+          renderTable();
+          renderTimeline();
+          renderSessions();
+        }
+      };
+
+      // Helper function to determine module from action
+      function getModuleFromAction(action) {
+        if (
+          action === "login" ||
+          action === "login_failed" ||
+          action === "logout"
+        )
+          return "Authentication";
+        if (action.startsWith("view_user")) return "User Management";
+        if (
+          action.startsWith("update_user") ||
+          action.startsWith("create_user")
+        )
+          return "User Management";
+        if (action.startsWith("view_dashboard")) return "Dashboard";
+        if (action.startsWith("view_blocks")) return "Blocks";
+        if (action.startsWith("view_scans")) return "Scan Operations";
+        if (action.startsWith("view_alerts")) return "Alerts";
+        if (action.startsWith("generate_report")) return "Reports";
+        if (action.startsWith("upload")) return "Scan Operations";
+        return "System";
+      }
+
+      // Helper function to generate details text
+      function getDetailsFromAction(data) {
+        if (data.action === "login") {
+          return "Successful login from " + (data.ip || "unknown IP");
+        }
+        if (data.action === "login_failed") {
+          return (
+            "Failed login attempt — " +
+            (data.errorCode || "invalid credentials")
+          );
+        }
+        if (data.action === "logout") {
+          return "Session ended normally";
+        }
+        if (data.action.startsWith("view_")) {
+          return (
+            "Accessed " +
+            data.action.replace("view_", "").replace(/_/g, " ") +
+            " page"
+          );
+        }
+        if (data.action.startsWith("update_user")) {
+          return "Updated user account";
+        }
+        return data.action.replace(/_/g, " ");
+      }
+
+      function updateTimestamp() {
+        var el = document.getElementById("last-updated");
+        if (el)
+          el.textContent =
+            "Updated " +
+            new Date().toLocaleTimeString("en-US", {
+              hour: "2-digit",
+              minute: "2-digit",
+            });
+      }
+
+      /* ── Hero Stats ────────────────────────────────────────────── */
+      function loadStats() {
+        var total = allLogs.length;
+        var criticals = allLogs.filter(function (l) {
+          return l.severity === "critical";
+        }).length;
+        var failed = allLogs.filter(function (l) {
+          return l.status === "error";
+        }).length;
+        var loginAttempts = allLogs.filter(function (l) {
+          return l.action === "login" || l.action === "login_failed";
+        }).length;
+        var sysChanges = allLogs.filter(function (l) {
+          return (
+            l.action.startsWith("update") ||
+            l.action.startsWith("create") ||
+            l.action.startsWith("delete")
+          );
+        }).length;
+        var activeSess = ACTIVE_SESSIONS.length;
+
+        var colorMap = {
+          green: { fg: "var(--green)", bg: "var(--green-bg)" },
+          amber: { fg: "var(--amber)", bg: "var(--amber-bg)" },
+          red: { fg: "var(--red)", bg: "var(--red-bg)" },
+          yellow: { fg: "var(--yellow)", bg: "var(--yellow-bg)" },
+          "": {
+            fg: "var(--color-text-secondary)",
+            bg: "var(--color-background-tertiary)",
+          },
+        };
+
+        var cards = [
+          {
+            label: "Total Logs",
+            value: total,
+            sub: "All time records",
+            color: "",
+            trend: "up",
+            trendTxt: "Growing",
+            icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>',
+          },
+          {
+            label: "Critical Events",
+            value: criticals,
+            sub: "High severity alerts",
+            color: criticals > 0 ? "red" : "green",
+            trend: criticals > 0 ? "dn" : "up",
+            trendTxt: criticals > 0 ? "Needs review" : "All clear",
+            icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+          },
+          {
+            label: "Failed Actions",
+            value: failed,
+            sub: "Error status events",
+            color: failed > 2 ? "red" : failed > 0 ? "amber" : "green",
+            trend: failed > 0 ? "dn" : "up",
+            trendTxt: failed > 0 ? "Monitor IPs" : "No failures",
+            icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
+          },
+          {
+            label: "Active Sessions",
+            value: activeSess,
+            sub: "Currently online",
+            color: activeSess > 0 ? "green" : "",
+            trend: activeSess > 0 ? "up" : "fl",
+            trendTxt: activeSess > 0 ? "Live now" : "No sessions",
+            icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>',
+          },
+          {
+            label: "Login Attempts",
+            value: loginAttempts,
+            sub: "Auth events logged",
+            color: "amber",
+            trend: "fl",
+            trendTxt: "Tracked",
+            icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
+          },
+          {
+            label: "System Changes",
+            value: sysChanges,
+            sub: "User & config updates",
+            color: "amber",
+            trend: "fl",
+            trendTxt: "Monitored",
+            icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>',
+          },
+        ];
+
+        var html = "";
+        cards.forEach(function (c) {
+          var cm = colorMap[c.color] || colorMap[""];
+          var arrow = c.trend === "up" ? "↑" : c.trend === "dn" ? "↓" : "→";
+          html +=
+            '<div class="col-xl-2 col-lg-4 col-md-4 col-sm-6 d-flex">' +
+            '<div class="mc h-100 w-100 ' +
+            c.color +
+            '">' +
+            '<div class="mc-icon-box" style="background:' +
+            cm.bg +
+            ";color:" +
+            cm.fg +
+            ';">' +
+            c.icon +
+            "</div>" +
+            '<div class="mc-label">' +
+            c.label +
+            "</div>" +
+            '<div class="mc-val">' +
+            c.value +
+            "</div>" +
+            '<div class="mc-sub">' +
+            c.sub +
+            '<span class="mc-trend ' +
+            c.trend +
+            '">' +
+            arrow +
+            " " +
+            c.trendTxt +
+            "</span></div>" +
+            "</div></div>";
+        });
+        document.getElementById("log-stats").innerHTML = html;
+      }
+
+      /* ── Charts ────────────────────────────────────────────────── */
+      function loadCharts() {
+        var days = [];
+        for (var d = 6; d >= 0; d--) {
+          var dt = new Date();
+          dt.setDate(dt.getDate() - d);
+          days.push(dt.toISOString().slice(0, 10));
+        }
+        var dayVolume = days.map(function (day) {
+          return allLogs.filter(function (l) {
+            return l.timestamp.startsWith(day);
+          }).length;
+        });
+        var totalThisWeek = dayVolume.reduce(function (a, b) {
+          return a + b;
+        }, 0);
+
+        var actionTypes = [
+          "login",
+          "logout",
+          "view",
+          "update",
+          "upload",
+          "generate",
+          "error",
+        ];
+        var actionLabels = [
+          "Login",
+          "Logout",
+          "View",
+          "Update",
+          "Upload",
+          "Report",
+          "Error",
+        ];
+        var actionColors = [
+          "#4caf78",
+          "#999",
+          "#3a5fc8",
+          "#e6a817",
+          "#f0c430",
+          "#9b59b6",
+          "#d94f4f",
+        ];
+        var actionCounts = actionTypes.map(function (a) {
+          return allLogs.filter(function (l) {
+            if (a === "view") return l.action.startsWith("view");
+            if (a === "update") return l.action.startsWith("update");
+            if (a === "generate") return l.action.startsWith("generate");
+            if (a === "error") return l.status === "error";
+            return l.action === a;
+          }).length;
+        });
+        var maxCount = Math.max.apply(null, actionCounts) || 1;
+        var barHtml = '<div class="bar-chart">';
+        actionCounts.forEach(function (count, i) {
+          var h = Math.max(4, Math.round((count / maxCount) * 54));
+          barHtml +=
+            '<div class="bar-item"><div class="bar-fill" style="height:' +
+            h +
+            "px;background:" +
+            actionColors[i] +
+            ';"></div><div class="bar-label">' +
+            actionLabels[i] +
+            "</div></div>";
+        });
+        barHtml += "</div>";
+
+        var errorByDay = days.map(function (day) {
+          return allLogs.filter(function (l) {
+            return l.timestamp.startsWith(day) && l.status === "error";
+          }).length;
+        });
+        var totalErrors = errorByDay.reduce(function (a, b) {
+          return a + b;
+        }, 0);
+        var errCount = allLogs.filter(function (l) {
+          return l.status === "error";
+        }).length;
+        var successRate =
+          allLogs.length > 0
+            ? Math.round(((allLogs.length - errCount) / allLogs.length) * 100)
+            : 100;
+        var successByDay = dayVolume.map(function (v, i) {
+          return v > 0 ? Math.round(((v - errorByDay[i]) / v) * 100) : 100;
+        });
+
+        var html = "";
+        html +=
+          '<div class="col-lg-4 col-md-12 d-flex">' +
+          '<div class="chart-panel h-100 w-100"><div class="chart-panel-title">Event Volume (7 days)</div>' +
+          '<div class="chart-panel-value">' +
+          totalThisWeek +
+          "</div>" +
+          '<div class="chart-panel-sub"><span class="up">↑ ' +
+          dayVolume[6] +
+          " today</span></div>" +
+          '<div class="sparkline-wrap">' +
+          buildSparkSVG(dayVolume, "#4caf78") +
+          "</div>" +
+          "</div></div>";
+
+        html +=
+          '<div class="col-lg-4 col-md-12 d-flex">' +
+          '<div class="chart-panel h-100 w-100"><div class="chart-panel-title">Action Breakdown</div>' +
+          '<div class="chart-panel-value">' +
+          actionTypes.length +
+          "</div>" +
+          '<div class="chart-panel-sub">Action categories tracked</div>' +
+          barHtml +
+          "</div></div>";
+
+        html +=
+          '<div class="col-lg-4 col-md-12 d-flex">' +
+          '<div class="chart-panel h-100 w-100"><div class="chart-panel-title">Success Rate</div>' +
+          '<div class="chart-panel-value">' +
+          successRate +
+          "%</div>" +
+          '<div class="chart-panel-sub">' +
+          (totalErrors > 0
+            ? '<span class="dn">↓ ' + totalErrors + " errors this week</span>"
+            : '<span class="up">↑ All clear this week</span>') +
+          "</div>" +
+          '<div class="sparkline-wrap">' +
+          buildSparkSVG(successByDay, "#2d6a3f") +
+          "</div>" +
+          "</div></div>";
+
+        document.getElementById("charts-row").innerHTML = html;
+      }
+
+      function buildSparkSVG(data, color) {
+        var W = 200,
+          H = 40;
+        if (!data || data.length < 2) return "";
+        var max = Math.max.apply(null, data),
+          min = Math.min.apply(null, data);
+        var range = max - min || 1;
+        var pts = data.map(function (v, i) {
+          return [
+            ((i / (data.length - 1)) * W).toFixed(1),
+            (H - 4 - ((v - min) / range) * (H - 8)).toFixed(1),
+          ];
+        });
+        var linePts = pts
+          .map(function (p) {
+            return p[0] + "," + p[1];
+          })
+          .join(" ");
+        var areaD =
+          "M0," +
+          H +
+          " " +
+          pts
+            .map(function (p) {
+              return "L" + p[0] + "," + p[1];
+            })
+            .join(" ") +
+          " L" +
+          W +
+          "," +
+          H +
+          " Z";
+        var uid = "sg" + Math.random().toString(36).slice(2, 7);
+        var last = pts[pts.length - 1];
+        return (
+          '<svg viewBox="0 0 ' +
+          W +
+          " " +
+          H +
+          '" preserveAspectRatio="none">' +
+          '<defs><linearGradient id="' +
+          uid +
+          '" x1="0" y1="0" x2="0" y2="1">' +
+          '<stop offset="0%" stop-color="' +
+          color +
+          '" stop-opacity="0.22"/>' +
+          '<stop offset="100%" stop-color="' +
+          color +
+          '" stop-opacity="0"/>' +
+          "</linearGradient></defs>" +
+          '<path d="' +
+          areaD +
+          '" fill="url(#' +
+          uid +
+          ')"/>' +
+          '<polyline points="' +
+          linePts +
+          '" fill="none" stroke="' +
+          color +
+          '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+          '<circle cx="' +
+          last[0] +
+          '" cy="' +
+          last[1] +
+          '" r="3" fill="' +
+          color +
+          '"/>' +
+          "</svg>"
+        );
+      }
+
+      /* ── Render Preview Table (5 most recent) ──────────────────── */
+      function renderTable() {
+        var preview = allLogs.slice(0, 5);
+        var tbody = document.getElementById("log-tbody");
+        if (!preview.length) {
+          tbody.innerHTML =
+            '<tr class="empty-rows"><td colspan="3">No log entries.</td></tr>';
+          return;
+        }
+        var html = "";
+        preview.forEach(function (log) {
+          var ts = new Date(log.timestamp);
+          var timeStr = ts.toLocaleString("en-US", {
+            month: "short",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+          });
+          var initials = log.user.substring(0, 2).toUpperCase();
+          var isAdmin = log.role === "admin",
+            isError = log.status === "error";
+          var avCls = isError ? "ae" : isAdmin ? "aa" : "ac";
+          var actionCls = getActionClass(log.action, log.status);
+          var actionLbl = getActionLabel(log.action);
+          html +=
+            '<tr class="log-row" onclick="openDetail(' +
+            log.id +
+            ')" title="Click to view details">' +
+            '<td style="font-family:var(--font-mono);font-size:var(--font-size-xs);white-space:nowrap;">' +
+            timeStr +
+            "</td>" +
+            '<td><div class="user-cell"><div class="log-avatar ' +
+            avCls +
+            '">' +
+            initials +
+            '</div><div class="user-cell-name">' +
+            log.user +
+            "</div></div></td>" +
+            '<td><span class="action-pill ' +
+            actionCls +
+            '">' +
+            actionLbl +
+            "</span></td>" +
+            "</tr>";
+        });
+        tbody.innerHTML = html;
+      }
+
+      /* ── Action helpers ────────────────────────────────────────── */
+      function getActionClass(action, status) {
+        if (status === "error" || action === "login_failed")
+          return "action-error";
+        if (action === "login") return "action-login";
+        if (action === "logout") return "action-logout";
+        if (action.startsWith("view")) return "action-view";
+        if (
+          action.startsWith("update") ||
+          action.startsWith("create") ||
+          action.startsWith("delete")
+        )
+          return "action-update";
+        if (action.startsWith("upload")) return "action-upload";
+        if (action.startsWith("generate")) return "action-generate";
+        return "action-view";
+      }
+
+      function getActionLabel(action) {
+        var map = {
+          login: "→ Login",
+          logout: "← Logout",
+          login_failed: "✕ Failed Login",
+          view_dashboard: "👁 Dashboard",
+          view_users: "👁 Users",
+          view_blocks: "👁 Blocks",
+          view_scan: "👁 Scan",
+          view_alerts: "👁 Alerts",
+          update_user: "✎ Update User",
+          create_user: "+ Create User",
+          upload_scan: "↑ Upload Scan",
+          generate_report: "⊞ Report",
+        };
+        return map[action] || action.replace(/_/g, " ");
+      }
+
+      /* ── Timeline ──────────────────────────────────────────────── */
+      function renderTimeline() {
+        var important = allLogs
+          .filter(function (l) {
+            return (
+              l.status === "error" ||
+              l.action.startsWith("update") ||
+              l.action.startsWith("upload") ||
+              l.action.startsWith("generate") ||
+              l.action === "login" ||
+              l.action === "logout" ||
+              l.action === "login_failed"
+            );
+          })
+          .slice(0, 14);
+
+        document.getElementById("timeline-count").textContent =
+          important.length + " events";
+
+        if (!important.length) {
+          document.getElementById("timeline-list").innerHTML =
+            '<p style="font-size:var(--font-size-xs);color:var(--color-text-tertiary);margin:0;">No events to display.</p>';
+          return;
+        }
+
+        var html = "";
+        important.forEach(function (log) {
+          var ts = new Date(log.timestamp);
+          var timeStr = ts.toLocaleString("en-US", {
+            month: "short",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+          });
+          var dotCls =
+            log.severity === "critical"
+              ? "dot-critical"
+              : log.severity === "warning"
+                ? "dot-warning"
+                : log.status === "error"
+                  ? "dot-warning"
+                  : log.action.startsWith("update") ||
+                      log.action.startsWith("upload")
+                    ? "dot-info"
+                    : "dot-success";
+          html +=
+            '<div class="tl-item">' +
+            '<div class="tl-dot ' +
+            dotCls +
+            '"></div>' +
+            '<span class="tl-time">' +
+            timeStr +
+            "</span>" +
+            '<span class="tl-desc">' +
+            log.details +
+            "</span>" +
+            '<span class="tl-user">' +
+            log.user +
+            " · " +
+            log.module +
+            "</span>" +
+            "</div>";
+        });
+        document.getElementById("timeline-list").innerHTML = html;
+      }
+
+      /* ── Sessions ──────────────────────────────────────────────── */
+      function renderSessions() {
+        // Get current logged-in user
+        var currentUser = auth.getCurrentUser();
+
+        if (!currentUser) {
+          ACTIVE_SESSIONS = [];
+          document.getElementById("session-count").textContent = "0 active";
+          document.getElementById("sessions-list").innerHTML =
+            '<p style="font-size:var(--font-size-xs);color:var(--color-text-tertiary);margin:0;">No active sessions.</p>';
+          return;
+        }
+
+        // Show only current session
+        ACTIVE_SESSIONS = [
+          {
+            id: "current_session",
+            user: currentUser.username,
+            role: currentUser.role,
+            ip: "192.168.1.100",
+            device: navigator.userAgent.includes("Chrome")
+              ? "Chrome / " +
+                (navigator.userAgent.includes("Windows")
+                  ? "Windows"
+                  : navigator.userAgent.includes("Mac")
+                    ? "macOS"
+                    : "Linux")
+              : "Browser",
+            login_at: currentUser.loginTime || new Date().toISOString(),
+            last_active: new Date().toISOString(),
+          },
+        ];
+
+        document.getElementById("session-count").textContent =
+          ACTIVE_SESSIONS.length + " active";
+
+        var html = "";
+        ACTIVE_SESSIONS.forEach(function (s) {
+          var isAdmin = s.role === "admin";
+          var avBg = isAdmin ? "var(--yellow-bg)" : "var(--green-bg)";
+          var avClr = isAdmin ? "var(--yellow)" : "var(--green)";
+          var initials = s.user.substring(0, 2).toUpperCase();
+          var loginTs = new Date(s.login_at);
+          var lastTs = new Date(s.last_active);
+          var loginStr = loginTs.toLocaleString("en-US", {
+            month: "short",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+          });
+          var lastStr = lastTs.toLocaleString("en-US", {
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+          });
+
+          html +=
+            '<div class="session-row">' +
+            '<div class="session-avatar" style="background:' +
+            avBg +
+            ";color:" +
+            avClr +
+            ';">' +
+            initials +
+            "</div>" +
+            '<div class="session-info">' +
+            '<div class="session-name">' +
+            s.user +
+            ' <span style="font-size:10px;font-weight:400;color:var(--color-text-secondary);">(' +
+            s.role +
+            ")</span></div>" +
+            '<div class="session-device">' +
+            s.device +
+            "</div>" +
+            '<div class="session-meta">Login: ' +
+            loginStr +
+            " · Last: " +
+            lastStr +
+            "</div>" +
+            "</div>" +
+            '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;">' +
+            '<div class="session-live"><div class="live-dot"></div>Live (You)</div>' +
+            "</div>" +
+            "</div>";
+        });
+        document.getElementById("sessions-list").innerHTML = html;
+      }
+
+      function revokeSession(id, e) {
+        e.stopPropagation();
+        utils.showToast("Session " + id + " revoked", "success");
+      }
+
+      function viewSessionActivity(user, e) {
+        e.stopPropagation();
+        window.location.href = "activity.html?user=" + encodeURIComponent(user);
+      }
+
+      /* ── Detail Offcanvas ──────────────────────────────────────── */
+      function openDetail(id) {
+        var log = allLogs.find(function (l) {
+          return l.id === id;
+        });
+        if (!log) return;
+
+        var ts = new Date(log.timestamp);
+        var timeStr = ts.toLocaleString("en-US", {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: true,
+        });
+        var isInternal =
+          (log.ip || "").startsWith("192.168") ||
+          (log.ip || "").startsWith("10.") ||
+          (log.ip || "").startsWith("172.");
+
+        document.getElementById("oc-title-id").textContent =
+          "Log Entry #" + String(log.id).padStart(2, "0");
+        document.getElementById("oc-subtitle").textContent =
+          getActionLabel(log.action) + " · " + log.user;
+
+        var statusHtml =
+          log.status === "success"
+            ? '<span class="badge good"><span class="bdot"></span>Success</span>'
+            : '<span class="badge crit"><span class="bdot"></span>Error</span>';
+        var sevHtml =
+          '<span class="sev sev-' +
+          log.severity +
+          '">' +
+          log.severity +
+          "</span>";
+        var ipHtml =
+          '<span class="det-mono" style="' +
+          (isInternal ? "" : "color:var(--red);") +
+          '">' +
+          (log.ip || "—") +
+          "</span>" +
+          ' <span style="font-size:10px;color:' +
+          (isInternal ? "var(--green)" : "var(--red)") +
+          ';">' +
+          (isInternal ? "(Internal)" : "(External)") +
+          "</span>";
+
+        var body =
+          '<div class="det-section">Event Information</div>' +
+          detRow(
+            "Log ID",
+            '<span class="det-mono">#' +
+              String(log.id).padStart(2, "0") +
+              "</span>",
+          ) +
+          detRow(
+            "Timestamp",
+            '<span class="det-mono" style="font-size:12px;">' +
+              timeStr +
+              "</span>",
+          ) +
+          detRow("Status", statusHtml) +
+          detRow("Severity", sevHtml) +
+          detRow(
+            "Action",
+            '<span class="action-pill ' +
+              getActionClass(log.action, log.status) +
+              '">' +
+              getActionLabel(log.action) +
+              "</span>",
+          ) +
+          detRow(
+            "Module",
+            '<span class="module-tag">' + log.module + "</span>",
+          ) +
+          detRow(
+            "Details",
+            '<span style="font-size:var(--font-size-sm);text-align:right;">' +
+              log.details +
+              "</span>",
+          ) +
+          '<div class="det-section">User & Session</div>' +
+          detRow("Username", "<strong>" + log.user + "</strong>") +
+          detRow(
+            "Role",
+            log.role === "admin"
+              ? '<span style="color:var(--amber);font-weight:var(--font-weight-medium);">Administrator</span>'
+              : log.user === "unknown"
+                ? '<span style="color:var(--red);">Unknown / Unauthenticated</span>'
+                : "Client",
+          ) +
+          detRow("IP Address", ipHtml) +
+          detRow(
+            "Network",
+            isInternal
+              ? "Internal LAN"
+              : '<span style="color:var(--red);">External / Public</span>',
+          ) +
+          detRow(
+            "Device",
+            '<span style="font-size:var(--font-size-sm);">' +
+              (log.device || "—") +
+              "</span>",
+          );
+
+        if (log.prev_value || log.new_value) {
+          body +=
+            '<div class="det-section">Data Changes</div>' +
+            '<div class="value-change-box">' +
+            (log.prev_value
+              ? '<div class="value-change-row"><span class="value-change-lbl">Before</span><span class="value-prev">' +
+                log.prev_value +
+                "</span></div>"
+              : "") +
+            (log.new_value
+              ? '<div class="value-change-row"><span class="value-change-lbl">After</span><span class="value-new">' +
+                log.new_value +
+                "</span></div>"
+              : "") +
+            "</div>";
+        }
+
+        if (log.status === "error") {
+          body +=
+            '<div class="security-notice">' +
+            (isInternal
+              ? "Failed authentication from an internal network address. Verify that credentials are not being shared or stored insecurely."
+              : "Failed authentication from an external IP address. Monitor this IP for repeated attempts and consider blocking if necessary.") +
+            "</div>";
+        }
+
+        document.getElementById("oc-body").innerHTML = body;
+        _offcanvas.show();
+      }
+
+      function detRow(label, valueHtml) {
+        return (
+          '<div class="det-row"><div class="det-label">' +
+          label +
+          '</div><div class="det-value">' +
+          valueHtml +
+          "</div></div>"
+        );
+      }
+
+      /* ── Refresh ───────────────────────────────────────────────── */
+      function refreshLogs() {
+        var btn = document.getElementById("refresh-btn"),
+          icon = document.getElementById("refresh-icon");
+        btn.disabled = true;
+        icon.classList.add("spinning");
+        setTimeout(function () {
+          window.initPage();
+          btn.disabled = false;
+          icon.classList.remove("spinning");
+          utils.showToast("Audit logs refreshed", "success");
+        }, 600);
+      }
+
+      function openLogoutModal() { auth.confirmLogout(); }
+      function closeLogoutModal() {
+        document.getElementById("logout-modal").style.display = "none";
+      }
+    </script>
+
+    <!-- Logout Confirmation Modal -->
+    <div
+      id="logout-modal"
+      style="
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: none;
+        align-items: center;
+        justify-content: center;
+      "
+    >
+      <!-- Backdrop -->
+      <div
+        onclick="closeLogoutModal()"
+        style="
+          position: absolute;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.45);
+          backdrop-filter: blur(2px);
+        "
+      ></div>
+      <!-- Dialog -->
+      <div
+        style="
+          position: relative;
+          background: var(--color-background-primary);
+          border: 1px solid var(--color-border-secondary);
+          border-radius: var(--radius-lg);
+          padding: var(--space-2xl);
+          width: 360px;
+          max-width: 90vw;
+          box-shadow: var(--shadow-md);
+          text-align: center;
+        "
+      >
+        <div
+          style="
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--red-bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto var(--space-lg);
+          "
+        >
+          <svg
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="var(--red)"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+        </div>
+        <h3
+          style="
+            font-size: var(--font-size-lg);
+            font-weight: var(--font-weight-semibold);
+            color: var(--color-text-primary);
+            margin-bottom: var(--space-sm);
+          "
+        >
+          Confirm Logout
+        </h3>
+        <p
+          style="
+            font-size: var(--font-size-sm);
+            color: var(--color-text-secondary);
+            margin-bottom: var(--space-xl);
+          "
+        >
+          Are you sure you want to log out of your session?
+        </p>
+        <div
+          style="display: flex; gap: var(--space-md); justify-content: center"
+        >
+          <button
+            onclick="closeLogoutModal()"
+            class="btn btn-secondary"
+            style="flex: 1"
+          >
+            Cancel
+          </button>
+          <button
+            onclick="auth.logout()"
+            class="btn btn-danger"
+            style="
+              flex: 1;
+              background: var(--red-mid);
+              color: #fff;
+              border-color: var(--red-mid);
+            "
+          >
+            Yes, Logout
+          </button>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

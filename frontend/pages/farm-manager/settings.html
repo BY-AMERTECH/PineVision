@@ -1,0 +1,1930 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      (function () {
+        try {
+          var s = JSON.parse(
+            localStorage.getItem("pinevision_settings") || "{}",
+          );
+          if (s.theme === "dark")
+            document.documentElement.classList.add("dark-mode");
+        } catch (e) {}
+      })();
+    </script>
+    <title>Settings - PineVision</title>
+
+    <link rel="stylesheet" href="../../bootstrap/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="../../css/tokens.css" />
+    <link rel="stylesheet" href="../../css/layout.css" />
+    <link rel="stylesheet" href="../../css/components.css" />
+
+    <style>
+      /* ── Settings tab pane entrance ────────────────── */
+      .tab-pane.show {
+        animation: fadeUp 0.18s ease both;
+      }
+
+      /* ── Sticky action bar ──────────────────────────── */
+      .action-bar {
+        position: sticky;
+        top: 0;
+        z-index: 40;
+        background: var(--surf);
+        border: var(--border-width-thin) solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 10px var(--space-lg);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-md);
+        box-shadow: var(--shadow-md);
+        margin-bottom: var(--space-xl);
+      }
+
+      .unsaved-label {
+        display: none;
+        align-items: center;
+        gap: var(--space-xs);
+        font-size: var(--font-size-sm);
+        color: var(--amber);
+      }
+      .unsaved-label.visible {
+        display: flex;
+      }
+      .unsaved-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--amber-mid);
+        flex-shrink: 0;
+      }
+      .action-bar-info {
+        font-size: var(--font-size-sm);
+        color: var(--muted);
+      }
+
+      /* ── Left nav card ──────────────────────────────── */
+      .settings-nav-card {
+        position: sticky;
+        top: 68px;
+        overflow: hidden;
+      }
+
+      .settings-nav .nav-link {
+        display: flex;
+        align-items: center;
+        gap: var(--space-md);
+        padding: 10px var(--space-lg);
+        font-size: var(--font-size-sm);
+        font-weight: var(--font-weight-medium);
+        color: var(--color-text-secondary);
+        border-radius: 0;
+        border: none;
+        border-left: 3px solid transparent;
+        transition: all var(--transition-fast);
+        width: 100%;
+        text-align: left;
+        background: none;
+      }
+      .settings-nav .nav-link:hover {
+        color: var(--green);
+        background: var(--green-bg);
+      }
+      .settings-nav .nav-link.active {
+        color: var(--green);
+        background: var(--green-bg);
+        border-left-color: var(--green);
+        font-weight: var(--font-weight-semibold);
+      }
+      .settings-nav .nav-link svg {
+        flex-shrink: 0;
+        opacity: 0.65;
+      }
+      .settings-nav .nav-link:hover svg,
+      .settings-nav .nav-link.active svg {
+        opacity: 1;
+      }
+
+      .snav-group {
+        display: block;
+        font-size: var(--font-size-xs);
+        font-weight: var(--font-weight-semibold);
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        padding: var(--space-md) var(--space-lg) 4px;
+      }
+      .snav-group:not(:first-child) {
+        border-top: var(--border-width-thin) solid var(--border);
+        margin-top: var(--space-xs);
+        padding-top: var(--space-md);
+      }
+
+      /* ── Section card ───────────────────────────────── */
+      .scard {
+        background: var(--surf);
+        border: 1.5px solid var(--color-border-primary);
+        border-radius: var(--radius-lg);
+        padding: var(--space-xl);
+        box-shadow: var(--shadow-sm);
+        margin-bottom: var(--space-lg);
+      }
+      .scard-head {
+        margin-bottom: var(--space-lg);
+        padding-bottom: var(--space-md);
+        border-bottom: var(--border-width-thin) solid var(--border);
+      }
+      .scard-head.no-border {
+        border-bottom: none;
+        margin-bottom: 0;
+      }
+      .scard-title {
+        font-size: var(--font-size-md);
+        font-weight: var(--font-weight-semibold);
+        color: var(--color-text-primary);
+        margin-bottom: 2px;
+      }
+      .scard-desc {
+        font-size: var(--font-size-sm);
+        color: var(--muted);
+        margin: 0;
+      }
+
+      /* ── Setting row ────────────────────────────────── */
+      .srow {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: var(--space-md) 0;
+        border-bottom: var(--border-width-thin) solid var(--border);
+        gap: var(--space-xl);
+      }
+      .srow:last-child {
+        border-bottom: none;
+      }
+      .srow-label {
+        flex: 1;
+        min-width: 0;
+      }
+      .srow-title {
+        font-size: var(--font-size-base);
+        font-weight: var(--font-weight-medium);
+        color: var(--color-text-primary);
+        margin-bottom: 2px;
+      }
+      .srow-desc {
+        font-size: var(--font-size-sm);
+        color: var(--muted);
+      }
+      .srow-ctrl {
+        flex-shrink: 0;
+      }
+
+      /* ── Toggle switch ──────────────────────────────── */
+      .toggle-switch {
+        position: relative;
+        display: inline-block;
+        width: 48px;
+        height: 26px;
+      }
+      .toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+      .toggle-slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: var(--color-background-secondary);
+        border: var(--border-width-thin) solid var(--border);
+        transition: 0.3s;
+        border-radius: 26px;
+      }
+      .toggle-slider:before {
+        position: absolute;
+        content: "";
+        height: 18px;
+        width: 18px;
+        left: 3px;
+        bottom: 3px;
+        background: var(--surf);
+        transition: 0.3s;
+        border-radius: 50%;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+      }
+      input:checked + .toggle-slider {
+        background: var(--green);
+        border-color: var(--green);
+      }
+      input:checked + .toggle-slider:before {
+        transform: translateX(22px);
+        background: white;
+      }
+
+      /* ── Radio group ────────────────────────────────── */
+      .radio-group {
+        display: flex;
+        gap: var(--space-sm);
+        flex-wrap: wrap;
+      }
+      .radio-option {
+        position: relative;
+      }
+      .radio-option input[type="radio"] {
+        position: absolute;
+        opacity: 0;
+      }
+      .radio-option label {
+        display: flex;
+        align-items: center;
+        padding: 6px var(--space-md);
+        border: var(--border-width-thin) solid var(--border);
+        border-radius: var(--radius-md);
+        cursor: pointer;
+        font-size: var(--font-size-sm);
+        background: var(--surf);
+        transition: all var(--transition-fast);
+        white-space: nowrap;
+      }
+      .radio-option input:checked + label {
+        background: var(--green-bg);
+        border-color: var(--green);
+        color: var(--green);
+        font-weight: var(--font-weight-medium);
+      }
+      .radio-option label:hover {
+        border-color: var(--color-border-primary);
+      }
+
+      /* ── Preview box ────────────────────────────────── */
+      .preview-box {
+        background: var(--surf2);
+        border: var(--border-width-thin) solid var(--border);
+        border-radius: var(--radius-md);
+        padding: var(--space-lg);
+        margin-top: var(--space-lg);
+      }
+      .preview-title {
+        font-size: var(--font-size-xs);
+        font-weight: var(--font-weight-semibold);
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: var(--space-sm);
+      }
+
+      /* ── Avatar ─────────────────────────────────────── */
+      .avatar-lg {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        background: var(--green);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        font-weight: var(--font-weight-semibold);
+        flex-shrink: 0;
+      }
+
+      /* ── Form inputs ────────────────────────────────── */
+      .s-input {
+        width: 100%;
+        padding: var(--space-sm) var(--space-md);
+        font-size: var(--font-size-sm);
+        border: var(--border-width-base) solid var(--border);
+        border-radius: var(--radius-md);
+        background: var(--surf);
+        color: var(--color-text-primary);
+        font-family: var(--font-sans);
+        transition: border-color var(--transition-fast);
+      }
+      .s-input:focus {
+        outline: none;
+        border-color: var(--green);
+        box-shadow: 0 0 0 3px var(--green-bg);
+      }
+      .s-input:disabled {
+        background: var(--surf2);
+        color: var(--muted);
+        cursor: not-allowed;
+      }
+
+      .s-label {
+        display: block;
+        font-size: var(--font-size-sm);
+        color: var(--muted);
+        margin-bottom: var(--space-xs);
+      }
+
+      .s-select {
+        padding: var(--space-sm) var(--space-md);
+        font-size: var(--font-size-sm);
+        border: var(--border-width-base) solid var(--border);
+        border-radius: var(--radius-md);
+        background: var(--surf);
+        color: var(--color-text-primary);
+        font-family: var(--font-sans);
+        transition: border-color var(--transition-fast);
+        min-width: 150px;
+      }
+      .s-select:focus {
+        outline: none;
+        border-color: var(--green);
+        box-shadow: 0 0 0 3px var(--green-bg);
+      }
+
+      /* ── Range slider ───────────────────────────────── */
+      .s-range {
+        width: 100%;
+        accent-color: var(--green);
+        cursor: pointer;
+      }
+      .range-labels {
+        display: flex;
+        justify-content: space-between;
+        font-size: var(--font-size-xs);
+        color: var(--muted);
+        margin-top: 2px;
+      }
+
+      /* ── Info value pill ────────────────────────────── */
+      .info-val {
+        font-size: var(--font-size-sm);
+        font-weight: var(--font-weight-medium);
+        color: var(--color-text-primary);
+        background: var(--surf2);
+        border: var(--border-width-thin) solid var(--border);
+        border-radius: var(--radius-md);
+        padding: 4px var(--space-md);
+        font-family: var(--font-mono);
+        white-space: nowrap;
+      }
+
+      /* ── Session rows ───────────────────────────────── */
+      .session-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: var(--space-md) 0;
+        border-bottom: var(--border-width-thin) solid var(--border);
+        gap: var(--space-md);
+      }
+      .session-row:last-child {
+        border-bottom: none;
+      }
+      .session-device {
+        font-size: var(--font-size-sm);
+        font-weight: var(--font-weight-medium);
+        color: var(--color-text-primary);
+      }
+      .session-meta {
+        font-size: var(--font-size-xs);
+        color: var(--muted);
+        margin-top: 2px;
+      }
+
+      /* ── Scrollable history ─────────────────────────── */
+      .history-scroll {
+        max-height: 210px;
+        overflow-y: auto;
+        margin-top: var(--space-lg);
+        border-top: var(--border-width-thin) solid var(--border);
+      }
+      .history-row {
+        display: grid;
+        grid-template-columns: 1.4fr 1.2fr 1fr auto;
+        gap: var(--space-md);
+        align-items: center;
+        padding: var(--space-sm) 0;
+        border-bottom: var(--border-width-thin) solid var(--border);
+        font-size: var(--font-size-sm);
+      }
+      .history-row:last-child {
+        border-bottom: none;
+      }
+      .history-head {
+        display: grid;
+        grid-template-columns: 1.4fr 1.2fr 1fr auto;
+        gap: var(--space-md);
+        padding: var(--space-sm) 0 var(--space-xs);
+        font-size: var(--font-size-xs);
+        font-weight: var(--font-weight-semibold);
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        border-bottom: var(--border-width-thin) solid var(--border);
+      }
+
+      /* ── Responsive ─────────────────────────────────── */
+      @media (max-width: 767px) {
+        .srow {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+        .srow-ctrl {
+          width: 100%;
+        }
+        .radio-group {
+          width: 100%;
+        }
+        .radio-option {
+          flex: 1;
+        }
+        .settings-nav-card {
+          position: static;
+        }
+        .action-bar {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-wrapper">
+      <!-- ── Sidebar ───────────────────────────────────────── -->
+      <aside class="sidebar">
+        <div class="sidebar-brand">
+          <div class="sidebar-logo">
+            <img
+              src="/frontend/assets/images/pinevision-logo.svg"
+              alt="PineVision"
+              class="sidebar-logo-img"
+            />
+          </div>
+          <div class="sidebar-brand-text">
+            <div class="sidebar-brand-name">PineVision</div>
+            <div class="sidebar-brand-tagline">Farm Manager Panel</div>
+          </div>
+        </div>
+
+        <button
+          class="sidebar-collapse-btn"
+          onclick="app.toggleSidebar()"
+          aria-label="Toggle sidebar"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <polyline points="15,18 9,12 15,6" />
+          </svg>
+          <span class="nav-link-text">Collapse sidebar</span>
+        </button>
+
+        <nav class="sidebar-nav">
+          <div class="nav-section">
+            <div class="nav-section-title">Main</div>
+            <ul class="nav-links">
+              <li>
+                <a
+                  href="dashboard.html"
+                  class="nav-link"
+                  data-tooltip="Dashboard"
+                >
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-dashboard.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Dashboard</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div class="nav-section">
+            <div class="nav-section-title">Monitoring</div>
+            <ul class="nav-links">
+              <li>
+                <a href="users.html" class="nav-link" data-tooltip="Users">
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-users.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Users</span>
+                </a>
+              </li>
+              <li>
+                <a
+                  href="auditlogs.html"
+                  class="nav-link"
+                  data-tooltip="Audit Logs"
+                >
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-clipboard.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Audit Logs</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div class="nav-section">
+            <div class="nav-section-title">Operations</div>
+            <ul class="nav-links">
+              <li>
+                <a
+                  href="flights-scans.html"
+                  class="nav-link"
+                  data-tooltip="Flights &amp; Scans"
+                >
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-flights.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Flights &amp; Scans</span>
+                </a>
+              </li>
+              <li>
+                <a href="alerts.html" class="nav-link" data-tooltip="Alerts">
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-bell.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Alerts</span>
+                  <span
+                    class="nav-badge"
+                    id="nav-badge-alerts"
+                    style="display: none"
+                  ></span>
+                </a>
+              </li>
+              <li>
+                <a href="reports.html" class="nav-link" data-tooltip="Reports">
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-reports.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Reports</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div class="nav-section">
+            <div class="nav-section-title">System</div>
+            <ul class="nav-links">
+              <li>
+                <a
+                  href="settings.html"
+                  class="nav-link active"
+                  data-tooltip="Settings"
+                >
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-cog.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Settings</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div class="sidebar-user">
+            <div class="sidebar-user-avatar">A</div>
+            <div class="sidebar-user-info">
+              <div class="sidebar-user-name">Admin</div>
+              <div class="sidebar-user-role">admin</div>
+            </div>
+          </div>
+          <button class="btn-logout" onclick="openLogoutModal()">
+            <img src="/frontend/assets/icons/logout.svg" alt="" width="16" />
+            <span class="logout-text">Logout</span>
+          </button>
+        </div>
+      </aside>
+      <!-- ── Main Content ──────────────────────────────────── -->
+      <main class="main-content">
+        <div
+          class="page-container"
+          style="
+            padding: var(--page-padding);
+            max-width: var(--page-max-width);
+            margin: 0 auto;
+          "
+        >
+          <!-- Page header -->
+          <div
+            style="
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-end;
+              margin-bottom: var(--space-lg);
+            "
+          >
+            <div>
+              <h1 class="page-title d-flex align-items-center gap-2">
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  style="color: var(--green); flex-shrink: 0"
+                >
+                  <circle cx="12" cy="12" r="3" />
+                  <path
+                    d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"
+                  /></svg
+                >Settings
+              </h1>
+              <p class="page-subtitle">
+                Manage your PineVision admin preferences
+              </p>
+            </div>
+          </div>
+
+          <!-- ── Sticky action bar ──────────────────────── -->
+          <div class="action-bar">
+            <div class="d-flex align-items-center gap-3">
+              <span class="unsaved-label" id="unsaved-label">
+                <span class="unsaved-dot"></span>Unsaved changes
+              </span>
+              <span class="action-bar-info"
+                >Display settings apply instantly</span
+              >
+            </div>
+            <div class="d-flex gap-2">
+              <button
+                class="btn btn-secondary btn-sm"
+                onclick="handleResetSettings()"
+              >
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  style="flex-shrink: 0"
+                >
+                  <polyline points="1 4 1 10 7 10" />
+                  <polyline points="23 20 23 14 17 14" />
+                  <path
+                    d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"
+                  />
+                </svg>
+                Reset
+              </button>
+              <button class="btn btn-primary btn-sm" onclick="handleSaveAll()">
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  style="flex-shrink: 0"
+                >
+                  <path
+                    d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"
+                  />
+                  <polyline points="17 21 17 13 7 13 7 21" />
+                  <polyline points="7 3 7 8 15 8" />
+                </svg>
+                Save Changes
+              </button>
+            </div>
+          </div>
+
+          <!-- ── Settings grid ──────────────────────────── -->
+          <div class="row g-3 align-items-start">
+            <!-- Left: nav pills -->
+            <div class="col-xl-3 col-lg-3 col-md-4">
+              <div class="card p-0 settings-nav-card" style="overflow: hidden">
+                <nav
+                  class="nav flex-column settings-nav"
+                  id="settingsTabs"
+                  role="tablist"
+                  aria-orientation="vertical"
+                >
+                  <span class="snav-group">Preferences</span>
+                  <button
+                    class="nav-link active"
+                    id="tab-appearance"
+                    data-bs-toggle="pill"
+                    data-bs-target="#pane-appearance"
+                    type="button"
+                    role="tab"
+                    aria-selected="true"
+                  >
+                    <svg
+                      width="15"
+                      height="15"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <circle cx="12" cy="12" r="3" />
+                      <path
+                        d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"
+                      />
+                    </svg>
+                    Appearance
+                  </button>
+                  <button
+                    class="nav-link"
+                    id="tab-account"
+                    data-bs-toggle="pill"
+                    data-bs-target="#pane-account"
+                    type="button"
+                    role="tab"
+                    aria-selected="false"
+                  >
+                    <svg
+                      width="15"
+                      height="15"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                      <circle cx="12" cy="7" r="4" />
+                    </svg>
+                    Account
+                  </button>
+
+                  <span class="snav-group">System</span>
+                  <button
+                    class="nav-link"
+                    id="tab-admin"
+                    data-bs-toggle="pill"
+                    data-bs-target="#pane-admin"
+                    type="button"
+                    role="tab"
+                    aria-selected="false"
+                  >
+                    <svg
+                      width="15"
+                      height="15"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <rect x="3" y="3" width="7" height="7" />
+                      <rect x="14" y="3" width="7" height="7" />
+                      <rect x="14" y="14" width="7" height="7" />
+                      <rect x="3" y="14" width="7" height="7" />
+                    </svg>
+                    Farm Manager Panel
+                  </button>
+                  <button
+                    class="nav-link"
+                    id="tab-notifications"
+                    data-bs-toggle="pill"
+                    data-bs-target="#pane-notifications"
+                    type="button"
+                    role="tab"
+                    aria-selected="false"
+                  >
+                    <svg
+                      width="15"
+                      height="15"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                    </svg>
+                    Notifications
+                  </button>
+
+                  <span class="snav-group">Configuration</span>
+
+                  <button
+                    class="nav-link"
+                    id="tab-security"
+                    data-bs-toggle="pill"
+                    data-bs-target="#pane-security"
+                    type="button"
+                    role="tab"
+                    aria-selected="false"
+                  >
+                    <svg
+                      width="15"
+                      height="15"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                    </svg>
+                    Security
+                  </button>
+                </nav>
+              </div>
+            </div>
+
+            <!-- Right: tab content -->
+            <div class="col-xl-9 col-lg-9 col-md-8">
+              <div class="tab-content" id="settingsContent">
+                <!-- ════════════════════════════════════
+                             APPEARANCE
+                             ════════════════════════════════════ -->
+                <div
+                  class="tab-pane fade show active"
+                  id="pane-appearance"
+                  role="tabpanel"
+                  aria-labelledby="tab-appearance"
+                >
+                  <!-- Theme -->
+                  <div class="scard">
+                    <div class="scard-head">
+                      <div class="scard-title">Theme</div>
+                      <p class="scard-desc">
+                        Switch between light and dark display mode
+                      </p>
+                    </div>
+                    <div class="srow">
+                      <div class="srow-label">
+                        <div class="srow-title">Dark Mode</div>
+                        <div class="srow-desc">
+                          Reduces eye strain in low-light environments
+                        </div>
+                      </div>
+                      <div class="srow-ctrl">
+                        <label class="toggle-switch">
+                          <input
+                            type="checkbox"
+                            id="theme-toggle"
+                            onchange="
+                              handleThemeToggle();
+                              markUnsaved();
+                            "
+                          />
+                          <span class="toggle-slider"></span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Font size -->
+                  <div class="scard">
+                    <div class="scard-head">
+                      <div class="scard-title">Font Size</div>
+                      <p class="scard-desc">
+                        Adjust text scale across the entire admin panel
+                      </p>
+                    </div>
+                    <div class="srow">
+                      <div class="srow-label">
+                        <div class="srow-title">Text Scale</div>
+                        <div class="srow-desc">
+                          Applies to labels, tables, and body text
+                        </div>
+                      </div>
+                      <div class="srow-ctrl">
+                        <div class="radio-group">
+                          <div class="radio-option">
+                            <input
+                              type="radio"
+                              id="font-small"
+                              name="font-size"
+                              value="small"
+                              onchange="
+                                handleFontSizeChange('small');
+                                markUnsaved();
+                              "
+                            />
+                            <label for="font-small">Small</label>
+                          </div>
+                          <div class="radio-option">
+                            <input
+                              type="radio"
+                              id="font-medium"
+                              name="font-size"
+                              value="medium"
+                              onchange="
+                                handleFontSizeChange('medium');
+                                markUnsaved();
+                              "
+                              checked
+                            />
+                            <label for="font-medium">Medium</label>
+                          </div>
+                          <div class="radio-option">
+                            <input
+                              type="radio"
+                              id="font-large"
+                              name="font-size"
+                              value="large"
+                              onchange="
+                                handleFontSizeChange('large');
+                                markUnsaved();
+                              "
+                            />
+                            <label for="font-large">Large</label>
+                          </div>
+                          <div class="radio-option">
+                            <input
+                              type="radio"
+                              id="font-xlarge"
+                              name="font-size"
+                              value="xlarge"
+                              onchange="
+                                handleFontSizeChange('xlarge');
+                                markUnsaved();
+                              "
+                            />
+                            <label for="font-xlarge">XL</label>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="preview-box">
+                      <div class="preview-title">Live Preview</div>
+                      <p
+                        style="
+                          margin-bottom: var(--space-sm);
+                          font-size: var(--font-size-base);
+                          color: var(--color-text-primary);
+                        "
+                      >
+                        <strong>Sample Text:</strong> This is how your text will
+                        appear with the selected settings.
+                      </p>
+                      <p
+                        style="
+                          font-family: var(--font-mono);
+                          font-size: var(--font-size-sm);
+                          color: var(--muted);
+                          margin: 0;
+                        "
+                      >
+                        Farm Manager Panel · Clients: 8 · Flights: 6 · Active Alerts: 3
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <!-- /pane-appearance -->
+
+                <!-- ════════════════════════════════════
+                             ACCOUNT
+                             ════════════════════════════════════ -->
+                <div
+                  class="tab-pane fade"
+                  id="pane-account"
+                  role="tabpanel"
+                  aria-labelledby="tab-account"
+                >
+                  <!-- Profile info -->
+                  <div class="scard">
+                    <div class="scard-head">
+                      <div class="scard-title">Profile</div>
+                      <p class="scard-desc">
+                        Your admin account identity and display name
+                      </p>
+                    </div>
+
+                    <div class="srow">
+                      <div class="srow-label">
+                        <div class="srow-title">Avatar</div>
+                        <div class="srow-desc">
+                          Shown in sidebar and across the panel
+                        </div>
+                      </div>
+                      <div class="srow-ctrl d-flex align-items-center gap-3">
+                        <div class="avatar-lg" id="account-avatar">A</div>
+                        <button
+                          class="btn btn-secondary btn-sm"
+                          onclick="
+                            utils.showToast(
+                              'Avatar upload not available in this version',
+                              'warning',
+                            )
+                          "
+                        >
+                          Change
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="srow">
+                      <div class="srow-label">
+                        <div class="srow-title">Username</div>
+                        <div class="srow-desc">
+                          Your login identifier — cannot be changed
+                        </div>
+                      </div>
+                      <div class="srow-ctrl">
+                        <span class="info-val" id="current-username">—</span>
+                      </div>
+                    </div>
+
+                    <div class="srow">
+                      <div class="srow-label">
+                        <div class="srow-title">Role</div>
+                        <div class="srow-desc" id="current-role">—</div>
+                      </div>
+                      <div class="srow-ctrl">
+                        <span
+                          class="badge"
+                          style="
+                            background: var(--yellow-bg);
+                            color: var(--yellow);
+                          "
+                        >
+                          <span
+                            class="bdot"
+                            style="background: var(--yellow-mid)"
+                          ></span
+                          >Admin
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Email preferences -->
+                  <div class="scard">
+                    <div class="scard-head">
+                      <div class="scard-title">Email Preferences</div>
+                      <p class="scard-desc">
+                        Contact address for alerts and system reports
+                      </p>
+                    </div>
+                    <div class="srow">
+                      <div class="srow-label">
+                        <div class="srow-title">Email Address</div>
+                        <div class="srow-desc">
+                          Used for alert digests and report delivery
+                        </div>
+                      </div>
+                      <div class="srow-ctrl" style="min-width: 220px">
+                        <input
+                          type="email"
+                          class="s-input"
+                          id="account-email"
+                          placeholder="admin@example.com"
+                          onchange="markUnsaved()"
+                        />
+                      </div>
+                    </div>
+                    <div class="srow">
+                      <div class="srow-label">
+                        <div class="srow-title">Weekly Digest</div>
+                        <div class="srow-desc">
+                          Receive a farm status summary every Monday
+                        </div>
+                      </div>
+                      <div class="srow-ctrl">
+                        <label class="toggle-switch">
+                          <input
+                            type="checkbox"
+                            id="digest-toggle"
+                            checked
+                            onchange="markUnsaved()"
+                          />
+                          <span class="toggle-slider"></span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Password change -->
+                  <div class="scard">
+                    <div class="scard-head">
+                      <div class="scard-title">Change Password</div>
+                      <p class="scard-desc">
+                        Update your admin account password
+                      </p>
+                    </div>
+                    <div class="row g-3">
+                      <div class="col-12">
+                        <label class="s-label" for="pw-current"
+                          >Current Password</label
+                        >
+                        <input
+                          type="password"
+                          class="s-input"
+                          id="pw-current"
+                          placeholder="Enter current password"
+                        />
+                      </div>
+                      <div class="col-sm-6">
+                        <label class="s-label" for="pw-new">New Password</label>
+                        <input
+                          type="password"
+                          class="s-input"
+                          id="pw-new"
+                          placeholder="New password"
+                        />
+                      </div>
+                      <div class="col-sm-6">
+                        <label class="s-label" for="pw-confirm"
+                          >Confirm Password</label
+                        >
+                        <input
+                          type="password"
+                          class="s-input"
+                          id="pw-confirm"
+                          placeholder="Confirm new password"
+                        />
+                      </div>
+                      <div class="col-12">
+                        <button
+                          class="btn btn-secondary btn-sm"
+                          onclick="handleChangePassword()"
+                        >
+                          Update Password
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <!-- /pane-account -->
+
+                <!-- ════════════════════════════════════
+                             ADMIN PANEL
+                             ════════════════════════════════════ -->
+                <div
+                  class="tab-pane fade"
+                  id="pane-admin"
+                  role="tabpanel"
+                  aria-labelledby="tab-admin"
+                >
+                  <div class="scard">
+                    <div class="scard-head">
+                      <div class="scard-title">Dashboard</div>
+                      <p class="scard-desc">
+                        Customize how the admin dashboard behaves
+                      </p>
+                    </div>
+
+                    <div class="srow">
+                      <div class="srow-label">
+                        <div class="srow-title">Auto-Refresh</div>
+                        <div class="srow-desc">
+                          Automatically reload dashboard metrics every 5 minutes
+                        </div>
+                      </div>
+                      <div class="srow-ctrl">
+                        <label class="toggle-switch">
+                          <input
+                            type="checkbox"
+                            id="auto-refresh-toggle"
+                            onchange="
+                              handleAutoRefreshToggle();
+                              markUnsaved();
+                            "
+                          />
+                          <span class="toggle-slider"></span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div class="srow">
+                      <div class="srow-label">
+                        <div class="srow-title">Compact Table View</div>
+                        <div class="srow-desc">
+                          Reduce row height in data tables for denser display
+                        </div>
+                      </div>
+                      <div class="srow-ctrl">
+                        <label class="toggle-switch">
+                          <input
+                            type="checkbox"
+                            id="compact-toggle"
+                            onchange="
+                              handleCompactToggle();
+                              markUnsaved();
+                            "
+                          />
+                          <span class="toggle-slider"></span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div class="srow">
+                      <div class="srow-label">
+                        <div class="srow-title">Default Date Range</div>
+                        <div class="srow-desc">
+                          Pre-selected filter when opening reports or logs
+                        </div>
+                      </div>
+                      <div class="srow-ctrl">
+                        <select
+                          class="s-select"
+                          id="date-range-default"
+                          onchange="markUnsaved()"
+                        >
+                          <option value="7">Last 7 days</option>
+                          <option value="30" selected>Last 30 days</option>
+                          <option value="90">Last 90 days</option>
+                          <option value="365">Last year</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="scard">
+                    <div class="scard-head">
+                      <div class="scard-title">Alert Notifications</div>
+                      <p class="scard-desc">
+                        Browser notification and sound preferences
+                      </p>
+                    </div>
+
+                    <div class="srow">
+                      <div class="srow-label">
+                        <div class="srow-title">Alert Notifications</div>
+                        <div class="srow-desc">
+                          Show browser notifications for new critical alerts
+                        </div>
+                      </div>
+                      <div class="srow-ctrl">
+                        <label class="toggle-switch">
+                          <input
+                            type="checkbox"
+                            id="notif-toggle"
+                            onchange="
+                              handleNotifToggle();
+                              markUnsaved();
+                            "
+                            checked
+                          />
+                          <span class="toggle-slider"></span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div class="srow">
+                      <div class="srow-label">
+                        <div class="srow-title">Sound Alerts</div>
+                        <div class="srow-desc">
+                          Play an audio cue when a critical alert arrives
+                        </div>
+                      </div>
+                      <div class="srow-ctrl">
+                        <label class="toggle-switch">
+                          <input
+                            type="checkbox"
+                            id="sound-toggle"
+                            onchange="markUnsaved()"
+                          />
+                          <span class="toggle-slider"></span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <!-- /pane-admin -->
+
+                <!-- ════════════════════════════════════
+                             NOTIFICATIONS
+                             ════════════════════════════════════ -->
+                <div
+                  class="tab-pane fade"
+                  id="pane-notifications"
+                  role="tabpanel"
+                  aria-labelledby="tab-notifications"
+                >
+                  <div class="scard">
+                    <div class="scard-head">
+                      <div class="scard-title">Channels</div>
+                      <p class="scard-desc">
+                        Control which channels receive alert notifications
+                      </p>
+                    </div>
+                    <div class="srow">
+                      <div class="srow-label">
+                        <div class="srow-title">Email Alerts</div>
+                        <div class="srow-desc">
+                          Send alert notifications to your configured email
+                          address
+                        </div>
+                      </div>
+                      <div class="srow-ctrl">
+                        <label class="toggle-switch">
+                          <input
+                            type="checkbox"
+                            id="email-alerts-toggle"
+                            checked
+                            onchange="markUnsaved()"
+                          />
+                          <span class="toggle-slider"></span>
+                        </label>
+                      </div>
+                    </div>
+                    <div class="srow">
+                      <div class="srow-label">
+                        <div class="srow-title">Push Notifications</div>
+                        <div class="srow-desc">
+                          Browser push for real-time alerts
+                        </div>
+                      </div>
+                      <div class="srow-ctrl">
+                        <label class="toggle-switch">
+                          <input
+                            type="checkbox"
+                            id="push-toggle"
+                            onchange="markUnsaved()"
+                          />
+                          <span class="toggle-slider"></span>
+                        </label>
+                      </div>
+                    </div>
+                    <div class="srow">
+                      <div class="srow-label">
+                        <div class="srow-title">In-App Badge</div>
+                        <div class="srow-desc">
+                          Show alert count badge in the sidebar navigation
+                        </div>
+                      </div>
+                      <div class="srow-ctrl">
+                        <label class="toggle-switch">
+                          <input
+                            type="checkbox"
+                            id="inapp-toggle"
+                            checked
+                            onchange="markUnsaved()"
+                          />
+                          <span class="toggle-slider"></span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="scard">
+                    <div class="scard-head">
+                      <div class="scard-title">Severity Filter</div>
+                      <p class="scard-desc">
+                        Choose which severity levels trigger notifications
+                      </p>
+                    </div>
+                    <div class="srow">
+                      <div class="srow-label">
+                        <div class="srow-title">Critical</div>
+                        <div class="srow-desc">
+                          Bearing rate below critical threshold
+                        </div>
+                      </div>
+                      <div class="srow-ctrl">
+                        <label class="toggle-switch">
+                          <input
+                            type="checkbox"
+                            id="sev-crit"
+                            checked
+                            onchange="markUnsaved()"
+                          />
+                          <span class="toggle-slider"></span>
+                        </label>
+                      </div>
+                    </div>
+                    <div class="srow">
+                      <div class="srow-label">
+                        <div class="srow-title">Warning</div>
+                        <div class="srow-desc">
+                          Bearing rate in the watch zone
+                        </div>
+                      </div>
+                      <div class="srow-ctrl">
+                        <label class="toggle-switch">
+                          <input
+                            type="checkbox"
+                            id="sev-warn"
+                            checked
+                            onchange="markUnsaved()"
+                          />
+                          <span class="toggle-slider"></span>
+                        </label>
+                      </div>
+                    </div>
+                    <div class="srow">
+                      <div class="srow-label">
+                        <div class="srow-title">Info</div>
+                        <div class="srow-desc">
+                          Scan completions and routine status updates
+                        </div>
+                      </div>
+                      <div class="srow-ctrl">
+                        <label class="toggle-switch">
+                          <input
+                            type="checkbox"
+                            id="sev-info"
+                            onchange="markUnsaved()"
+                          />
+                          <span class="toggle-slider"></span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="scard">
+                    <div class="scard-head">
+                      <div class="scard-title">Digest Schedule</div>
+                      <p class="scard-desc">
+                        Configure how often to receive automated farm summaries
+                      </p>
+                    </div>
+                    <div class="srow">
+                      <div class="srow-label">
+                        <div class="srow-title">Report Frequency</div>
+                        <div class="srow-desc">
+                          How often to receive farm status summaries via email
+                        </div>
+                      </div>
+                      <div class="srow-ctrl">
+                        <select
+                          class="s-select"
+                          id="digest-freq"
+                          onchange="markUnsaved()"
+                        >
+                          <option value="daily">Daily</option>
+                          <option value="weekly" selected>Weekly</option>
+                          <option value="monthly">Monthly</option>
+                          <option value="never">Never</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div class="srow">
+                      <div class="srow-label">
+                        <div class="srow-title">Quiet Hours</div>
+                        <div class="srow-desc">
+                          Suppress non-critical notifications between 10 PM – 6
+                          AM
+                        </div>
+                      </div>
+                      <div class="srow-ctrl">
+                        <label class="toggle-switch">
+                          <input
+                            type="checkbox"
+                            id="quiet-hours"
+                            checked
+                            onchange="markUnsaved()"
+                          />
+                          <span class="toggle-slider"></span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <!-- /pane-notifications -->
+
+                <!-- ════════════════════════════════════
+                             SECURITY
+                             ════════════════════════════════════ -->
+                <div
+                  class="tab-pane fade"
+                  id="pane-security"
+                  role="tabpanel"
+                  aria-labelledby="tab-security"
+                >
+                  <!-- 2FA + Session -->
+                  <div class="scard">
+                    <div class="scard-head">
+                      <div class="scard-title">Access Security</div>
+                      <p class="scard-desc">
+                        Two-factor authentication and session policies
+                      </p>
+                    </div>
+                    <div class="srow">
+                      <div class="srow-label">
+                        <div class="srow-title">Two-Factor Authentication</div>
+                        <div class="srow-desc">
+                          Require a verification code on each login
+                        </div>
+                      </div>
+                      <div class="srow-ctrl d-flex align-items-center gap-2">
+                        <span
+                          class="badge"
+                          style="
+                            background: var(--amber-bg);
+                            color: var(--amber);
+                          "
+                        >
+                          <span
+                            class="bdot"
+                            style="background: var(--amber-mid)"
+                          ></span
+                          >Not configured
+                        </span>
+                        <button
+                          class="btn btn-secondary btn-sm"
+                          onclick="
+                            utils.showToast(
+                              '2FA setup not available in this version',
+                              'warning',
+                            )
+                          "
+                        >
+                          Set Up
+                        </button>
+                      </div>
+                    </div>
+                    <div class="srow">
+                      <div class="srow-label">
+                        <div class="srow-title">Session Timeout</div>
+                        <div class="srow-desc">
+                          Automatically log out after a period of inactivity
+                        </div>
+                      </div>
+                      <div class="srow-ctrl">
+                        <select
+                          class="s-select"
+                          id="session-timeout"
+                          onchange="markUnsaved()"
+                        >
+                          <option value="30">30 minutes</option>
+                          <option value="60" selected>1 hour</option>
+                          <option value="240">4 hours</option>
+                          <option value="480">8 hours</option>
+                          <option value="0">Never</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Active sessions -->
+                  <div class="scard">
+                    <div class="scard-head">
+                      <div class="scard-title">Active Sessions</div>
+                      <p class="scard-desc">
+                        Devices currently signed in to your admin account
+                      </p>
+                    </div>
+
+                    <div class="session-row">
+                      <div>
+                        <div class="session-device">Chrome on Windows</div>
+                        <div class="session-meta">
+                          Last active: Just now · 192.168.1.10
+                        </div>
+                      </div>
+                      <span class="badge good"
+                        ><span class="bdot"></span>Current</span
+                      >
+                    </div>
+                    <div class="session-row">
+                      <div>
+                        <div class="session-device">Safari on iPhone</div>
+                        <div class="session-meta">
+                          Last active: 2 hours ago · 10.0.0.5
+                        </div>
+                      </div>
+                      <button
+                        class="btn btn-secondary btn-sm"
+                        onclick="utils.showToast('Session revoked', 'success')"
+                      >
+                        Revoke
+                      </button>
+                    </div>
+                    <div class="session-row">
+                      <div>
+                        <div class="session-device">Firefox on macOS</div>
+                        <div class="session-meta">
+                          Last active: 1 day ago · 172.16.0.3
+                        </div>
+                      </div>
+                      <button
+                        class="btn btn-secondary btn-sm"
+                        onclick="utils.showToast('Session revoked', 'success')"
+                      >
+                        Revoke
+                      </button>
+                    </div>
+
+                    <div
+                      style="
+                        margin-top: var(--space-lg);
+                        padding-top: var(--space-md);
+                        border-top: var(--border-width-thin) solid var(--border);
+                      "
+                    >
+                      <button
+                        class="btn btn-secondary btn-sm"
+                        onclick="
+                          utils.showToast(
+                            'All other sessions revoked',
+                            'success',
+                          )
+                        "
+                      >
+                        Revoke All Other Sessions
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <!-- /pane-security -->
+              </div>
+              <!-- /tab-content -->
+            </div>
+            <!-- /col right -->
+          </div>
+          <!-- /row -->
+        </div>
+        <!-- /page-container -->
+      </main>
+    </div>
+    <!-- /app-wrapper -->
+
+    <!-- JavaScript -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="../../bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="../../js/auth.js"></script>
+    <script src="../../js/data.js"></script>
+    <script src="../../js/utils.js"></script>
+    <script src="../../js/app.js"></script>
+
+    <script>
+      window.initPage = function () {
+        loadCurrentSettings();
+        loadAccountInfo();
+      };
+
+      function loadCurrentSettings() {
+        const settings = utils.getSettings();
+        document.getElementById("theme-toggle").checked =
+          settings.theme === "dark";
+        const fontRadio = document.getElementById("font-" + settings.fontSize);
+        if (fontRadio) fontRadio.checked = true;
+      }
+
+      function loadAccountInfo() {
+        const session = auth.getSession();
+        if (session) {
+          document.getElementById("current-username").textContent =
+            session.username;
+          document.getElementById("current-role").textContent =
+            session.role.charAt(0).toUpperCase() + session.role.slice(1);
+          const avatar = document.getElementById("account-avatar");
+          if (avatar)
+            avatar.textContent = session.username.charAt(0).toUpperCase();
+        }
+      }
+
+      let _unsaved = false;
+
+      function markUnsaved() {
+        if (!_unsaved) {
+          _unsaved = true;
+          document.getElementById("unsaved-label").classList.add("visible");
+        }
+      }
+
+      function clearUnsaved() {
+        _unsaved = false;
+        document.getElementById("unsaved-label").classList.remove("visible");
+      }
+
+      /* ── Preserved handlers (original functionality) ── */
+
+      function handleThemeToggle() {
+        const newTheme = utils.toggleTheme();
+        utils.showToast(
+          "Theme changed to " + utils.getThemeLabel(newTheme),
+          "success",
+        );
+      }
+
+      function handleFontSizeChange(size) {
+        utils.applyFontSize(size);
+        utils.showToast(
+          "Font size changed to " + utils.getFontSizeLabel(size),
+          "success",
+        );
+      }
+
+      function handleAutoRefreshToggle() {
+        const on = document.getElementById("auto-refresh-toggle").checked;
+        utils.showToast(
+          "Auto-refresh " + (on ? "enabled" : "disabled"),
+          "success",
+        );
+      }
+
+      function handleNotifToggle() {
+        const on = document.getElementById("notif-toggle").checked;
+        utils.showToast(
+          "Alert notifications " + (on ? "enabled" : "disabled"),
+          "success",
+        );
+      }
+
+      function handleCompactToggle() {
+        const on = document.getElementById("compact-toggle").checked;
+        utils.showToast(
+          "Compact view " + (on ? "enabled" : "disabled"),
+          "success",
+        );
+      }
+
+      /* ── New handlers ── */
+
+      function handleChangePassword() {
+        const current = document.getElementById("pw-current").value;
+        const newPw = document.getElementById("pw-new").value;
+        const confirm = document.getElementById("pw-confirm").value;
+        if (!current || !newPw || !confirm) {
+          utils.showToast("Please fill in all password fields", "error");
+          return;
+        }
+        if (newPw !== confirm) {
+          utils.showToast("New passwords do not match", "error");
+          return;
+        }
+        document.getElementById("pw-current").value = "";
+        document.getElementById("pw-new").value = "";
+        document.getElementById("pw-confirm").value = "";
+        utils.showToast("Password updated successfully", "success");
+      }
+
+      function handleSaveAll() {
+        clearUnsaved();
+        utils.showToast("Settings saved successfully", "success");
+      }
+
+      function handleResetSettings() {
+        if (confirm("Reset all settings to their defaults?")) {
+          utils.applyTheme("light");
+          utils.applyFontSize("medium");
+          document.getElementById("theme-toggle").checked = false;
+          document.getElementById("font-medium").checked = true;
+          document.getElementById("auto-refresh-toggle").checked = false;
+          document.getElementById("notif-toggle").checked = true;
+          document.getElementById("compact-toggle").checked = false;
+          clearUnsaved();
+          utils.showToast("Settings reset to default", "success");
+        }
+      }
+
+      function openLogoutModal() { auth.confirmLogout(); }
+      function closeLogoutModal() {
+        document.getElementById("logout-modal").style.display = "none";
+      }
+    </script>
+
+    <!-- Logout Confirmation Modal -->
+    <div
+      id="logout-modal"
+      style="
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: none;
+        align-items: center;
+        justify-content: center;
+      "
+    >
+      <!-- Backdrop -->
+      <div
+        onclick="closeLogoutModal()"
+        style="
+          position: absolute;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.45);
+          backdrop-filter: blur(2px);
+        "
+      ></div>
+      <!-- Dialog -->
+      <div
+        style="
+          position: relative;
+          background: var(--color-background-primary);
+          border: 1px solid var(--color-border-secondary);
+          border-radius: var(--radius-lg);
+          padding: var(--space-2xl);
+          width: 360px;
+          max-width: 90vw;
+          box-shadow: var(--shadow-md);
+          text-align: center;
+        "
+      >
+        <div
+          style="
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--red-bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto var(--space-lg);
+          "
+        >
+          <svg
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="var(--red)"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+        </div>
+        <h3
+          style="
+            font-size: var(--font-size-lg);
+            font-weight: var(--font-weight-semibold);
+            color: var(--color-text-primary);
+            margin-bottom: var(--space-sm);
+          "
+        >
+          Confirm Logout
+        </h3>
+        <p
+          style="
+            font-size: var(--font-size-sm);
+            color: var(--color-text-secondary);
+            margin-bottom: var(--space-xl);
+          "
+        >
+          Are you sure you want to log out of your session?
+        </p>
+        <div
+          style="display: flex; gap: var(--space-md); justify-content: center"
+        >
+          <button
+            onclick="closeLogoutModal()"
+            class="btn btn-secondary"
+            style="flex: 1"
+          >
+            Cancel
+          </button>
+          <button
+            onclick="auth.logout()"
+            class="btn btn-danger"
+            style="
+              flex: 1;
+              background: var(--red-mid);
+              color: #fff;
+              border-color: var(--red-mid);
+            "
+          >
+            Yes, Logout
+          </button>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

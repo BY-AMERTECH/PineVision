@@ -115,6 +115,8 @@ var auth = (function () {
     function redirectToDashboard(role) {
         if (role === "admin") {
             window.location.href = "/admin/dashboard.html";
+        } else if (role === "farm_manager") {
+            window.location.href = "/farm-manager/dashboard.html";
         } else {
             window.location.href = "/client/dashboard.html";
         }
@@ -133,16 +135,36 @@ var auth = (function () {
     }
 
     /**
-     * Require admin role - redirect if not admin
+     * Require Super Admin role (admin) - redirect if not super admin
      */
-    function requireAdmin() {
+    function requireSuperAdmin() {
         if (!requireAuth()) return false;
         const session = getSession();
         if (session.role !== "admin") {
-            window.location.href = "/client/dashboard.html";
+            redirectToDashboard(session.role);
             return false;
         }
         return true;
+    }
+
+    /**
+     * Require Farm Manager role - redirect if not farm_manager
+     */
+    function requireFarmManager() {
+        if (!requireAuth()) return false;
+        const session = getSession();
+        if (session.role !== "farm_manager") {
+            redirectToDashboard(session.role);
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Require admin role - redirect if not admin (kept for compatibility; same as requireSuperAdmin)
+     */
+    function requireAdmin() {
+        return requireSuperAdmin();
     }
 
     /**
@@ -364,6 +386,8 @@ var auth = (function () {
         closeLogoutModal: closeLogoutModal,
         requireAuth: requireAuth,
         requireAdmin: requireAdmin,
+        requireSuperAdmin: requireSuperAdmin,
+        requireFarmManager: requireFarmManager,
         checkExistingSession: checkExistingSession,
         getCurrentUser: getCurrentUser,
         getSession: getSession,

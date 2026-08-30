@@ -17,7 +17,7 @@
         } catch (e) {}
       })();
     </script>
-    <title>Admin Dashboard - PineVision</title>
+    <title>Super Admin Dashboard - PineVision</title>
     <link rel="stylesheet" href="../../bootstrap/css/bootstrap.min.css" />
     <link rel="stylesheet" href="../../css/tokens.css" />
     <link rel="stylesheet" href="../../css/layout.css" />
@@ -355,7 +355,7 @@
           </div>
           <div class="sidebar-brand-text">
             <div class="sidebar-brand-name">PineVision</div>
-            <div class="sidebar-brand-tagline">Admin Panel</div>
+            <div class="sidebar-brand-tagline">Super Admin Panel</div>
           </div>
         </div>
 
@@ -554,7 +554,7 @@
                   <rect x="14" y="3" width="7" height="7" />
                   <rect x="14" y="14" width="7" height="7" />
                   <rect x="3" y="14" width="7" height="7" /></svg
-                >Admin Dashboard
+                >Super Admin Dashboard
               </h1>
               <p class="page-subtitle">
                 System overview and flight management control center
@@ -729,7 +729,7 @@
     <script src="../../js/utils.js"></script>
     <script src="../../js/app.js"></script>
     <script>
-      if (!auth.requireAdmin()) {
+      if (!auth.requireSuperAdmin()) {
         /* redirects */
       }
 
@@ -1315,8 +1315,10 @@
                 : '<span class="badge" style="background:var(--surf2);color:var(--muted);"><span class="bdot" style="background:var(--muted);"></span>Off</span>';
             var roleBadge =
               user.role === "admin"
-                ? '<span class="badge" style="background:var(--yellow-bg);color:var(--yellow);"><span class="bdot" style="background:var(--yellow);"></span>Admin</span>'
-                : '<span class="badge" style="background:var(--surf2);color:var(--muted);"><span class="bdot" style="background:var(--muted);"></span>Client</span>';
+                ? '<span class="badge" style="background:var(--red-bg);color:var(--red);"><span class="bdot" style="background:var(--red-mid);"></span>Super Admin</span>'
+                : user.role === "farm_manager"
+                  ? '<span class="badge" style="background:var(--amber-bg);color:var(--amber);"><span class="bdot" style="background:var(--amber-mid);"></span>Farm Manager</span>'
+                  : '<span class="badge" style="background:var(--surf2);color:var(--muted);"><span class="bdot" style="background:var(--muted);"></span>User</span>';
             html +=
               "<tr>" +
               "<td><strong>" +

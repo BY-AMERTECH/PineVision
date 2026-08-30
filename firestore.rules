@@ -3,27 +3,32 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ─────────────────────────────────────────────────────────
-    // Helper: check whether the requesting user is an admin
-    // by reading their role from the users collection.
+    // Helpers: check role from the users collection.
     // ─────────────────────────────────────────────────────────
     function isAdmin() {
       return request.auth != null &&
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
+    function isFarmManager() {
+      return request.auth != null &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'farm_manager';
+    }
+
     // ─────────────────────────────────────────────────────────
     // users collection
     //
-    // Read own document OR admin reads any.
-    // List (query) is allowed for authenticated users so the
-    // username-to-email lookup in auth.js can run before sign-in
-    // completes.  This is a known trade-off: email addresses are
-    // discoverable by authenticated users.  Move the lookup to a
-    // Cloud Function to remove this if stricter privacy is needed.
-    // Write requires admin.
+    // Both get and list are allowed for any authenticated user.
+    // This is consistent: list already exposes every user's
+    // email and profile data to any authenticated caller (needed
+    // for the username→email lookup in auth.js).  Restricting
+    // get-by-UID to owner/admin would be an inconsistency since
+    // the same data is reachable via list.
+    // Write still requires admin (Super Admin only).
+    // Move lookup to a Cloud Function to tighten read access.
     // ─────────────────────────────────────────────────────────
     match /users/{userId} {
-      allow get:   if request.auth.uid == userId || isAdmin();
+      allow get:   if request.auth != null;
       allow list:  if request.auth != null;
       allow write: if isAdmin();
     }
@@ -72,13 +77,13 @@ service cloud.firestore {
     // ─────────────────────────────────────────────────────────
     match /activity_logs/{docId} {
       allow create: if true;
-      allow read:   if isAdmin();
+      allow read:   if isAdmin() || isFarmManager();
       allow update, delete: if isAdmin();
     }
 
     match /alerts/{docId} {
       allow create: if true;
-      allow read:   if isAdmin();
+      allow read:   if isAdmin() || isFarmManager();
       allow update, delete: if isAdmin();
     }
 

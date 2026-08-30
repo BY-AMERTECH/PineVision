@@ -1,0 +1,3241 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+    <link rel="dns-prefetch" href="https://firestore.googleapis.com">
+    <link rel="dns-prefetch" href="https://identitytoolkit.googleapis.com">
+    <script>
+      (function () {
+        try {
+          var s = JSON.parse(
+            localStorage.getItem("pinevision_settings") || "{}",
+          );
+          if (s.theme === "dark")
+            document.documentElement.classList.add("dark-mode");
+        } catch (e) {}
+      })();
+    </script>
+    <title>User Management - PineVision</title>
+    <link rel="stylesheet" href="../../bootstrap/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="../../css/tokens.css" />
+    <link rel="stylesheet" href="../../css/layout.css" />
+    <link rel="stylesheet" href="../../css/components.css" />
+    <style>
+      .mg-users {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: var(--grid-gap);
+        margin-bottom: var(--space-2xl);
+      }
+
+      .mc {
+        transition:
+          box-shadow var(--transition-fast),
+          transform var(--transition-fast);
+        cursor: default;
+      }
+
+      .mc:hover {
+        box-shadow: var(--shadow-md);
+        transform: translateY(-2px);
+      }
+
+      .mc-icon {
+        margin-bottom: var(--space-sm);
+      }
+
+      .mc-trend {
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        font-size: 11px;
+        font-weight: var(--font-weight-medium);
+        margin-left: var(--space-xs);
+      }
+
+      .mc-trend.up {
+        color: var(--green);
+      }
+
+      .mc-trend.dn {
+        color: var(--red-mid);
+      }
+
+      .mc-trend.fl {
+        color: var(--color-text-secondary);
+      }
+
+      .ph {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        margin-bottom: var(--space-2xl);
+      }
+
+      .users-layout {
+        display: grid;
+        grid-template-columns: 1fr 300px;
+        gap: var(--grid-gap);
+        margin-bottom: var(--space-2xl);
+        align-items: stretch;
+      }
+
+      .users-main {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .users-main > .tcard {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .users-main .twrap {
+        flex: 1;
+        overflow-y: auto;
+        min-height: 424px;
+      }
+
+      .toolbar {
+        display: flex;
+        align-items: center;
+        gap: var(--space-md);
+        padding: var(--space-lg);
+        border-bottom: 1px solid var(--border);
+        flex-wrap: wrap;
+      }
+
+      .toolbar-search {
+        position: relative;
+        flex: 1;
+        min-width: 200px;
+        max-width: 320px;
+      }
+
+      .toolbar-search-icon {
+        position: absolute;
+        left: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--muted);
+        pointer-events: none;
+        display: flex;
+      }
+
+      .toolbar-search input {
+        width: 100%;
+        padding: 7px 12px 7px 34px;
+        font-size: var(--font-size-sm);
+        border: 1px solid var(--color-border-primary);
+        border-radius: var(--radius-md);
+        background: var(--color-background-primary);
+        color: var(--color-text-primary);
+        font-family: var(--font-sans);
+        transition:
+          border-color var(--transition-fast),
+          box-shadow var(--transition-fast);
+      }
+
+      .toolbar-search input:focus {
+        outline: none;
+        border-color: var(--green);
+        box-shadow: 0 0 0 3px var(--green-bg);
+      }
+
+      .toolbar-search input::placeholder {
+        color: var(--color-text-tertiary);
+      }
+
+      .toolbar-right {
+        display: flex;
+        align-items: center;
+        gap: var(--space-sm);
+        margin-left: auto;
+      }
+
+      .filter-select {
+        padding: 7px 10px;
+        font-size: var(--font-size-sm);
+        border: 1px solid var(--color-border-primary);
+        border-radius: var(--radius-md);
+        background: var(--color-background-primary);
+        color: var(--color-text-primary);
+        font-family: var(--font-sans);
+        cursor: pointer;
+        transition: border-color var(--transition-fast);
+      }
+
+      .filter-select:focus {
+        outline: none;
+        border-color: var(--green);
+        box-shadow: 0 0 0 3px var(--green-bg);
+      }
+
+      .bulk-bar {
+        display: none;
+        align-items: center;
+        gap: var(--space-md);
+        padding: var(--space-sm) var(--space-lg);
+        background: var(--green-bg);
+        border-bottom: 1px solid rgba(45, 106, 63, 0.15);
+        font-size: var(--font-size-sm);
+        flex-wrap: wrap;
+      }
+
+      .bulk-bar.visible {
+        display: flex;
+      }
+
+      .bulk-count {
+        font-weight: var(--font-weight-semibold);
+        color: var(--green);
+      }
+
+      .user-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: var(--font-weight-semibold);
+        text-transform: uppercase;
+        flex-shrink: 0;
+      }
+
+      .user-name-cell {
+        display: flex;
+        align-items: center;
+        gap: var(--space-md);
+      }
+
+      .user-name-info {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .user-name-primary {
+        font-weight: var(--font-weight-medium);
+        color: var(--color-text-primary);
+        font-size: var(--font-size-sm);
+      }
+
+      .user-name-secondary {
+        font-size: 11px;
+        color: var(--muted);
+      }
+
+      .tbl-actions {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .tbl-btn {
+        width: 28px;
+        height: 28px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--color-border-primary);
+        border-radius: var(--radius-sm);
+        background: var(--color-background-primary);
+        color: var(--color-text-secondary);
+        cursor: pointer;
+        transition: all var(--transition-fast);
+      }
+
+      .tbl-btn:hover {
+        background: var(--color-background-secondary);
+        border-color: var(--green);
+        color: var(--green);
+      }
+
+      .tbl-btn.danger:hover {
+        background: var(--red-bg);
+        border-color: var(--red);
+        color: var(--red);
+      }
+
+      .tbl-btn.amber:hover {
+        background: var(--amber-bg);
+        border-color: var(--amber);
+        color: var(--amber);
+      }
+
+      .users-table {
+        table-layout: auto;
+      }
+
+      .users-table th,
+      .users-table td {
+        white-space: nowrap;
+      }
+
+      .user-row:hover {
+        cursor: pointer;
+      }
+
+      .user-row.selected {
+        background: var(--green-bg) !important;
+      }
+
+      .sort-header {
+        cursor: pointer;
+        user-select: none;
+      }
+
+      .sort-arrow {
+        display: inline-block;
+        font-size: 10px;
+        margin-left: 3px;
+        opacity: 0.45;
+      }
+
+      .sort-arrow.active {
+        opacity: 1;
+        color: var(--green);
+      }
+
+      .pag-wrap {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: var(--space-lg);
+        border-top: 1px solid var(--border);
+        flex-wrap: wrap;
+        gap: var(--space-md);
+      }
+
+      .pag-info {
+        font-size: var(--font-size-sm);
+        color: var(--muted);
+      }
+
+      .pag-btns {
+        display: flex;
+        gap: 4px;
+      }
+
+      .pag-btn {
+        min-width: 32px;
+        height: 32px;
+        padding: 0 8px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--color-border-primary);
+        border-radius: var(--radius-sm);
+        background: var(--color-background-primary);
+        color: var(--color-text-primary);
+        font-size: var(--font-size-sm);
+        cursor: pointer;
+        transition: all var(--transition-fast);
+        font-family: var(--font-sans);
+      }
+
+      .pag-btn:hover:not([disabled]) {
+        background: var(--green-bg);
+        border-color: var(--green);
+        color: var(--green);
+      }
+
+      .pag-btn.active {
+        background: var(--green);
+        border-color: var(--green);
+        color: white;
+      }
+
+      .pag-btn[disabled] {
+        opacity: 0.38;
+        cursor: not-allowed;
+      }
+
+      .timeline {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .tl-item {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--space-md);
+        padding: 10px 0;
+        border-bottom: 1px solid var(--color-border-secondary);
+      }
+
+      .tl-item:last-child {
+        border-bottom: none;
+      }
+
+      .tl-icon {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        margin-top: 1px;
+      }
+
+      .tl-icon.login {
+        background: var(--green-bg);
+        color: var(--green);
+      }
+
+      .tl-icon.upload {
+        background: var(--amber-bg);
+        color: var(--amber);
+      }
+
+      .tl-icon.report {
+        background: var(--color-background-secondary);
+        color: var(--color-text-secondary);
+      }
+
+      .tl-icon.alert {
+        background: var(--red-bg);
+        color: var(--red);
+      }
+
+      .tl-body {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .tl-text {
+        font-size: var(--font-size-sm);
+        color: var(--color-text-primary);
+        line-height: 1.4;
+      }
+
+      .tl-text strong {
+        font-weight: var(--font-weight-medium);
+      }
+
+      .tl-time {
+        font-size: 11px;
+        color: var(--muted);
+        font-family: var(--font-mono);
+        margin-top: 2px;
+      }
+
+      .profile-header {
+        display: flex;
+        align-items: center;
+        gap: var(--space-lg);
+        padding: var(--space-xl);
+        background: var(--color-background-secondary);
+        border-radius: var(--radius-lg);
+        margin-bottom: var(--space-xl);
+      }
+
+      .profile-avatar-lg {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        font-weight: var(--font-weight-semibold);
+        text-transform: uppercase;
+        flex-shrink: 0;
+      }
+
+      .profile-info {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .profile-name {
+        font-size: var(--font-size-xl);
+        font-weight: var(--font-weight-semibold);
+        color: var(--color-text-primary);
+      }
+
+      .profile-email {
+        font-size: var(--font-size-sm);
+        color: var(--muted);
+        margin-top: 2px;
+      }
+
+      .profile-meta {
+        display: flex;
+        align-items: center;
+        gap: var(--space-md);
+        margin-top: var(--space-sm);
+        flex-wrap: wrap;
+      }
+
+      .profile-meta-item {
+        font-size: 11px;
+        color: var(--muted);
+        font-family: var(--font-mono);
+      }
+
+      .detail-stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: var(--space-md);
+        margin-bottom: var(--space-xl);
+      }
+
+      .detail-stat {
+        background: var(--color-background-secondary);
+        border-radius: var(--radius-md);
+        padding: var(--space-md);
+        text-align: center;
+      }
+
+      .detail-stat-val {
+        font-size: var(--font-size-xl);
+        font-weight: var(--font-weight-semibold);
+        font-family: var(--font-mono);
+        color: var(--color-text-primary);
+      }
+
+      .detail-stat-lbl {
+        font-size: 11px;
+        color: var(--muted);
+        margin-top: 2px;
+      }
+
+      .modal-tabs {
+        display: flex;
+        gap: 2px;
+        margin-bottom: var(--space-xl);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .modal-tab {
+        padding: var(--space-md) var(--space-lg);
+        font-size: var(--font-size-sm);
+        font-weight: var(--font-weight-medium);
+        color: var(--muted);
+        border: none;
+        background: none;
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -1px;
+        transition: all var(--transition-fast);
+      }
+
+      .modal-tab:hover {
+        color: var(--color-text-primary);
+      }
+
+      .modal-tab.active {
+        color: var(--green);
+        border-bottom-color: var(--green);
+        font-weight: var(--font-weight-semibold);
+      }
+
+      .modal-tab-panel {
+        display: none;
+      }
+
+      .modal-tab-panel.active {
+        display: block;
+      }
+
+      .perm-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-sm);
+        margin-bottom: var(--space-xl);
+      }
+
+      .perm-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 4px 10px;
+        background: var(--green-bg);
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: var(--font-weight-medium);
+        color: var(--green);
+      }
+
+      .bs-modal .modal-content {
+        background: var(--color-background-primary);
+        border: 1.5px solid var(--color-border-primary);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-xl);
+        color: var(--color-text-primary);
+      }
+
+      .dark-mode .btn-close {
+        filter: invert(1) grayscale(1);
+      }
+
+      /* Fix Bootstrap modal: undo conflicting custom .modal CSS (z-index:1000, dark bg,
+           no overflow) so Bootstrap's centering and stacking work correctly. */
+      .bs-modal {
+        background-color: transparent !important;
+        z-index: 1055 !important;
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+        display: none;
+        /* Offset the modal's content area to start after the fixed sidebar so
+               margin:auto centers the dialog in the visible content area, not the
+               full viewport (which would look left-shifted). */
+        padding-left: var(--sidebar-width);
+      }
+
+      .bs-modal.show {
+        display: block !important;
+      }
+
+      .modal-backdrop {
+        z-index: 1050 !important;
+      }
+
+      /* Center each dialog in the visible content area */
+      .bs-modal .modal-dialog {
+        margin-left: auto !important;
+        margin-right: auto !important;
+      }
+
+      /* On small screens the sidebar collapses, remove the offset */
+      @media (max-width: 768px) {
+        .bs-modal {
+          padding-left: 0;
+        }
+      }
+
+      /* Animation: slide-down-from-top + fade in, compatible with centered dialogs */
+      .bs-modal.fade .modal-dialog {
+        transition:
+          transform 0.28s cubic-bezier(0.34, 1.2, 0.64, 1),
+          opacity 0.22s ease !important;
+        transform: translateY(-24px);
+        opacity: 0;
+      }
+
+      .bs-modal.fade.show .modal-dialog {
+        transform: translateY(0);
+        opacity: 1;
+      }
+
+      .cf-input {
+        width: 100%;
+        padding: var(--space-md);
+        font-size: var(--font-size-base);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        background: var(--surf);
+        color: var(--color-text-primary);
+        font-family: var(--font-sans);
+        transition:
+          border-color var(--transition-fast),
+          box-shadow var(--transition-fast);
+      }
+
+      .cf-input:focus {
+        outline: none;
+        border-color: var(--green);
+        box-shadow: 0 0 0 3px var(--green-bg);
+      }
+
+      .cf-label {
+        display: block;
+        font-size: var(--font-size-sm);
+        font-weight: var(--font-weight-medium);
+        color: var(--color-text-primary);
+        margin-bottom: var(--space-sm);
+      }
+
+      .cf-hint {
+        font-size: 11px;
+        color: var(--muted);
+        margin-top: 4px;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      @media (max-width: 1200px) {
+        .mg-users {
+          grid-template-columns: repeat(3, 1fr);
+        }
+      }
+
+      @media (max-width: 960px) {
+        .users-layout {
+          grid-template-columns: 1fr;
+        }
+
+        .mg-users {
+          grid-template-columns: repeat(3, 1fr);
+        }
+      }
+
+      @media (max-width: 640px) {
+        .mg-users {
+          grid-template-columns: 1fr 1fr;
+        }
+
+        .ph {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: var(--space-md);
+        }
+
+        .toolbar {
+          flex-direction: column;
+          align-items: stretch;
+        }
+
+        .toolbar-search {
+          max-width: none;
+        }
+
+        .toolbar-right {
+          margin-left: 0;
+          flex-wrap: wrap;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="app-wrapper">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <div class="sidebar-brand">
+          <div class="sidebar-logo">
+            <img
+              src="/frontend/assets/images/pinevision-logo.svg"
+              alt="PineVision"
+              class="sidebar-logo-img"
+            />
+          </div>
+          <div class="sidebar-brand-text">
+            <div class="sidebar-brand-name">PineVision</div>
+            <div class="sidebar-brand-tagline">Farm Manager Panel</div>
+          </div>
+        </div>
+
+        <button
+          class="sidebar-collapse-btn"
+          onclick="app.toggleSidebar()"
+          aria-label="Toggle sidebar"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <polyline points="15,18 9,12 15,6" />
+          </svg>
+          <span class="nav-link-text">Collapse sidebar</span>
+        </button>
+
+        <nav class="sidebar-nav">
+          <div class="nav-section">
+            <div class="nav-section-title">Main</div>
+            <ul class="nav-links">
+              <li>
+                <a
+                  href="dashboard.html"
+                  class="nav-link"
+                  data-tooltip="Dashboard"
+                >
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-dashboard.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Dashboard</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div class="nav-section">
+            <div class="nav-section-title">Monitoring</div>
+            <ul class="nav-links">
+              <li>
+                <a
+                  href="users.html"
+                  class="nav-link active"
+                  data-tooltip="Users"
+                >
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-users.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Users</span>
+                </a>
+              </li>
+              <li>
+                <a
+                  href="auditlogs.html"
+                  class="nav-link"
+                  data-tooltip="Audit Logs"
+                >
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-clipboard.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Audit Logs</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div class="nav-section">
+            <div class="nav-section-title">Operations</div>
+            <ul class="nav-links">
+              <li>
+                <a
+                  href="flights-scans.html"
+                  class="nav-link"
+                  data-tooltip="Flights &amp; Scans"
+                >
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-flights.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Flights &amp; Scans</span>
+                </a>
+              </li>
+              <li>
+                <a href="alerts.html" class="nav-link" data-tooltip="Alerts">
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-bell.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Alerts</span>
+                  <span
+                    class="nav-badge"
+                    id="nav-badge-alerts"
+                    style="display: none"
+                  ></span>
+                </a>
+              </li>
+              <li>
+                <a href="reports.html" class="nav-link" data-tooltip="Reports">
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-reports.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Reports</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div class="nav-section">
+            <div class="nav-section-title">System</div>
+            <ul class="nav-links">
+              <li>
+                <a
+                  href="settings.html"
+                  class="nav-link"
+                  data-tooltip="Settings"
+                >
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-cog.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Settings</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div class="sidebar-user">
+            <div class="sidebar-user-avatar">A</div>
+            <div class="sidebar-user-info">
+              <div class="sidebar-user-name">Admin</div>
+              <div class="sidebar-user-role">admin</div>
+            </div>
+          </div>
+          <button class="btn-logout" onclick="openLogoutModal()">
+            <img src="/frontend/assets/icons/logout.svg" alt="" width="16" />
+            <span class="logout-text">Logout</span>
+          </button>
+        </div>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="main-content">
+        <div
+          class="page-container"
+          style="
+            padding: var(--page-padding);
+            max-width: var(--page-max-width);
+            margin: 0 auto;
+          "
+        >
+          <!-- Page Header -->
+          <div class="ph">
+            <div>
+              <h1 class="page-title d-flex align-items-center gap-2">
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  style="color: var(--green); flex-shrink: 0"
+                >
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg
+                >User Management
+              </h1>
+              <p class="page-subtitle" style="margin-bottom: 0">
+                Monitor, manage and configure user accounts and access levels
+              </p>
+            </div>
+            <div
+              style="display: flex; align-items: center; gap: var(--space-md)"
+            >
+              <span
+                id="last-updated"
+                style="
+                  font-size: 11px;
+                  color: var(--color-text-tertiary);
+                  font-family: var(--font-mono);
+                "
+              ></span>
+              <button
+                class="btn btn-secondary btn-sm"
+                onclick="refreshPage()"
+                id="refresh-btn"
+              >
+                <svg
+                  id="refresh-icon"
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <polyline points="23 4 23 10 17 10" />
+                  <polyline points="1 20 1 14 7 14" />
+                  <path
+                    d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"
+                  />
+                </svg>
+                <span>Refresh</span>
+              </button>
+              <button
+                class="btn btn-primary btn-sm"
+                onclick="openAddUserModal()"
+              >
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                Add User
+              </button>
+            </div>
+          </div>
+
+          <!-- Metric Grid -->
+          <div class="mg-users" id="user-metrics"></div>
+
+          <!-- Main Layout -->
+          <div class="users-layout">
+            <!-- Left: User Table -->
+            <div class="users-main">
+              <div class="tcard" style="margin-bottom: 0">
+                <!-- Bulk Action Bar -->
+                <div class="bulk-bar" id="bulk-bar">
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="var(--green)"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <polyline points="9 11 12 14 22 4" />
+                    <path
+                      d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"
+                    />
+                  </svg>
+                  <span class="bulk-count" id="bulk-count">0</span>
+                  <span style="color: var(--color-text-secondary)"
+                    >selected</span
+                  >
+                  <div
+                    style="
+                      display: flex;
+                      gap: var(--space-sm);
+                      margin-left: var(--space-md);
+                    "
+                  >
+                    <button
+                      class="btn btn-secondary btn-sm"
+                      onclick="bulkAction('activate')"
+                    >
+                      <svg
+                        width="11"
+                        height="11"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2.5"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                      Enable
+                    </button>
+                    <button
+                      class="btn btn-secondary btn-sm"
+                      onclick="bulkAction('disable')"
+                    >
+                      <svg
+                        width="11"
+                        height="11"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2.5"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+                      </svg>
+                      Disable
+                    </button>
+                  </div>
+                  <button
+                    class="btn btn-secondary btn-sm"
+                    style="margin-left: auto"
+                    onclick="clearSelection()"
+                  >
+                    Clear
+                  </button>
+                </div>
+
+                <!-- Toolbar -->
+                <div class="toolbar">
+                  <div class="toolbar-search">
+                    <span class="toolbar-search-icon">
+                      <svg
+                        width="13"
+                        height="13"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2.5"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
+                        <circle cx="11" cy="11" r="8" />
+                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                      </svg>
+                    </span>
+                    <input
+                      type="text"
+                      id="user-search"
+                      placeholder="Search by name, email or username…"
+                      oninput="filterUsers()"
+                    />
+                  </div>
+                  <select
+                    class="filter-select"
+                    id="status-filter"
+                    onchange="filterUsers()"
+                  >
+                    <option value="">All Statuses</option>
+                    <option value="active">Active</option>
+                    <option value="disabled">Disabled</option>
+                  </select>
+                  <select
+                    class="filter-select"
+                    id="role-filter"
+                    onchange="filterUsers()"
+                  >
+                    <option value="">All Roles</option>
+                    <option value="farm_manager">Farm Manager</option>
+                    <option value="client">User</option>
+                  </select>
+                  <select
+                    class="filter-select"
+                    id="sort-select"
+                    onchange="filterUsers()"
+                  >
+                    <option value="name-asc">Name A→Z</option>
+                    <option value="name-desc">Name Z→A</option>
+                    <option value="lastlogin-desc">Last Login ↓</option>
+                    <option value="lastlogin-asc">Last Login ↑</option>
+                    <option value="role-fm">Farm Managers First</option>
+                  </select>
+                  <div class="toolbar-right">
+                    <span
+                      id="result-count"
+                      style="
+                        font-size: 11px;
+                        color: var(--muted);
+                        font-family: var(--font-mono);
+                        white-space: nowrap;
+                      "
+                    ></span>
+                    <button
+                      class="btn btn-secondary btn-sm"
+                      onclick="exportUsers()"
+                    >
+                      <svg
+                        width="13"
+                        height="13"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" y1="15" x2="12" y2="3" />
+                      </svg>
+                      Export
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Table -->
+                <div class="twrap">
+                  <table class="users-table">
+                    <thead>
+                      <tr>
+                        <th style="width: 36px; padding-right: 0">
+                          <input
+                            type="checkbox"
+                            id="select-all"
+                            onchange="toggleSelectAll()"
+                            style="
+                              width: 15px;
+                              height: 15px;
+                              cursor: pointer;
+                              accent-color: var(--green);
+                            "
+                          />
+                        </th>
+                        <th class="sort-header" onclick="applySort('name')">
+                          User
+                          <span class="sort-arrow active" id="sort-name"
+                            >↑</span
+                          >
+                        </th>
+                        <th>Email</th>
+                        <th class="sort-header" onclick="applySort('role')">
+                          Role <span class="sort-arrow" id="sort-role">↕</span>
+                        </th>
+                        <th
+                          class="sort-header"
+                          onclick="applySort('lastlogin')"
+                        >
+                          Last Login
+                          <span class="sort-arrow" id="sort-lastlogin">↕</span>
+                        </th>
+                        <th>Status</th>
+                        <th style="text-align: right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="users-tbody"></tbody>
+                  </table>
+                </div>
+
+                <!-- Pagination -->
+                <div class="pag-wrap">
+                  <div class="pag-info" id="pag-info"></div>
+                  <div class="pag-btns" id="pag-btns"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right Panel -->
+            <div
+              style="
+                display: flex;
+                flex-direction: column;
+                gap: var(--grid-gap);
+                height: 100%;
+              "
+            >
+              <!-- Activity Feed -->
+              <div
+                class="tcard"
+                style="
+                  margin-bottom: 0;
+                  flex: 1;
+                  display: flex;
+                  flex-direction: column;
+                  min-height: 0;
+                "
+              >
+                <div class="thead-row">
+                  <h3 class="thead-title">Activity Feed</h3>
+                  <a href="activity.html" class="btn btn-secondary btn-sm"
+                    >All →</a
+                  >
+                </div>
+                <div
+                  style="
+                    padding: 0 var(--space-lg) var(--space-lg);
+                    flex: 1;
+                    overflow-y: auto;
+                    min-height: 0;
+                  "
+                >
+                  <div class="timeline" id="activity-timeline"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- User Detail Modal -->
+    <div
+      class="modal fade bs-modal"
+      id="userDetailModal"
+      tabindex="-1"
+      aria-hidden="true"
+    >
+      <div
+        class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable"
+      >
+        <div class="modal-content">
+          <div
+            class="modal-header"
+            style="
+              padding: var(--space-xl);
+              border-bottom: 1px solid var(--border);
+            "
+          >
+            <h5
+              class="modal-title"
+              id="detail-modal-title"
+              style="
+                font-size: var(--font-size-xl);
+                font-weight: var(--font-weight-semibold);
+                color: var(--color-text-primary);
+              "
+            >
+              User Details
+            </h5>
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+              aria-label="Close"
+            ></button>
+          </div>
+          <div
+            class="modal-body"
+            style="padding: var(--space-xl)"
+            id="detail-modal-body"
+          ></div>
+          <div
+            class="modal-footer"
+            style="
+              border-top: 1px solid var(--border);
+              padding: var(--space-xl);
+              display: flex;
+              gap: var(--space-md);
+              justify-content: flex-end;
+            "
+          >
+            <button
+              type="button"
+              class="btn btn-secondary btn-sm"
+              data-bs-dismiss="modal"
+            >
+              Close
+            </button>
+            <button
+              type="button"
+              class="btn btn-sm"
+              id="detail-reset-btn"
+              style="
+                background: var(--amber-bg);
+                color: var(--amber);
+                border: 1px solid rgba(180, 120, 0, 0.2);
+              "
+            >
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                style="margin-right: 4px"
+              >
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+              Reset Password
+            </button>
+            <button
+              type="button"
+              class="btn btn-primary btn-sm"
+              id="detail-edit-btn"
+            >
+              Edit User
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add / Edit User Modal -->
+    <div
+      class="modal fade bs-modal"
+      id="addUserModal"
+      tabindex="-1"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+          <div
+            class="modal-header"
+            style="
+              padding: var(--space-xl);
+              border-bottom: 1px solid var(--border);
+            "
+          >
+            <h5
+              class="modal-title"
+              id="add-modal-title"
+              style="
+                font-size: var(--font-size-xl);
+                font-weight: var(--font-weight-semibold);
+                color: var(--color-text-primary);
+              "
+            >
+              Add New User
+            </h5>
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+              aria-label="Close"
+            ></button>
+          </div>
+          <div class="modal-body" style="padding: var(--space-xl)">
+            <div
+              id="add-form-error"
+              style="
+                display: none;
+                background: var(--red-bg);
+                border: 1px solid rgba(139, 32, 32, 0.3);
+                color: var(--red);
+                padding: var(--space-md);
+                border-radius: var(--radius-md);
+                margin-bottom: var(--space-lg);
+                font-size: var(--font-size-sm);
+              "
+            ></div>
+
+            <!-- Last Login (edit mode display only) -->
+            <div
+              id="f-lastlogin-row"
+              style="display: none; margin-bottom: var(--space-lg)"
+            >
+              <label class="cf-label">Last Login</label>
+              <div
+                style="
+                  padding: var(--space-md);
+                  background: var(--color-background-secondary);
+                  border-radius: var(--radius-md);
+                  font-size: var(--font-size-sm);
+                  font-family: var(--font-mono);
+                  color: var(--color-text-secondary);
+                "
+                id="f-lastlogin-val"
+              >
+                —
+              </div>
+            </div>
+
+            <!-- Name + Username -->
+            <div
+              style="
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: var(--space-md);
+                margin-bottom: var(--space-lg);
+              "
+            >
+              <div>
+                <label class="cf-label">Full Name</label>
+                <input
+                  type="text"
+                  class="cf-input"
+                  id="f-fullname"
+                  placeholder="e.g. Juan Dela Cruz"
+                />
+              </div>
+              <div>
+                <label class="cf-label">Username</label>
+                <input
+                  type="text"
+                  class="cf-input"
+                  id="f-username"
+                  placeholder="e.g. jdelacruz"
+                />
+              </div>
+            </div>
+
+            <!-- Email -->
+            <div style="margin-bottom: var(--space-lg)">
+              <label class="cf-label">Email Address</label>
+              <input
+                type="email"
+                class="cf-input"
+                id="f-email"
+                placeholder="e.g. juan@pinewatch.ph"
+              />
+            </div>
+
+            <!-- Role + Status -->
+            <div
+              style="
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: var(--space-md);
+                margin-bottom: var(--space-lg);
+              "
+            >
+              <div>
+                <label class="cf-label">Role / Access Level</label>
+                <select class="cf-input" id="f-role">
+                  <option value="client">User</option>
+                  <option value="farm_manager">Farm Manager</option>
+                </select>
+              </div>
+              <div>
+                <label class="cf-label">Account Status</label>
+                <select class="cf-input" id="f-status">
+                  <option value="active">Active</option>
+                  <option value="disabled">Disabled</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Password + Confirm -->
+            <div
+              style="
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: var(--space-md);
+                margin-bottom: var(--space-lg);
+              "
+            >
+              <div>
+                <label class="cf-label" id="f-password-label">Password</label>
+                <input
+                  type="password"
+                  class="cf-input"
+                  id="f-password"
+                  placeholder="Enter password"
+                  autocomplete="new-password"
+                />
+                <div class="cf-hint" id="f-password-hint">
+                  Minimum 6 characters
+                </div>
+              </div>
+              <div>
+                <label class="cf-label">Confirm Password</label>
+                <input
+                  type="password"
+                  class="cf-input"
+                  id="f-confirm-password"
+                  placeholder="Re-enter password"
+                  autocomplete="new-password"
+                />
+              </div>
+            </div>
+
+            <!-- Permissions section removed for Farm Manager UI -->
+          </div>
+          <div
+            class="modal-footer"
+            style="
+              border-top: 1px solid var(--border);
+              padding: var(--space-xl);
+              display: flex;
+              gap: var(--space-md);
+              justify-content: flex-end;
+            "
+          >
+            <button
+              type="button"
+              class="btn btn-secondary btn-sm"
+              data-bs-dismiss="modal"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              class="btn btn-primary btn-sm"
+              onclick="saveUser()"
+            >
+              Save User
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reset Password Modal -->
+    <div
+      class="modal fade bs-modal"
+      id="resetPasswordModal"
+      tabindex="-1"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div
+            class="modal-header"
+            style="
+              padding: var(--space-xl);
+              border-bottom: 1px solid var(--border);
+            "
+          >
+            <h5
+              class="modal-title"
+              id="reset-pw-title"
+              style="
+                font-size: var(--font-size-xl);
+                font-weight: var(--font-weight-semibold);
+                color: var(--color-text-primary);
+              "
+            >
+              Reset Password
+            </h5>
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+              aria-label="Close"
+            ></button>
+          </div>
+          <div class="modal-body" style="padding: var(--space-xl)">
+            <div
+              id="reset-pw-error"
+              style="
+                display: none;
+                background: var(--red-bg);
+                border: 1px solid rgba(139, 32, 32, 0.3);
+                color: var(--red);
+                padding: var(--space-md);
+                border-radius: var(--radius-md);
+                margin-bottom: var(--space-lg);
+                font-size: var(--font-size-sm);
+              "
+            ></div>
+            <div style="margin-bottom: var(--space-lg)">
+              <label class="cf-label">New Password</label>
+              <input
+                type="password"
+                class="cf-input"
+                id="rp-password"
+                placeholder="Enter new password"
+                autocomplete="new-password"
+              />
+            </div>
+            <div>
+              <label class="cf-label">Confirm New Password</label>
+              <input
+                type="password"
+                class="cf-input"
+                id="rp-confirm"
+                placeholder="Re-enter new password"
+                autocomplete="new-password"
+              />
+              <div class="cf-hint">Minimum 6 characters</div>
+            </div>
+          </div>
+          <div
+            class="modal-footer"
+            style="
+              border-top: 1px solid var(--border);
+              padding: var(--space-xl);
+              display: flex;
+              gap: var(--space-md);
+              justify-content: flex-end;
+            "
+          >
+            <button
+              type="button"
+              class="btn btn-secondary btn-sm"
+              data-bs-dismiss="modal"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              class="btn btn-primary btn-sm"
+              onclick="doResetPassword()"
+            >
+              Reset Password
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+    <script src="../../js/auth.js"></script>
+    <script src="../../js/data.js"></script>
+    <script src="../../js/utils.js"></script>
+    <script src="../../js/app.js"></script>
+    <script src="../../bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script>
+      if (!auth.requireFarmManager()) {
+        /* redirects */
+      }
+
+      // ── State ────────────────────────────────────────────────────────────
+      var ALL_USERS = [];
+      var filtered = [];
+      var currentPage = 1;
+      var PAGE_SIZE = 8;
+      var currentSort = "name-asc";
+      var selectedIds = [];
+      var activeUserId = null;
+      var editingId = null;
+      var resetPwUserId = null;
+
+      // Load users from Firestore — Farm Managers never see admin accounts
+      async function loadUsersFromBackend() {
+        try {
+          console.log("📥 Loading users from Firestore...");
+
+          // Fetch users directly from Firestore
+          const usersSnapshot = await firebase
+            .firestore()
+            .collection("users")
+            .get();
+
+          ALL_USERS = [];
+
+          usersSnapshot.forEach(function (doc) {
+            const userData = doc.data();
+            // Farm Managers must never see Super Admin accounts
+            if (userData.role === "admin") return;
+            ALL_USERS.push({
+              id: doc.id,
+              fullName: userData.fullName,
+              username: userData.username,
+              email: userData.email,
+              role: userData.role,
+              status: userData.status,
+              createdAt: userData.createdAt || new Date().toISOString(),
+              lastLogin: userData.lastLogin
+                ? userData.lastLogin.toDate().toISOString()
+                : null,
+              permissions: userData.permissions || [],
+            });
+          });
+
+          console.log(
+            "✅ Loaded " + ALL_USERS.length + " users from Firestore",
+          );
+        } catch (error) {
+          console.error("❌ Error loading users:", error);
+          ALL_USERS = [];
+        }
+
+        // Always render, even if empty
+        renderMetrics();
+        renderTable();
+        updateTimestamp();
+      }
+      // ── Backend API helpers ──────────────────────────────────────────────
+      async function getAuthToken() {
+        const currentUser = firebase.auth().currentUser;
+        if (!currentUser) throw new Error("Not authenticated");
+        return await currentUser.getIdToken();
+      }
+
+      async function apiCall(method, path, body) {
+        const token = await getAuthToken();
+        const options = {
+          method: method,
+          headers: {
+            Authorization: "Bearer " + token,
+            "Content-Type": "application/json",
+          },
+        };
+        if (body !== undefined) options.body = JSON.stringify(body);
+        const resp = await fetch(path, options);
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || "Request failed");
+        return data;
+      }
+
+      // ── Init ─────────────────────────────────────────────────────────────
+      window.initPage = function () {
+        loadUsersFromBackend();
+        renderTimeline();
+        updateTimestamp();
+      };
+
+      function updateTimestamp() {
+        var el = document.getElementById("last-updated");
+        if (el)
+          el.textContent =
+            "Updated " +
+            new Date().toLocaleTimeString("en-US", {
+              hour: "2-digit",
+              minute: "2-digit",
+            });
+      }
+
+      function refreshPage() {
+        var btn = document.getElementById("refresh-btn");
+        var icon = document.getElementById("refresh-icon");
+        btn.disabled = true;
+        icon.classList.add("spinning");
+        setTimeout(function () {
+          window.initPage();
+          btn.disabled = false;
+          icon.classList.remove("spinning");
+          utils.showToast("User data refreshed", "success");
+        }, 600);
+      }
+
+      // ── Metrics ──────────────────────────────────────────────────────────
+      function renderMetrics() {
+        var total = ALL_USERS.length;
+        var active = ALL_USERS.filter(function (u) {
+          return u.status === "active";
+        }).length;
+        var disabled = ALL_USERS.filter(function (u) {
+          return u.status === "disabled";
+        }).length;
+        var admins = ALL_USERS.filter(function (u) {
+          return u.role === "farm_manager";
+        }).length;
+        var now = new Date();
+        var newMonth = ALL_USERS.filter(function (u) {
+          var d = new Date(u.createdAt);
+          return (
+            d.getMonth() === now.getMonth() &&
+            d.getFullYear() === now.getFullYear()
+          );
+        }).length;
+
+        var colorMap = {
+          green: { fg: "var(--green)", bg: "var(--green-bg)" },
+          red: { fg: "var(--red)", bg: "var(--red-bg)" },
+          amber: { fg: "var(--amber)", bg: "var(--amber-bg)" },
+          "": {
+            fg: "var(--color-text-secondary)",
+            bg: "var(--color-background-tertiary)",
+          },
+        };
+
+        var cards = [
+          {
+            label: "Total Users",
+            value: total,
+            sub: "Registered accounts",
+            color: "green",
+            trend: "fl",
+            trendTxt: "All time",
+            icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+          },
+          {
+            label: "Active Users",
+            value: active,
+            sub: Math.round((active / Math.max(total, 1)) * 100) + "% of total",
+            color: "green",
+            trend: "up",
+            trendTxt: "Enabled",
+            icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>',
+          },
+          {
+            label: "Disabled",
+            value: disabled,
+            sub: disabled > 0 ? "Needs review" : "All clear",
+            color: disabled > 0 ? "red" : "green",
+            trend: disabled > 0 ? "dn" : "up",
+            trendTxt: disabled > 0 ? "Action needed" : "No issues",
+            icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>',
+          },
+          {
+            label: "New This Month",
+            value: newMonth,
+            sub: "Recently added",
+            color: "amber",
+            trend: newMonth > 0 ? "up" : "fl",
+            trendTxt: "This month",
+            icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>',
+          },
+          {
+            label: "Farm Managers",
+            value: admins,
+            sub: "Farm management access",
+            color: "",
+            trend: "fl",
+            trendTxt: "Managers",
+            icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
+          },
+        ];
+
+        var html = "";
+        cards.forEach(function (c) {
+          var cm = colorMap[c.color] || colorMap[""];
+          var arrow = c.trend === "up" ? "↑" : c.trend === "dn" ? "↓" : "→";
+          html +=
+            '<div class="mc ' +
+            c.color +
+            '">' +
+            '<div class="mc-icon"><div style="width:32px;height:32px;border-radius:var(--radius-sm);background:' +
+            cm.bg +
+            ";display:flex;align-items:center;justify-content:center;color:" +
+            cm.fg +
+            ';">' +
+            c.icon +
+            "</div></div>" +
+            '<div class="mc-label">' +
+            c.label +
+            "</div>" +
+            '<div class="mc-val">' +
+            c.value +
+            "</div>" +
+            '<div class="mc-sub">' +
+            c.sub +
+            '<span class="mc-trend ' +
+            c.trend +
+            '">' +
+            arrow +
+            " " +
+            c.trendTxt +
+            "</span></div>" +
+            "</div>";
+        });
+        document.getElementById("user-metrics").innerHTML = html;
+      }
+
+      // ── Table ────────────────────────────────────────────────────────────
+      var AVATAR_PALETTES = [
+        { bg: "var(--green-bg)", fg: "var(--green)" },
+        { bg: "var(--amber-bg)", fg: "var(--amber)" },
+        { bg: "var(--yellow-bg)", fg: "var(--yellow)" },
+        { bg: "#e0eaff", fg: "#3a5fc8" },
+        { bg: "#f0e8ff", fg: "#7c3aed" },
+      ];
+
+      function pal(id) {
+        // Hash the ID string to get a number
+        var hash = 0;
+        var str = String(id);
+        for (var i = 0; i < str.length; i++) {
+          hash = str.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        return AVATAR_PALETTES[Math.abs(hash) % AVATAR_PALETTES.length];
+      }
+
+      function initials(name) {
+        return name
+          .split(" ")
+          .map(function (w) {
+            return w[0] || "";
+          })
+          .join("")
+          .substring(0, 2)
+          .toUpperCase();
+      }
+
+      function statusBadge(s) {
+        if (s === "active")
+          return '<span class="badge good"><span class="bdot"></span>Active</span>';
+        if (s === "disabled")
+          return '<span class="badge crit"><span class="bdot"></span>Disabled</span>';
+        return '<span class="badge"><span class="bdot"></span>' + s + "</span>";
+      }
+
+      function roleBadge(role) {
+        if (role === "farm_manager")
+          return '<span class="badge" style="background:var(--amber-bg);color:var(--amber);"><span class="bdot" style="background:var(--amber-mid);"></span>Farm Manager</span>';
+        return '<span class="badge" style="background:var(--color-background-secondary);color:var(--color-text-secondary);"><span class="bdot" style="background:var(--color-text-tertiary);"></span>User</span>';
+      }
+
+      function renderTable() {
+        var search = (document.getElementById("user-search").value || "")
+          .toLowerCase()
+          .trim();
+        var statusF = document.getElementById("status-filter").value;
+        var roleF = document.getElementById("role-filter").value;
+        var sortV = document.getElementById("sort-select").value;
+        currentSort = sortV;
+
+        filtered = ALL_USERS.filter(function (u) {
+          var ms =
+            !search ||
+            u.fullName.toLowerCase().indexOf(search) !== -1 ||
+            u.email.toLowerCase().indexOf(search) !== -1 ||
+            u.username.toLowerCase().indexOf(search) !== -1;
+          var mf = !statusF || u.status === statusF;
+          var mr = !roleF || u.role === roleF;
+          return ms && mf && mr;
+        });
+
+        filtered.sort(function (a, b) {
+          if (sortV === "name-asc") return a.fullName.localeCompare(b.fullName);
+          if (sortV === "name-desc")
+            return b.fullName.localeCompare(a.fullName);
+          if (sortV === "lastlogin-desc")
+            return new Date(b.lastLogin) - new Date(a.lastLogin);
+          if (sortV === "lastlogin-asc")
+            return new Date(a.lastLogin) - new Date(b.lastLogin);
+          if (sortV === "role-fm")
+            return a.role === "farm_manager"
+              ? -1
+              : b.role === "farm_manager"
+                ? 1
+                : a.fullName.localeCompare(b.fullName);
+          return a.fullName.localeCompare(b.fullName);
+        });
+
+        var total = filtered.length;
+        var pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+        if (currentPage > pages) currentPage = 1;
+        var s0 = (currentPage - 1) * PAGE_SIZE;
+        var s1 = Math.min(s0 + PAGE_SIZE, total);
+        var page = filtered.slice(s0, s1);
+
+        document.getElementById("result-count").textContent =
+          total + " user" + (total !== 1 ? "s" : "");
+
+        ["name", "role", "lastlogin"].forEach(function (col) {
+          var el = document.getElementById("sort-" + col);
+          if (!el) return;
+          var isActive =
+            sortV.indexOf(col) === 0 ||
+            (col === "role" && sortV === "role-admin");
+          el.className = "sort-arrow" + (isActive ? " active" : "");
+          el.textContent = isActive
+            ? sortV.indexOf("desc") !== -1
+              ? "↓"
+              : "↑"
+            : "↕";
+        });
+
+        var tbody = "";
+        if (page.length === 0) {
+          tbody =
+            '<tr><td colspan="7" style="text-align:center;padding:var(--space-4xl);">' +
+            '<div class="empty-state" style="padding:0;">' +
+            '<div class="empty-state-icon" style="margin-bottom:var(--space-lg);"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>' +
+            '<div class="empty-state-title">No users found</div>' +
+            '<div class="empty-state-text">Try adjusting your search or filters</div>' +
+            "</div></td></tr>";
+        } else {
+          page.forEach(function (u) {
+            var p = pal(u.id);
+            var ini = initials(u.fullName);
+            var login = u.lastLogin
+              ? new Date(u.lastLogin).toLocaleString("en-US", {
+                  month: "short",
+                  day: "2-digit",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  hour12: true,
+                })
+              : "Never";
+            var isSel = selectedIds.indexOf(u.id) !== -1;
+            var isDisabled = u.status === "disabled";
+            var toggleTitle = isDisabled ? "Enable Account" : "Disable Account";
+            var toggleIcon = isDisabled
+              ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
+              : '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>';
+
+            tbody +=
+              '<tr class="user-row' +
+              (isSel ? " selected" : "") +
+              '" data-id="' +
+              u.id +
+              '">' +
+              '<td style="width:36px;padding-right:0;" onclick="event.stopPropagation();">' +
+              '<input type="checkbox" class="row-chk" data-id="' +
+              u.id +
+              '" ' +
+              (isSel ? "checked" : "") +
+              ' onchange="toggleRow(this)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--green);">' +
+              "</td>" +
+              "<td onclick=\"openDetail('" +
+              u.id +
+              "')\">" +
+              '<div class="user-name-cell">' +
+              '<div class="user-avatar" style="background:' +
+              p.bg +
+              ";color:" +
+              p.fg +
+              ';">' +
+              ini +
+              "</div>" +
+              '<div class="user-name-info">' +
+              '<div class="user-name-primary">' +
+              esc(u.fullName) +
+              "</div>" +
+              '<div class="user-name-secondary">@' +
+              esc(u.username) +
+              "</div>" +
+              "</div>" +
+              "</div>" +
+              "</td>" +
+              "<td onclick=\"openDetail('" +
+              u.id +
+              '\')" style="color:var(--color-text-secondary);font-size:var(--font-size-sm);">' +
+              esc(u.email) +
+              "</td>" +
+              "<td onclick=\"openDetail('" +
+              u.id +
+              "')\">" +
+              roleBadge(u.role) +
+              "</td>" +
+              "<td onclick=\"openDetail('" +
+              u.id +
+              '\')" style="font-size:11px;font-family:var(--font-mono);color:var(--color-text-secondary);">' +
+              login +
+              "</td>" +
+              "<td onclick=\"openDetail('" +
+              u.id +
+              "')\">" +
+              statusBadge(u.status) +
+              "</td>" +
+              '<td style="text-align:right;" onclick="event.stopPropagation();">' +
+              '<div class="tbl-actions" style="justify-content:flex-end;">' +
+              '<button class="tbl-btn" title="View Details" onclick="openDetail(\'' +
+              u.id +
+              "')\">" +
+              '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>' +
+              "</button>" +
+              '<button class="tbl-btn" title="Edit User" onclick="openEdit(\'' +
+              u.id +
+              "')\">" +
+              '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' +
+              "</button>" +
+              '<button class="tbl-btn amber" title="Reset Password" onclick="openResetPassword(\'' +
+              u.id +
+              "')\">" +
+              '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>' +
+              "</button>" +
+              '<button class="tbl-btn ' +
+              (isDisabled ? "" : "danger") +
+              '" title="' +
+              toggleTitle +
+              '" onclick="toggleStatus(\'' +
+              u.id +
+              "')\">" +
+              toggleIcon +
+              "</button>" +
+              "</div>" +
+              "</td>" +
+              "</tr>";
+          });
+        }
+        document.getElementById("users-tbody").innerHTML = tbody;
+
+        var allSel =
+          page.length > 0 &&
+          page.every(function (u) {
+            return selectedIds.indexOf(u.id) !== -1;
+          });
+        var anySel = page.some(function (u) {
+          return selectedIds.indexOf(u.id) !== -1;
+        });
+        var sa = document.getElementById("select-all");
+        sa.checked = allSel;
+        sa.indeterminate = !allSel && anySel;
+
+        renderPagination(total, pages);
+        syncBulkBar();
+      }
+
+      function renderPagination(total, pages) {
+        var s0 = (currentPage - 1) * PAGE_SIZE + 1;
+        var s1 = Math.min(currentPage * PAGE_SIZE, total);
+        document.getElementById("pag-info").textContent =
+          total === 0
+            ? "0 users"
+            : "Showing " + s0 + "–" + s1 + " of " + total + " users";
+
+        var html = "";
+        html +=
+          '<button class="pag-btn" onclick="goPage(' +
+          (currentPage - 1) +
+          ')" ' +
+          (currentPage === 1 ? "disabled" : "") +
+          ">‹</button>";
+        for (var p = 1; p <= pages; p++) {
+          if (
+            pages > 7 &&
+            p > 2 &&
+            p < pages - 1 &&
+            Math.abs(p - currentPage) > 1
+          ) {
+            if (p === 3 || p === pages - 2)
+              html += '<button class="pag-btn" disabled>…</button>';
+            continue;
+          }
+          html +=
+            '<button class="pag-btn' +
+            (p === currentPage ? " active" : "") +
+            '" onclick="goPage(' +
+            p +
+            ')">' +
+            p +
+            "</button>";
+        }
+        html +=
+          '<button class="pag-btn" onclick="goPage(' +
+          (currentPage + 1) +
+          ')" ' +
+          (currentPage === pages ? "disabled" : "") +
+          ">›</button>";
+        document.getElementById("pag-btns").innerHTML = html;
+      }
+
+      function goPage(p) {
+        var pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+        if (p < 1 || p > pages) return;
+        currentPage = p;
+        renderTable();
+      }
+
+      function filterUsers() {
+        currentPage = 1;
+        renderTable();
+      }
+
+      function applySort(col) {
+        var sel = document.getElementById("sort-select");
+        var colMap = {
+          name: "name-asc",
+          role: "role-fm",
+          lastlogin: "lastlogin-desc",
+        };
+        sel.value = colMap[col] || "name-asc";
+        filterUsers();
+      }
+
+      // ── Selection ────────────────────────────────────────────────────────
+      function toggleSelectAll() {
+        var checked = document.getElementById("select-all").checked;
+        var s0 = (currentPage - 1) * PAGE_SIZE;
+        filtered
+          .slice(s0, Math.min(s0 + PAGE_SIZE, filtered.length))
+          .forEach(function (u) {
+            var idx = selectedIds.indexOf(u.id);
+            if (checked && idx === -1) selectedIds.push(u.id);
+            if (!checked && idx !== -1) selectedIds.splice(idx, 1);
+          });
+        renderTable();
+      }
+
+      function toggleRow(el) {
+        var id = parseInt(el.getAttribute("data-id"));
+        var idx = selectedIds.indexOf(id);
+        if (el.checked && idx === -1) selectedIds.push(id);
+        if (!el.checked && idx !== -1) selectedIds.splice(idx, 1);
+        var row = el.closest("tr");
+        if (row) row.classList.toggle("selected", el.checked);
+        syncBulkBar();
+        var s0 = (currentPage - 1) * PAGE_SIZE;
+        var page = filtered.slice(
+          s0,
+          Math.min(s0 + PAGE_SIZE, filtered.length),
+        );
+        var sa = document.getElementById("select-all");
+        sa.checked =
+          page.length > 0 &&
+          page.every(function (u) {
+            return selectedIds.indexOf(u.id) !== -1;
+          });
+        sa.indeterminate =
+          !sa.checked &&
+          page.some(function (u) {
+            return selectedIds.indexOf(u.id) !== -1;
+          });
+      }
+
+      function clearSelection() {
+        selectedIds = [];
+        renderTable();
+      }
+
+      function syncBulkBar() {
+        var bar = document.getElementById("bulk-bar");
+        var cnt = document.getElementById("bulk-count");
+        if (selectedIds.length > 0) {
+          bar.classList.add("visible");
+          cnt.textContent = selectedIds.length;
+        } else bar.classList.remove("visible");
+      }
+
+      async function bulkAction(action) {
+        var ids = selectedIds.slice();
+        var count = ids.length;
+        if (count === 0) return;
+
+        var results = { ok: 0, fail: 0 };
+
+        for (var i = 0; i < ids.length; i++) {
+          var id = ids[i];
+          var u = ALL_USERS.filter(function (x) { return x.id === id; })[0];
+          if (!u || u.role === "admin") continue;
+
+          try {
+            if (action === "activate" || action === "disable") {
+              // Only call API if the status needs to change
+              var targetStatus = action === "activate" ? "active" : "disabled";
+              if (u.status !== targetStatus) {
+                await apiCall("POST", "/api/fm/users/" + id + "/toggle-status");
+              }
+              results.ok++;
+            }
+          } catch (e) {
+            console.error("Bulk action failed for", id, e);
+            results.fail++;
+          }
+        }
+
+        selectedIds = [];
+        await loadUsersFromBackend();
+        renderTable();
+
+        var label = action === "activate" ? "enabled" : "disabled";
+        var msg = results.ok + " user" + (results.ok !== 1 ? "s" : "") + " " + label;
+        if (results.fail > 0) msg += " (" + results.fail + " failed)";
+        utils.showToast(msg, results.fail > 0 ? "error" : "success");
+      }
+
+      // ── Toggle Status ────────────────────────────────────────────────────
+      async function toggleStatus(id) {
+        try {
+          // Read current user data first (for the guard check and display name)
+          const userDoc = await firebase
+            .firestore()
+            .collection("users")
+            .doc(id)
+            .get();
+
+          if (!userDoc.exists) {
+            utils.showToast("User not found", "error");
+            return;
+          }
+
+          const userData = userDoc.data();
+
+          // Farm Managers cannot modify Super Admin accounts
+          if (userData.role === "admin") {
+            utils.showToast(
+              "You do not have permission to modify Super Admin accounts",
+              "error",
+            );
+            return;
+          }
+
+          // Use backend API — updates both Firestore and Firebase Auth disabled state
+          const result = await apiCall(
+            "POST",
+            "/api/fm/users/" + id + "/toggle-status",
+          );
+          const newStatus = result.status;
+
+          // Log activity (activity_logs allows create: true, so this always works)
+          try {
+            const currentUser = firebase.auth().currentUser;
+            if (currentUser) {
+              const cuDoc = await firebase
+                .firestore()
+                .collection("users")
+                .doc(currentUser.uid)
+                .get();
+              const cuData = cuDoc.data();
+              await firebase.firestore().collection("activity_logs").add({
+                userId: currentUser.uid,
+                user: cuData.username,
+                action: "toggle_status",
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                status: "success",
+                email: cuData.email,
+                role: cuData.role,
+                details:
+                  (newStatus === "disabled" ? "Disabled" : "Enabled") +
+                  " user: " +
+                  userData.fullName,
+              });
+            }
+          } catch (logError) {
+            console.error("Failed to log status toggle activity:", logError);
+          }
+
+          utils.showToast(
+            userData.fullName +
+              " " +
+              (newStatus === "disabled" ? "disabled" : "enabled"),
+            newStatus === "disabled" ? "error" : "success",
+          );
+
+          await loadUsersFromBackend();
+          await renderTimeline();
+        } catch (error) {
+          console.error("Error toggling user status:", error);
+          utils.showToast("Failed to update user status", "error");
+        }
+      }
+
+      function exportUsers() {
+        utils.showToast("Preparing user export…", "success");
+      }
+
+      // ── User Detail Modal ────────────────────────────────────────────────
+      async function openDetail(id) {
+        try {
+          // Fetch user from Firestore
+          const userDoc = await firebase
+            .firestore()
+            .collection("users")
+            .doc(id)
+            .get();
+
+          if (!userDoc.exists) {
+            utils.showToast("User not found", "error");
+            return;
+          }
+
+          const u = userDoc.data();
+          u.id = userDoc.id;
+
+          activeUserId = id;
+
+          var p = pal(id);
+          var ini = initials(u.fullName);
+          var logins = u.lastLogin
+            ? new Date(u.lastLogin.toDate()).toLocaleString("en-US", {
+                weekday: "short",
+                month: "long",
+                day: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: true,
+              })
+            : "Never logged in";
+          var since = u.createdAt
+            ? new Date(u.createdAt.toDate()).toLocaleDateString("en-US", {
+                month: "long",
+                year: "numeric",
+              })
+            : "Unknown";
+
+          var perms = u.permissions || [];
+          var daysSince = u.lastLogin
+            ? Math.floor(
+                (Date.now() - u.lastLogin.toDate().getTime()) / 86400000,
+              )
+            : null;
+          var daysSinceStr =
+            daysSince === null
+              ? "—"
+              : daysSince === 0
+                ? "Today"
+                : daysSince + "d ago";
+
+          var html = "";
+
+          // Profile header
+          html +=
+            '<div class="profile-header">' +
+            '<div class="profile-avatar-lg" style="background:' +
+            p.bg +
+            ";color:" +
+            p.fg +
+            ';">' +
+            ini +
+            "</div>" +
+            '<div class="profile-info">' +
+            '<div class="profile-name">' +
+            esc(u.fullName) +
+            "</div>" +
+            '<div class="profile-email">' +
+            esc(u.email) +
+            "</div>" +
+            '<div class="profile-meta">' +
+            '<span class="profile-meta-item">@' +
+            esc(u.username) +
+            "</span>" +
+            '<span style="color:var(--color-border-primary);">·</span>' +
+            '<span class="profile-meta-item">Since ' +
+            since +
+            "</span>" +
+            '<span style="color:var(--color-border-primary);">·</span>' +
+            roleBadge(u.role) +
+            '<span style="color:var(--color-border-primary);">·</span>' +
+            statusBadge(u.status) +
+            "</div>" +
+            "</div>" +
+            "</div>";
+
+          // Stats
+          html +=
+            '<div class="detail-stats">' +
+            '<div class="detail-stat"><div class="detail-stat-val">' +
+            (perms[0] === "all" ? "∞" : perms.length) +
+            '</div><div class="detail-stat-lbl">Permissions</div></div>' +
+            '<div class="detail-stat"><div class="detail-stat-val">0</div><div class="detail-stat-lbl">Activity Events</div></div>' +
+            '<div class="detail-stat"><div class="detail-stat-val">' +
+            daysSinceStr +
+            '</div><div class="detail-stat-lbl">Last Login</div></div>' +
+            "</div>";
+
+          // Tabs
+          html +=
+            '<div class="modal-tabs">' +
+            '<button class="modal-tab active" onclick="switchTab(this,\'dt-overview\')">Overview</button>' +
+            '<button class="modal-tab" onclick="switchTab(this,\'dt-activity\')">Activity</button>' +
+            "</div>";
+
+          // Overview tab
+          html += '<div class="modal-tab-panel active" id="dt-overview">';
+
+          html +=
+            '<div style="font-size:11px;font-weight:var(--font-weight-semibold);color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:var(--space-md);">Last Login</div>';
+          html +=
+            '<div style="display:flex;align-items:center;gap:var(--space-md);padding:var(--space-md);background:var(--color-background-secondary);border-radius:var(--radius-md);margin-bottom:var(--space-xl);">' +
+            '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' +
+            '<span style="font-size:var(--font-size-sm);font-family:var(--font-mono);">' +
+            logins +
+            "</span>" +
+            "</div>";
+
+          html +=
+            '<div style="font-size:11px;font-weight:var(--font-weight-semibold);color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:var(--space-md);">Permissions</div>';
+          if (perms.length === 0) {
+            html +=
+              '<div style="margin-bottom:var(--space-xl);font-size:var(--font-size-sm);color:var(--muted);">No permissions assigned</div>';
+          } else if (perms[0] === "all") {
+            html +=
+              '<div style="margin-bottom:var(--space-xl);display:flex;align-items:center;gap:var(--space-sm);padding:var(--space-md);background:var(--amber-bg);border-radius:var(--radius-md);">' +
+              '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>' +
+              '<span style="font-size:var(--font-size-sm);color:var(--amber);font-weight:var(--font-weight-medium);">Full admin access — all permissions granted</span>' +
+              "</div>";
+          } else {
+            var permLabels = {
+              view_dashboard: "Dashboard",
+              view_blocks: "View Blocks",
+              view_scans: "View Scans",
+              view_alerts: "Manage Alerts",
+              generate_report: "Generate Reports",
+            };
+            html += '<div class="perm-list">';
+            perms.forEach(function (perm) {
+              var lbl = permLabels[perm] || perm.replace(/_/g, " ");
+              html +=
+                '<span class="perm-pill"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' +
+                lbl +
+                "</span>";
+            });
+            html += "</div>";
+          }
+
+          html +=
+            '<div style="font-size:11px;font-weight:var(--font-weight-semibold);color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:var(--space-md);">Account Info</div>';
+          html +=
+            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-md);">' +
+            '<div style="padding:var(--space-md);background:var(--color-background-secondary);border-radius:var(--radius-md);">' +
+            '<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Role</div>' +
+            '<div style="font-size:var(--font-size-sm);font-weight:var(--font-weight-medium);color:var(--color-text-primary);">' +
+            (u.role === "farm_manager" ? "Farm Manager" : "Regular User") +
+            "</div>" +
+            "</div>" +
+            '<div style="padding:var(--space-md);background:var(--color-background-secondary);border-radius:var(--radius-md);">' +
+            '<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Status</div>' +
+            '<div style="font-size:var(--font-size-sm);font-weight:var(--font-weight-medium);color:' +
+            (u.status === "active" ? "var(--green)" : "var(--red)") +
+            ';text-transform:capitalize;">' +
+            u.status +
+            "</div>" +
+            "</div>" +
+            "</div>";
+
+          html += "</div>";
+
+          // Activity tab
+          html += '<div class="modal-tab-panel" id="dt-activity">';
+          html +=
+            '<div class="empty-state" style="padding:var(--space-2xl) 0;"><div class="empty-state-title">No Activity</div><div class="empty-state-text">Activity tracking coming soon</div></div>';
+          html += "</div>";
+
+          document.getElementById("detail-modal-body").innerHTML = html;
+          document.getElementById("detail-modal-title").textContent =
+            u.fullName;
+          document.getElementById("detail-edit-btn").onclick = function () {
+            bootstrap.Modal.getInstance(
+              document.getElementById("userDetailModal"),
+            ).hide();
+            openEdit(activeUserId);
+          };
+          document.getElementById("detail-reset-btn").onclick = function () {
+            bootstrap.Modal.getInstance(
+              document.getElementById("userDetailModal"),
+            ).hide();
+            openResetPassword(activeUserId);
+          };
+
+          new bootstrap.Modal(
+            document.getElementById("userDetailModal"),
+          ).show();
+        } catch (error) {
+          console.error("Error loading user details:", error);
+          utils.showToast("Failed to load user details", "error");
+        }
+      }
+
+      function switchTab(btn, panelId) {
+        var ctx = btn.closest(".modal-body");
+        ctx.querySelectorAll(".modal-tab").forEach(function (t) {
+          t.classList.remove("active");
+        });
+        btn.classList.add("active");
+        ctx.querySelectorAll(".modal-tab-panel").forEach(function (p) {
+          p.classList.remove("active");
+        });
+        var panel = document.getElementById(panelId);
+        if (panel) panel.classList.add("active");
+      }
+
+      // ── Add / Edit Modal ─────────────────────────────────────────────────
+      function openAddUserModal() {
+        editingId = null;
+        document.getElementById("add-modal-title").textContent = "Add New User";
+        document.getElementById("f-fullname").value = "";
+        document.getElementById("f-username").value = "";
+        document.getElementById("f-email").value = "";
+        document.getElementById("f-role").value = "client";
+        document.getElementById("f-status").value = "active";
+        document.getElementById("f-password").value = "";
+        document.getElementById("f-confirm-password").value = "";
+        document.getElementById("f-password-label").textContent = "Password";
+        document.getElementById("f-password-hint").textContent =
+          "Minimum 6 characters";
+        document.getElementById("f-password").placeholder = "Enter password";
+        document.getElementById("f-lastlogin-row").style.display = "none";
+        document.getElementById("add-form-error").style.display = "none";
+        new bootstrap.Modal(document.getElementById("addUserModal")).show();
+      }
+
+      async function openEdit(id) {
+        try {
+          // Fetch user from Firestore
+          const userDoc = await firebase
+            .firestore()
+            .collection("users")
+            .doc(id)
+            .get();
+
+          if (!userDoc.exists) {
+            utils.showToast("User not found", "error");
+            return;
+          }
+
+          const u = userDoc.data();
+          u.id = userDoc.id;
+
+          editingId = id;
+          document.getElementById("add-modal-title").textContent =
+            "Edit — " + u.fullName;
+          document.getElementById("f-fullname").value = u.fullName;
+          document.getElementById("f-username").value = u.username;
+          document.getElementById("f-email").value = u.email;
+          document.getElementById("f-role").value = u.role;
+          document.getElementById("f-status").value = u.status;
+          document.getElementById("f-password").value = "";
+          document.getElementById("f-confirm-password").value = "";
+          document.getElementById("f-password-label").textContent =
+            "New Password";
+          document.getElementById("f-password-hint").textContent =
+            "Leave blank to keep current password";
+          document.getElementById("f-password").placeholder =
+            "Leave blank to keep current";
+          document.getElementById("add-form-error").style.display = "none";
+
+          if (u.lastLogin) {
+            document.getElementById("f-lastlogin-row").style.display = "block";
+            var lastLoginDate = u.lastLogin.toDate
+              ? u.lastLogin.toDate()
+              : new Date(u.lastLogin);
+            document.getElementById("f-lastlogin-val").textContent =
+              lastLoginDate.toLocaleString("en-US", {
+                weekday: "short",
+                month: "long",
+                day: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: true,
+              });
+          } else {
+            document.getElementById("f-lastlogin-row").style.display = "none";
+          }
+
+          // Farm Managers cannot edit Super Admin accounts
+          if (u.role === "admin") {
+            utils.showToast("You do not have permission to edit Super Admin accounts", "error");
+            return;
+          }
+
+          new bootstrap.Modal(document.getElementById("addUserModal")).show();
+        } catch (error) {
+          console.error("Error loading user for edit:", error);
+          utils.showToast("Failed to load user", "error");
+        }
+      }
+
+      async function saveUser() {
+        var fn = document.getElementById("f-fullname").value.trim();
+        var un = document.getElementById("f-username").value.trim();
+        var em = document.getElementById("f-email").value.trim();
+        var rl = document.getElementById("f-role").value;
+        var st = document.getElementById("f-status").value;
+        var pw = document.getElementById("f-password").value;
+        var pw2 = document.getElementById("f-confirm-password").value;
+        var err = document.getElementById("add-form-error");
+
+        // Farm Managers cannot assign the Super Admin role
+        if (rl === "admin") {
+          err.textContent =
+            "You do not have permission to assign the Super Admin role.";
+          err.style.display = "block";
+          return;
+        }
+
+        // When editing, verify the target is not a Super Admin
+        if (editingId) {
+          try {
+            const targetDoc = await firebase
+              .firestore()
+              .collection("users")
+              .doc(editingId)
+              .get();
+            if (targetDoc.exists && targetDoc.data().role === "admin") {
+              err.textContent =
+                "You do not have permission to edit Super Admin accounts.";
+              err.style.display = "block";
+              return;
+            }
+          } catch (e) {
+            err.textContent = "Failed to verify user permissions.";
+            err.style.display = "block";
+            return;
+          }
+        }
+
+        // Validation
+        if (!fn || !un || !em) {
+          err.textContent = "Full name, username and email are required.";
+          err.style.display = "block";
+          return;
+        }
+        if (!/\S+@\S+\.\S+/.test(em)) {
+          err.textContent = "Please enter a valid email address.";
+          err.style.display = "block";
+          return;
+        }
+        if (!editingId && !pw) {
+          err.textContent = "Password is required for new users.";
+          err.style.display = "block";
+          return;
+        }
+        if (pw && pw.length < 6) {
+          err.textContent = "Password must be at least 6 characters.";
+          err.style.display = "block";
+          return;
+        }
+        if (pw && pw !== pw2) {
+          err.textContent = "Passwords do not match.";
+          err.style.display = "block";
+          return;
+        }
+        err.style.display = "none";
+
+        try {
+          if (editingId) {
+            // EDIT — backend API updates both Firestore and Firebase Auth
+            await apiCall("PUT", "/api/fm/users/" + editingId, {
+              fullName: fn,
+              username: un,
+              email: em,
+              role: rl,
+              status: st,
+              permissions: [],
+            });
+
+            // Password change — backend Admin SDK sets it directly
+            if (pw) {
+              await apiCall(
+                "POST",
+                "/api/fm/users/" + editingId + "/reset-password",
+                { newPassword: pw },
+              );
+            }
+
+            // Log activity
+            try {
+              const currentUser = firebase.auth().currentUser;
+              if (currentUser) {
+                const cuDoc = await firebase
+                  .firestore()
+                  .collection("users")
+                  .doc(currentUser.uid)
+                  .get();
+                const cuData = cuDoc.data();
+                await firebase.firestore().collection("activity_logs").add({
+                  userId: currentUser.uid,
+                  user: cuData.username,
+                  action: "update_user",
+                  timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                  status: "success",
+                  email: cuData.email,
+                  role: cuData.role,
+                  details: "Updated user: " + fn,
+                });
+              }
+            } catch (logError) {
+              console.error("Failed to log edit activity:", logError);
+            }
+
+            utils.showToast("User updated successfully", "success");
+          } else {
+            // CREATE — check username uniqueness before calling API
+            const usernameCheck = await firebase
+              .firestore()
+              .collection("users")
+              .where("username", "==", un)
+              .limit(1)
+              .get();
+
+            if (!usernameCheck.empty) {
+              throw new Error("Username already exists");
+            }
+
+            // Backend API — uses Admin SDK so current session is not replaced
+            await apiCall("POST", "/api/fm/users", {
+              fullName: fn,
+              username: un,
+              email: em,
+              password: pw,
+              role: rl,
+              status: st,
+              permissions: [],
+            });
+
+            utils.showToast("User created successfully", "success");
+          }
+
+          bootstrap.Modal.getInstance(
+            document.getElementById("addUserModal"),
+          ).hide();
+
+          await loadUsersFromBackend();
+          await renderTimeline();
+        } catch (error) {
+          console.error("Error saving user:", error);
+          if (
+            error.message &&
+            error.message.toLowerCase().includes("email already")
+          ) {
+            err.textContent = "Email address is already in use";
+          } else {
+            err.textContent = error.message || "Failed to save user";
+          }
+          err.style.display = "block";
+        }
+      }
+
+      // ── Reset Password ────────────────────────────────────────────────────
+      async function openResetPassword(id) {
+        try {
+          // Fetch user from Firestore
+          const userDoc = await firebase
+            .firestore()
+            .collection("users")
+            .doc(id)
+            .get();
+
+          if (!userDoc.exists) {
+            utils.showToast("User not found", "error");
+            return;
+          }
+
+          const u = userDoc.data();
+
+          // Farm Managers cannot reset Super Admin passwords
+          if (u.role === "admin") {
+            utils.showToast("You do not have permission to reset Super Admin passwords", "error");
+            return;
+          }
+
+          resetPwUserId = id;
+
+          document.getElementById("reset-pw-title").textContent =
+            "Reset Password — " + u.fullName;
+          document.getElementById("rp-password").value = "";
+          document.getElementById("rp-confirm").value = "";
+          document.getElementById("reset-pw-error").style.display = "none";
+
+          new bootstrap.Modal(
+            document.getElementById("resetPasswordModal"),
+          ).show();
+        } catch (error) {
+          console.error("Error loading user for password reset:", error);
+          utils.showToast("Failed to load user", "error");
+        }
+      }
+
+      async function doResetPassword() {
+        var pw = document.getElementById("rp-password").value;
+        var pw2 = document.getElementById("rp-confirm").value;
+        var err = document.getElementById("reset-pw-error");
+
+        if (!pw || pw.length < 6) {
+          err.textContent = "Password must be at least 6 characters.";
+          err.style.display = "block";
+          return;
+        }
+        if (pw !== pw2) {
+          err.textContent = "Passwords do not match.";
+          err.style.display = "block";
+          return;
+        }
+
+        try {
+          // Fetch user data for the activity log
+          const userDoc = await firebase
+            .firestore()
+            .collection("users")
+            .doc(resetPwUserId)
+            .get();
+
+          if (!userDoc.exists) throw new Error("User not found");
+          const userData = userDoc.data();
+
+          // Use backend API — Admin SDK sets the password directly
+          await apiCall(
+            "POST",
+            "/api/fm/users/" + resetPwUserId + "/reset-password",
+            { newPassword: pw },
+          );
+
+          // Log activity
+          try {
+            const currentUser = firebase.auth().currentUser;
+            if (currentUser) {
+              const cuDoc = await firebase
+                .firestore()
+                .collection("users")
+                .doc(currentUser.uid)
+                .get();
+              const cuData = cuDoc.data();
+              await firebase.firestore().collection("activity_logs").add({
+                userId: currentUser.uid,
+                user: cuData.username,
+                action: "reset_password",
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                status: "success",
+                email: cuData.email,
+                role: cuData.role,
+                details: "Reset password for: " + userData.fullName,
+              });
+            }
+          } catch (logError) {
+            console.error("Failed to log password reset activity:", logError);
+          }
+
+          err.style.display = "none";
+          bootstrap.Modal.getInstance(
+            document.getElementById("resetPasswordModal"),
+          ).hide();
+          utils.showToast("Password reset successfully", "success");
+
+          await renderTimeline();
+        } catch (error) {
+          console.error("Error resetting password:", error);
+          err.textContent = error.message || "Failed to reset password";
+          err.style.display = "block";
+        }
+      }
+
+      // ── Activity Timeline ────────────────────────────────────────────────
+      async function renderTimeline() {
+        try {
+          // Fetch recent activity logs from Firestore
+          const logsSnapshot = await firebase
+            .firestore()
+            .collection("activity_logs")
+            .orderBy("timestamp", "desc")
+            .limit(10)
+            .get();
+
+          var logs = [];
+          logsSnapshot.forEach(function (doc) {
+            logs.push(doc.data());
+          });
+
+          var labels = {
+            login: "Logged in",
+            logout: "Logged out",
+            view_dashboard: "Viewed dashboard",
+            view_blocks: "Viewed blocks",
+            view_scans: "Viewed scans",
+            view_alerts: "Viewed alerts",
+            generate_report: "Generated report",
+            upload_scan: "Uploaded scan",
+            login_failed: "Login failed",
+            update_user: "Updated user", // NEW
+            reset_password: "Reset password", // NEW
+            toggle_status: "Toggled status", // NEW
+            view_users: "Viewed users",
+          };
+
+          var types = {
+            login: "login",
+            logout: "login",
+            upload_scan: "upload",
+            generate_report: "report",
+            view_alerts: "alert",
+            login_failed: "alert",
+            update_user: "report", // NEW
+            reset_password: "alert", // NEW
+            toggle_status: "report", // NEW
+            view_users: "report",
+            view_dashboard: "report",
+            view_blocks: "report",
+          };
+
+          var html = "";
+
+          if (logs.length === 0) {
+            html =
+              '<div class="empty-state" style="padding:var(--space-xl) 0;"><div class="empty-state-text">No recent activity</div></div>';
+          } else {
+            logs.forEach(function (log) {
+              // Handle timestamp - could be Firestore Timestamp or ISO string
+              var timestamp = log.timestamp;
+              var date;
+              if (timestamp && timestamp.toDate) {
+                // Firestore Timestamp
+                date = timestamp.toDate();
+              } else if (timestamp) {
+                // ISO string
+                date = new Date(timestamp);
+              } else {
+                // No timestamp
+                date = new Date();
+              }
+
+              var ts = date.toLocaleString("en-US", {
+                month: "short",
+                day: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: true,
+              });
+
+              var type = types[log.action] || "login";
+              var lbl = labels[log.action] || log.action.replace(/_/g, " ");
+              var statusClass = log.status === "error" ? "crit" : "good";
+              var statusText = log.status === "error" ? "Err" : "OK";
+
+              html +=
+                '<div class="tl-item">' +
+                '<div class="tl-icon ' +
+                type +
+                '">' +
+                getActionIcon(log.action) +
+                "</div>" +
+                '<div class="tl-body"><div class="tl-text"><strong>' +
+                esc(log.user) +
+                "</strong> " +
+                lbl +
+                '</div><div class="tl-time">' +
+                ts +
+                "</div></div>" +
+                '<span class="badge ' +
+                statusClass +
+                '" style="font-size:10px;padding:2px 7px;flex-shrink:0;"><span class="bdot"></span>' +
+                statusText +
+                "</span>" +
+                "</div>";
+            });
+          }
+
+          document.getElementById("activity-timeline").innerHTML = html;
+        } catch (error) {
+          console.error("Error loading activity logs:", error);
+          document.getElementById("activity-timeline").innerHTML =
+            '<div class="empty-state" style="padding:var(--space-xl) 0;"><div class="empty-state-text">Failed to load activity</div></div>';
+        }
+      }
+
+      // ── Helpers ──────────────────────────────────────────────────────────
+      function tlIcon(type) {
+        if (type === "login")
+          return '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>';
+        if (type === "upload")
+          return '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>';
+        if (type === "report")
+          return '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
+        return '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>';
+      }
+
+      function getActionIcon(action) {
+        var icons = {
+          // Login/Logout
+          login:
+            '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>',
+
+          logout:
+            '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>',
+
+          // User Management
+          update_user:
+            '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
+
+          reset_password:
+            '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
+
+          toggle_status:
+            '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>',
+
+          // Errors/Alerts
+          login_failed:
+            '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
+
+          view_alerts:
+            '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>',
+
+          // Upload/Reports
+          upload_scan:
+            '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>',
+
+          generate_report:
+            '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
+
+          // Default/Views
+          view_dashboard:
+            '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>',
+
+          view_users:
+            '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+
+          view_blocks:
+            '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>',
+
+          view_scans:
+            '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>',
+        };
+
+        // Return specific icon or default to document icon
+        return (
+          icons[action] ||
+          '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>'
+        );
+      }
+
+      function esc(str) {
+        if (!str) return "";
+        return String(str)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+
+      function openLogoutModal() { auth.confirmLogout(); }
+      function closeLogoutModal() {
+        document.getElementById("logout-modal").style.display = "none";
+      }
+    </script>
+
+    <!-- Logout Confirmation Modal -->
+    <div
+      id="logout-modal"
+      style="
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: none;
+        align-items: center;
+        justify-content: center;
+      "
+    >
+      <!-- Backdrop -->
+      <div
+        onclick="closeLogoutModal()"
+        style="
+          position: absolute;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.45);
+          backdrop-filter: blur(2px);
+        "
+      ></div>
+      <!-- Dialog -->
+      <div
+        style="
+          position: relative;
+          background: var(--color-background-primary);
+          border: 1px solid var(--color-border-secondary);
+          border-radius: var(--radius-lg);
+          padding: var(--space-2xl);
+          width: 360px;
+          max-width: 90vw;
+          box-shadow: var(--shadow-md);
+          text-align: center;
+        "
+      >
+        <div
+          style="
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--red-bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto var(--space-lg);
+          "
+        >
+          <svg
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="var(--red)"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+        </div>
+        <h3
+          style="
+            font-size: var(--font-size-lg);
+            font-weight: var(--font-weight-semibold);
+            color: var(--color-text-primary);
+            margin-bottom: var(--space-sm);
+          "
+        >
+          Confirm Logout
+        </h3>
+        <p
+          style="
+            font-size: var(--font-size-sm);
+            color: var(--color-text-secondary);
+            margin-bottom: var(--space-xl);
+          "
+        >
+          Are you sure you want to log out of your session?
+        </p>
+        <div
+          style="display: flex; gap: var(--space-md); justify-content: center"
+        >
+          <button
+            onclick="closeLogoutModal()"
+            class="btn btn-secondary"
+            style="flex: 1"
+          >
+            Cancel
+          </button>
+          <button
+            onclick="auth.logout()"
+            class="btn btn-danger"
+            style="
+              flex: 1;
+              background: var(--red-mid);
+              color: #fff;
+              border-color: var(--red-mid);
+            "
+          >
+            Yes, Logout
+          </button>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
