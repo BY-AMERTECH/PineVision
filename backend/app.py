@@ -5,6 +5,14 @@ Serves the frontend static files, /api/drone/* endpoints, and Firebase user mana
 Run with:  python app.py
 """
 
+import sys
+# Force UTF-8 stdout/stderr so emoji in detection.py print() calls never raise
+# UnicodeEncodeError on Windows terminals that default to cp1252.
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+
 import os
 from flask import Flask, send_from_directory, abort, request, jsonify
 from flask_cors import CORS
@@ -488,4 +496,20 @@ if __name__ == '__main__':
     print("📡 Frontend: http://localhost:5000")
     print("🔥 Firebase: User Management API enabled")
     print("🚁 Drone: Endpoints available via /api/drone/*")
+
+    # Pre-initialize the YOLO detector before accepting any HTTP requests.
+    # With debug=True Werkzeug spawns a child process (WERKZEUG_RUN_MAIN=true)
+    # that actually handles requests; the parent is only the file-change watcher.
+    # Initializing in the child ensures the model loads exactly once, before the
+    # first upload request arrives, without wasting time in the watcher process.
+    if os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+        from drone_conn.detection import get_detector as _get_detector
+        print("📦 Pre-initializing YOLO detector...")
+        try:
+            _get_detector()
+            print("✅ YOLO detector ready")
+        except Exception as _exc:
+            print(f"⚠️  Detector pre-initialization failed: {_exc}")
+            print("   Upload requests will return a proper JSON error if the model cannot load.")
+
     app.run(host='0.0.0.0', port=5000, debug=True)

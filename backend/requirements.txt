@@ -1,3 +1,6 @@
+# setuptools must stay <80: v80+ removed pkg_resources which deep_sort_realtime requires
+setuptools>=70,<80
+
 flask==2.3.0
 flask-cors==4.0.0
 firebase-admin==6.2.0

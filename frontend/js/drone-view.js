@@ -49,6 +49,8 @@ const DRONE_STATE = {
     videoBlobUrl:         null,   // object URL for the uploaded file
     videoEnded:           false,  // true when browser video element has finished playing
     backendCompleted:     false,  // true when backend scan loop signals 'completed' via Firestore
+    _syncPrevPct:         0,      // scanProgress value at the previous syncVideoToBackend call
+    _syncPrevTime:        0,      // Date.now() at the previous syncVideoToBackend call
     stats: { total: 0, bearing: 0, nonBearing: 0, discolored: 0, progress: 0 },
 };
 
@@ -194,8 +196,11 @@ const BboxOverlay = (() => {
         for (const det of dets) {
             if (!det.b || det.b.length < 4) continue;
             const [nx, ny, nw, nh] = det.b;
-            const color  = COLORS[det.cls] || '#94a3b8';
-            const label  = (SHORT[det.cls] || '?') + ' #' + det.id;
+            const color   = COLORS[det.cls] || '#94a3b8';
+            const confStr = (typeof det.conf === 'number' && det.conf > 0)
+                ? ' ' + Math.round(det.conf * 100) + '%'
+                : '';
+            const label   = (SHORT[det.cls] || '?') + ' #' + det.id + confStr;
             const px = nx * pr.w + pr.x;
             const py = ny * pr.h + pr.y;
             const pw = nw * pr.w;
@@ -629,6 +634,18 @@ async function apiUploadVideo(formData) {
         // No Content-Type header — browser sets multipart boundary automatically
         signal: AbortSignal.timeout(120_000),  // large file may take time
     });
+    if (!resp.ok) {
+        // Try to extract a message from a JSON error body (routes.py returns one).
+        // If the body is HTML (e.g. Werkzeug 500 debug page), fall back to status text.
+        let msg = `Server error (HTTP ${resp.status})`;
+        try {
+            const body = await resp.json();
+            if (body && body.message) msg = body.message;
+        } catch {
+            msg = `Server error (HTTP ${resp.status}: ${resp.statusText || 'Internal Server Error'})`;
+        }
+        throw new Error(msg);
+    }
     return resp.json();
 }
 
@@ -681,7 +698,18 @@ async function handleFileSelect(event) {
         result = await apiUploadVideo(formData);
     } catch (err) {
         console.error('Video upload error:', err);
-        handleVideoFailed('Cannot reach backend. Ensure Flask server is running on port 5000.');
+        let msg;
+        if (err.name === 'TimeoutError' || err.name === 'AbortError') {
+            // AbortSignal.timeout() fires after 120 s — model may still be loading
+            msg = 'Upload timed out. The server may be initializing — try again in a moment.';
+        } else if (err instanceof TypeError) {
+            // fetch() throws TypeError on network-level failure (connection refused, no server)
+            msg = 'Cannot reach backend. Ensure Flask server is running on port 5000.';
+        } else {
+            // Error thrown by apiUploadVideo's !resp.ok branch — actual backend error
+            msg = err.message || 'Backend error. Check the Flask server terminal for details.';
+        }
+        handleVideoFailed(msg);
         return;
     }
 
@@ -695,16 +723,17 @@ async function handleFileSelect(event) {
     DRONE_STATE.scanStartTime    = new Date();
     DRONE_STATE.videoEnded       = false;
     DRONE_STATE.backendCompleted = false;
-    // Note: no _videoTimeSendAt reset needed — detection is driven entirely
-    // by the backend sequential loop, not by frontend video timestamps.
+    DRONE_STATE._syncPrevPct     = 0;
+    DRONE_STATE._syncPrevTime    = 0;
 
     startFirebaseListener();
     startScanCompletionListener();
     startScanTimer();
 
-    // Start playback — backend will seek video to its current frame via
-    // syncVideoToBackend(), keeping displayed position in sync with the scan.
-    videoEl.play().catch(() => {});
+    // Video stays paused until syncVideoToBackend() receives the first backend
+    // progress update (~2 s after scan start).  This ensures the initial bbox
+    // batch is already cached before the video begins playing, so every visible
+    // frame has detection boxes available from the first moment.
     videoEl.addEventListener('ended', handleVideoEnd, { once: true });
 
     transitionTo('active');
@@ -717,10 +746,13 @@ async function handleFileSelect(event) {
 
 function handleVideoFailed(message) {
     BboxOverlay.stop();
-    DRONE_STATE.videoMode = false;
+    DRONE_STATE.videoMode     = false;
+    DRONE_STATE._syncPrevPct  = 0;
+    DRONE_STATE._syncPrevTime = 0;
 
     const videoEl = document.getElementById('drone-feed');
     videoEl.removeEventListener('timeupdate', updateVideoProgress);
+    videoEl.playbackRate = 1.0;
     videoEl.pause();
     videoEl.removeAttribute('src');
     videoEl.load();
@@ -785,6 +817,7 @@ function handleScanFinished() {
 
     const videoEl = document.getElementById('drone-feed');
     videoEl.removeEventListener('timeupdate', updateVideoProgress);
+    videoEl.playbackRate = 1.0;
     videoEl.pause();
     videoEl.removeAttribute('src');
     videoEl.load();
@@ -799,6 +832,8 @@ function handleScanFinished() {
     DRONE_STATE.backendCompleted = false;
     DRONE_STATE.scanId           = null;
     DRONE_STATE.scanStartTime    = null;
+    DRONE_STATE._syncPrevPct     = 0;
+    DRONE_STATE._syncPrevTime    = 0;
     DRONE_STATE.stats            = { total: 0, bearing: 0, nonBearing: 0, discolored: 0, progress: 0 };
 
     transitionTo('idle');
@@ -853,22 +888,39 @@ function syncVideoToBackend(pct) {
     const pctEl = document.getElementById('stat-progress-pct');
     if (pctEl) pctEl.textContent = Math.round(pct) + '%';
 
-    // Seek video element to the backend's current frame position
     const videoEl = document.getElementById('drone-feed');
-    if (!videoEl || !videoEl.duration) return;
+    if (!videoEl || !Number.isFinite(videoEl.duration) || videoEl.duration <= 0) return;
 
-    const targetTime = videoEl.duration * (pct / 100);
-    const diff = targetTime - videoEl.currentTime;
+    const now      = Date.now();
+    const prevPct  = DRONE_STATE._syncPrevPct;
+    const prevTime = DRONE_STATE._syncPrevTime;
 
-    if (diff > 2) {
-        // Backend is ahead — skip forward and resume
-        videoEl.currentTime = targetTime;
-        videoEl.play().catch(() => {});
-    } else if (diff < -3) {
-        // Backend is behind — pause until it catches up
-        videoEl.pause();
-    } else if (videoEl.paused && !DRONE_STATE.videoEnded) {
-        // Back in sync — resume normal playback
+    // Derive how many video-seconds the backend has processed per real second
+    // and set the <video> element's playbackRate to match.  This keeps the
+    // frame currently visible to the user aligned with the backend's processed
+    // position without ever pausing or seeking the video:
+    //   • On fast hardware (GPU): rate > 1 → video plays faster than real-time;
+    //     all bboxes are pre-cached before the matching frame is displayed.
+    //   • On slow hardware (CPU): rate < 1 → video plays in slow motion;
+    //     every displayed frame already has its bboxes cached.
+    // 200 ms guard prevents a spurious division when two snapshots arrive
+    // very close together (e.g. Firestore initial + first write).
+    if (prevTime > 0 && pct > prevPct && (now - prevTime) > 200) {
+        const videoSecsDone   = (pct - prevPct) / 100 * videoEl.duration;
+        const realSecsElapsed = (now - prevTime) / 1000;
+        const backendRate     = videoSecsDone / realSecsElapsed;
+        // 0.1× floor: prevents near-freeze on very slow hardware.
+        // 4.0× ceiling: keeps the video watchable even on a fast GPU.
+        videoEl.playbackRate  = Math.max(0.1, Math.min(4.0, backendRate));
+    }
+
+    DRONE_STATE._syncPrevPct  = pct;
+    DRONE_STATE._syncPrevTime = now;
+
+    // Start playback on the first progress update.  The video was deliberately
+    // kept paused at scan start so the first bbox batch arrives before any
+    // frame is displayed.
+    if (videoEl.paused && !DRONE_STATE.videoEnded) {
         videoEl.play().catch(() => {});
     }
 }
@@ -917,6 +969,25 @@ function checkVideoScanComplete() {
     // Backend completion is the authoritative signal — it runs the full frame
     // sequence deterministically, so its 'completed' status means all data is saved.
     if (!DRONE_STATE.backendCompleted) return;
+
+    const videoEl = document.getElementById('drone-feed');
+
+    // If the backend finished first (fast GPU / short video), let the video
+    // play to its natural end before showing the results modal.  Reset rate to
+    // 1× so the remaining seconds play at normal speed.  handleVideoEnd will
+    // call checkVideoScanComplete() again once the 'ended' event fires.
+    if (!DRONE_STATE.videoEnded) {
+        if (videoEl && videoEl.ended) {
+            // 'ended' fired but the flag was not set — fix the inconsistency
+            DRONE_STATE.videoEnded = true;
+        } else {
+            if (videoEl) {
+                videoEl.playbackRate = 1.0;
+                if (videoEl.paused) videoEl.play().catch(() => {});
+            }
+            return;
+        }
+    }
 
     stopScanIntervals();
     showScanFinishedModal();
@@ -1026,6 +1097,7 @@ async function handleEndScan() {
     BboxOverlay.stop();
 
     const videoEl = document.getElementById('drone-feed');
+    videoEl.playbackRate = 1.0;
     videoEl.pause();
     videoEl.removeAttribute('src');
     videoEl.load();
@@ -1039,6 +1111,8 @@ async function handleEndScan() {
     DRONE_STATE.scanId            = null;
     DRONE_STATE.videoEnded        = false;
     DRONE_STATE.backendCompleted  = false;
+    DRONE_STATE._syncPrevPct      = 0;
+    DRONE_STATE._syncPrevTime     = 0;
 
     setEndScanButtonLoading(false);
     closeBsModal('modal-end-scan');

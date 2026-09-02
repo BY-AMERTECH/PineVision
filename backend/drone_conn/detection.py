@@ -395,9 +395,10 @@ class PineappleDetector:
                 y2 = max(0.0, min(y2, inf_h_px))
                 if x2 > x1 and y2 > y1:
                     bbox_detections.append({
-                        'id':  int(track.track_id),
-                        'cls': cls_key,
-                        'b':   [
+                        'id':   int(track.track_id),
+                        'cls':  cls_key,
+                        'conf': round(float(getattr(track, 'det_conf', 0) or 0), 3),
+                        'b':    [
                             round(x1 / inf_w_px, 4),
                             round(y1 / inf_h_px, 4),
                             round((x2 - x1) / inf_w_px, 4),

@@ -265,7 +265,15 @@ def upload_video():
     f.save(video_path)
     log.info('upload-video: saved %s (%d bytes)', video_path, os.path.getsize(video_path))
 
-    detector = get_detector()
+    try:
+        detector = get_detector()
+    except Exception:
+        log.exception('upload-video: detector initialization failed')
+        return jsonify({
+            'ok':      False,
+            'message': 'Detection model failed to initialize. Check server logs.',
+        }), 503
+
     scan_id  = detector.start_video_scan(
         video_path=video_path,
         block_id=block_id,
