@@ -8,10 +8,15 @@ If run standalone (e.g. testing detection.py directly), it will
 initialize using serviceAccountKey.json as a fallback.
 """
 
+import json
 import os
+import tempfile
 import firebase_admin
 from firebase_admin import credentials, firestore
 from typing import Optional
+
+# Directory where temp MP4 uploads and detection manifests are stored.
+_UPLOADS_DIR = os.path.join(tempfile.gettempdir(), 'pinevision_uploads')
 
 _db = None
 
@@ -62,17 +67,21 @@ def update_detection_batch(
     non_viable_count: int,
     total_count: int,
     scan_progress: float = 0.0,
-    recent_frames=None,
+    processed_frames: int = 0,
+    total_frames: int = 0,
 ) -> bool:
     """
-    Update both block stats AND scan progress in a single Firestore batch
-    commit. Replaces the previous pattern of two separate .update() calls
-    (update_block_stats + update_scan_progress), halving the number of
-    network round-trips during every detection cycle.
+    Update both block stats AND scan analysis progress in a single Firestore
+    batch commit.
 
     scan_progress: 0–100 percentage of video frames already processed.
-    Written to the scan doc so the frontend can sync the progress bar and
-    video position to the backend's current frame.
+    processed_frames / total_frames: raw frame counts for the progress display.
+
+    NOTE: recentFrames is no longer written to Firestore. Detection bounding
+    boxes are now accumulated locally and written as a single manifest JSON
+    file when analysis is complete. The frontend fetches that manifest via
+    GET /api/drone/scan/<scan_id>/manifest and uses it for synchronized
+    overlay rendering at normal 1× playback speed.
     """
     try:
         db = get_firestore_client()
@@ -83,7 +92,7 @@ def update_detection_batch(
 
         batch = db.batch()
 
-        # Write 1 — block aggregate stats (drives frontend live view)
+        # Write 1 — block aggregate stats (drives live stats panel)
         block_ref = db.collection('blocks').document(block_id)
         batch.update(block_ref, {
             'bearingPercent':    round(bearing_pct,     1),
@@ -93,18 +102,18 @@ def update_detection_batch(
             'lastUpdate':        firestore.SERVER_TIMESTAMP,
         })
 
-        # Write 2 — active scan session record (includes frame progress for frontend sync)
+        # Write 2 — scan progress for frontend progress bar only (no recentFrames)
         scan_ref = db.collection('scans').document(scan_id)
         scan_update = {
-            'bearing':      bearing_count,
-            'nonBearing':   non_bearing_count,
-            'nonViable':    non_viable_count,
-            'total':        total_count,
-            'scanProgress': round(scan_progress, 1),
-            'lastUpdate':   firestore.SERVER_TIMESTAMP,
+            'bearing':          bearing_count,
+            'nonBearing':       non_bearing_count,
+            'nonViable':        non_viable_count,
+            'total':            total_count,
+            'scanProgress':     round(scan_progress, 1),
+            'processedFrames':  processed_frames,
+            'totalFrames':      total_frames,
+            'lastUpdate':       firestore.SERVER_TIMESTAMP,
         }
-        if recent_frames is not None:
-            scan_update['recentFrames'] = recent_frames
         batch.update(scan_ref, scan_update)
 
         batch.commit()
@@ -113,6 +122,27 @@ def update_detection_batch(
     except Exception as e:
         print(f"❌ Error in detection batch update: {e}")
         return False
+
+
+def save_detection_manifest(scan_id: str, manifest_data: dict) -> Optional[str]:
+    """
+    Write the detection manifest as a JSON file to the uploads temp directory.
+
+    The manifest is read by GET /api/drone/scan/<scan_id>/manifest and then
+    loaded into the frontend's BboxOverlay for synchronized 1× playback.
+
+    Returns the file path on success, None on failure.
+    """
+    try:
+        os.makedirs(_UPLOADS_DIR, exist_ok=True)
+        path = os.path.join(_UPLOADS_DIR, f'{scan_id}_manifest.json')
+        with open(path, 'w', encoding='utf-8') as fh:
+            json.dump(manifest_data, fh, separators=(',', ':'))
+        print(f"✅ Manifest written: {path} ({os.path.getsize(path):,} bytes)")
+        return path
+    except Exception as e:
+        print(f"❌ Failed to write manifest: {e}")
+        return None
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -125,15 +155,19 @@ def create_scan_session(block_id: str, user_id: str) -> Optional[str]:
         db = get_firestore_client()
         scan_ref = db.collection('scans').document()
         scan_ref.set({
-            'blockId':    block_id,
-            'userId':     user_id,
-            'status':     'active',
-            'startTime':  firestore.SERVER_TIMESTAMP,
-            'bearing':    0,
-            'nonBearing': 0,
-            'nonViable':  0,
-            'total':      0,
-            'lastUpdate': firestore.SERVER_TIMESTAMP,
+            'blockId':         block_id,
+            'userId':          user_id,
+            'status':          'active',
+            'startTime':       firestore.SERVER_TIMESTAMP,
+            'bearing':         0,
+            'nonBearing':      0,
+            'nonViable':       0,
+            'total':           0,
+            'scanProgress':    0,
+            'processedFrames': 0,
+            'totalFrames':     0,
+            'manifestReady':   False,
+            'lastUpdate':      firestore.SERVER_TIMESTAMP,
         })
         print(f"✅ Created scan session: {scan_ref.id}")
         return scan_ref.id
@@ -191,6 +225,7 @@ def complete_scan_session(
             'nonBearing':            non_bearing_count,
             'nonViable':             non_viable_count,
             'total':                 total_count,
+            'scanProgress':          100,
             'bearingPercent':        round(bearing_pct,     1),
             'nonBearingPercent':     round(non_bearing_pct, 1),
             'nonViablePercent':      round(non_viable_pct,  1),
@@ -198,6 +233,7 @@ def complete_scan_session(
             'estimatedBearing':      estimated_bearing,
             'estimatedNonBearing':   estimated_non_bearing,
             'detectionCoverage':     round(detection_coverage, 2),
+            'manifestReady':         True,
         })
 
         block_ref = db.collection('blocks').document(block_id)

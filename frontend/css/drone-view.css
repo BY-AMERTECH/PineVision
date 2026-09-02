@@ -257,7 +257,7 @@ body {
     line-height: 1.6;
 }
 
-/* Connecting spinner */
+/* Connecting / Analyzing spinner */
 .dv-spinner-wrapper { text-align: center; }
 .dv-spinner {
     color: #22c55e;
@@ -268,6 +268,18 @@ body {
     font-size: var(--font-size-sm);
     color: rgba(255, 255, 255, 0.45);
     margin: 10px 0 0;
+}
+
+/* Analysis progress bar (shown during 'analyzing' phase) */
+.dv-analyze-progress {
+    width: 240px;
+    margin: 12px auto 0;
+}
+.dv-connecting-sub {
+    font-size: var(--font-size-xs);
+    color: rgba(255, 255, 255, 0.25);
+    margin: 6px 0 0;
+    text-align: center;
 }
 
 /* Live badge */

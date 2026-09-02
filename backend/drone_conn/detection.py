@@ -17,6 +17,7 @@ from .firebase_client import (
     get_firestore_client,
     get_block_population,
     update_detection_batch,
+    save_detection_manifest,
     create_scan_session,
     complete_scan_session,
 )
@@ -847,20 +848,23 @@ class PineappleDetector:
         update_interval: float,
     ):
         """
-        Deterministic sequential background scan loop.
+        Phase 1 of the two-phase MP4 scan pipeline.
 
-        Reads every frame in order via cap.read() — never seeks — so the
-        exact same set of frames is always decoded in the exact same order.
-        This mirrors test_video_firebase.py exactly and makes results fully
-        reproducible across repeated scans of the same video.
+        Reads every frame in order via cap.read(), runs YOLO + DeepSORT on
+        every Nth frame, and accumulates a complete timestamped detection
+        manifest in memory.  The manifest is written to disk once when the
+        entire video has been processed.  The frontend fetches it via
+        GET /api/drone/scan/<scan_id>/manifest and uses it to render bounding
+        boxes synchronised to normal 1× video playback.
 
-        Non-determinism sources eliminated vs. the old time-synced loop:
-          • No cv2.CAP_PROP_POS_MSEC seeks (seek accuracy is codec-dependent)
-          • No dependency on browser timeupdate event timing or CPU load
-          • No queue-drain that could drop or reorder frames between runs
-          • DeepSORT receives frames in a fixed, repeatable sequence so its
-            Kalman filter and appearance features converge identically every run
+        Firestore is used ONLY for progress updates (scanProgress,
+        processedFrames, totalFrames) and final statistics/completion.
+        recentFrames is never written to Firestore — that was the old
+        architecture that forced the video to slow down so the detector
+        could keep up.
         """
+        import os as _os
+
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
             print(f"❌ OpenCV could not open: {video_path}")
@@ -879,26 +883,37 @@ class PineappleDetector:
 
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         source_fps   = cap.get(cv2.CAP_PROP_FPS) or 25.0
-        print(f"🎬 Deterministic sequential scan: {total_frames} frames @ {source_fps:.1f} FPS | "
-              f"process_every={process_every_n_frames} frames | block={block_id}")
+        duration_sec = total_frames / source_fps if source_fps > 0 else 0.0
+
+        print(f"🎬 Two-phase sequential scan: {total_frames} frames @ {source_fps:.1f} FPS | "
+              f"process_every={process_every_n_frames} | block={block_id}")
+
+        # Write video metadata to Firestore so the frontend can show "X frames"
+        try:
+            db = get_firestore_client()
+            db.collection('scans').document(scan_id).update({
+                'totalFrames': total_frames,
+                'videoDuration': round(duration_sec, 2),
+                'videoFps': round(source_fps, 2),
+            })
+        except Exception as e:
+            print(f"⚠️  Could not update totalFrames: {e}")
 
         frame_count       = 0
         frames_processed  = 0
         last_firebase_update = time.time()
         success_flag      = False
-        recent_frames_buf = []   # per-frame bbox data accumulated between batch writes
+        manifest_frames   = []   # full timestamped manifest — kept until analysis is done
 
         try:
             while self.detection_active:
                 ret, frame = cap.read()
                 if not ret:
-                    # End of video — natural completion
                     success_flag = True
                     break
 
                 frame_count += 1
 
-                # Process every Nth frame — identical stride to test_video_firebase.py
                 if frame_count % process_every_n_frames != 0:
                     continue
 
@@ -915,27 +930,34 @@ class PineappleDetector:
                               f"NV:{results['non_viable']}) "
                               f"[+{results['new_detections']} new]")
 
-                    # Accumulate bbox snapshot for this processed frame
-                    recent_frames_buf.append({
+                    # Append this processed frame to the in-memory manifest
+                    manifest_frames.append({
                         't': round(frame_count / source_fps, 3),
                         'd': results.get('bbox_detections', []),
                     })
 
+                    # Periodic Firestore update — progress bar only, no recentFrames
                     now = time.time()
                     if now - last_firebase_update >= update_interval:
-                        frames_to_write = recent_frames_buf.copy()
-                        recent_frames_buf = []
+                        _b  = results['bearing']
+                        _nb = results['non_bearing']
+                        _nv = results['non_viable']
+                        _t  = results['total']
+                        _pf = frames_processed
+                        _tf = total_frames
+                        _pg = progress
                         threading.Thread(
                             target=update_detection_batch,
                             kwargs=dict(
                                 block_id=block_id,
                                 scan_id=scan_id,
-                                bearing_count=results['bearing'],
-                                non_bearing_count=results['non_bearing'],
-                                non_viable_count=results['non_viable'],
-                                total_count=results['total'],
-                                scan_progress=progress,
-                                recent_frames=frames_to_write,
+                                bearing_count=_b,
+                                non_bearing_count=_nb,
+                                non_viable_count=_nv,
+                                total_count=_t,
+                                scan_progress=_pg,
+                                processed_frames=_pf,
+                                total_frames=_tf,
                             ),
                             daemon=True,
                         ).start()
@@ -955,10 +977,31 @@ class PineappleDetector:
             self._current_scan_id = None
             self.detection_active = False
 
-        print(f"🛑 Sequential scan loop stopped "
-              f"({frame_count} frames read, {frames_processed} frames processed)")
+        print(f"🛑 Scan loop stopped: {frame_count} frames read, {frames_processed} processed")
 
-        # ── Final counts ─────────────────────────────────────────────
+        # ── Always clean up the temp video file first ─────────────────
+        try:
+            if _os.path.isfile(video_path):
+                _os.remove(video_path)
+                print(f"🗑️  Removed temp video: {video_path}")
+        except Exception as e:
+            print(f"⚠️  Could not remove temp video: {e}")
+
+        if not success_flag:
+            # Loop was cancelled or crashed — mark scan as failed
+            try:
+                db = get_firestore_client()
+                from firebase_admin import firestore as _fs
+                db.collection('scans').document(scan_id).update({
+                    'status': 'failed',
+                    'endTime': _fs.SERVER_TIMESTAMP,
+                    'error':  'Analysis was interrupted before completion.',
+                })
+            except Exception:
+                pass
+            return
+
+        # ── Final counts ──────────────────────────────────────────────
         bearing_count     = len(self.unique_ids['bearing'])
         non_bearing_count = len(self.unique_ids['non_bearing'])
         non_viable_count  = len(self.unique_ids['non_viable'])
@@ -976,60 +1019,68 @@ class PineappleDetector:
             bearing_count, non_bearing_count, registered_population
         )
 
-        if success_flag:
-            committed = complete_scan_session(
-                scan_id=scan_id,
-                block_id=block_id,
-                bearing_count=bearing_count,
-                non_bearing_count=non_bearing_count,
-                non_viable_count=non_viable_count,
-                total_count=total_count,
-                registered_population=registered_population,
-                estimated_bearing=est_bearing,
-                estimated_non_bearing=est_non_bearing,
-                detection_coverage=det_coverage,
-            )
-            if committed:
-                print(f"✅ Sequential scan complete — {frames_processed} frames processed")
-                print(f"📊 Final Results: Total={total_count} "
-                      f"(B:{bearing_count} {bearing_pct:.1f}%, "
-                      f"NB:{non_bearing_count} {non_bearing_pct:.1f}%, "
-                      f"NV:{non_viable_count} {non_viable_pct:.1f}%)")
-                if registered_population > 0:
-                    print(f"📈 Population Estimates (registered: {registered_population}): "
-                          f"Est. Bearing={est_bearing}, Est. Non-Bearing={est_non_bearing}, "
-                          f"Coverage={det_coverage:.1f}%")
-                try:
-                    check_thresholds_and_create_alerts(
-                        block_id=block_id,
-                        bearing_percent=bearing_pct,
-                        non_bearing_percent=non_bearing_pct,
-                        non_viable_percent=non_viable_pct,
-                        user_id=user_id,
-                    )
-                except Exception as e:
-                    print(f"⚠️  Threshold check failed: {e}")
-            else:
-                print("❌ complete_scan_session failed in sequential loop")
-        else:
+        # ── Write manifest JSON to disk ───────────────────────────────
+        # This must happen BEFORE complete_scan_session() sets manifestReady=True,
+        # so the file exists before the frontend tries to fetch it.
+        manifest_data = {
+            'scan_id':     scan_id,
+            'video_fps':   round(source_fps, 2),
+            'frame_count': total_frames,
+            'duration':    round(duration_sec, 2),
+            'frames':      manifest_frames,
+        }
+        manifest_path = save_detection_manifest(scan_id, manifest_data)
+        if not manifest_path:
+            # Manifest write failed — mark scan failed rather than silently completing
+            print("❌ Manifest write failed — marking scan as failed")
             try:
                 db = get_firestore_client()
                 from firebase_admin import firestore as _fs
                 db.collection('scans').document(scan_id).update({
                     'status': 'failed',
                     'endTime': _fs.SERVER_TIMESTAMP,
+                    'error': 'Failed to write detection manifest.',
                 })
             except Exception:
                 pass
+            return
 
-        # Clean up temp file
-        try:
-            import os as _os
-            if _os.path.isfile(video_path):
-                _os.remove(video_path)
-                print(f"🗑️  Removed temp file: {video_path}")
-        except Exception as e:
-            print(f"⚠️  Could not remove temp file: {e}")
+        # ── Complete scan in Firestore (sets manifestReady=True) ──────
+        committed = complete_scan_session(
+            scan_id=scan_id,
+            block_id=block_id,
+            bearing_count=bearing_count,
+            non_bearing_count=non_bearing_count,
+            non_viable_count=non_viable_count,
+            total_count=total_count,
+            registered_population=registered_population,
+            estimated_bearing=est_bearing,
+            estimated_non_bearing=est_non_bearing,
+            detection_coverage=det_coverage,
+        )
+
+        if committed:
+            print(f"✅ Analysis complete — {frames_processed} frames processed")
+            print(f"📊 Final: Total={total_count} "
+                  f"(B:{bearing_count} {bearing_pct:.1f}%, "
+                  f"NB:{non_bearing_count} {non_bearing_pct:.1f}%, "
+                  f"NV:{non_viable_count} {non_viable_pct:.1f}%)")
+            if registered_population > 0:
+                print(f"📈 Estimates (registered={registered_population}): "
+                      f"B={est_bearing}, NB={est_non_bearing}, "
+                      f"Coverage={det_coverage:.1f}%")
+            try:
+                check_thresholds_and_create_alerts(
+                    block_id=block_id,
+                    bearing_percent=bearing_pct,
+                    non_bearing_percent=non_bearing_pct,
+                    non_viable_percent=non_viable_pct,
+                    user_id=user_id,
+                )
+            except Exception as e:
+                print(f"⚠️  Threshold check failed: {e}")
+        else:
+            print("❌ complete_scan_session failed in sequential loop")
 
     def run_video_scan(
         self,

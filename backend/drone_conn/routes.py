@@ -3,14 +3,17 @@ Flask Blueprint: /api/drone/*
 Exposes the drone stream connection and health-check endpoints.
 """
 
+import json
 import logging
 import os
+import re
 import tempfile
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, send_file
 from werkzeug.utils import secure_filename
 from . import service
 from .detection import get_detector
+from .firebase_client import _UPLOADS_DIR
 
 log = logging.getLogger(__name__)
 
@@ -286,6 +289,43 @@ def upload_video():
         return jsonify({'ok': False, 'message': 'Failed to start video scan'}), 500
 
     return jsonify({'ok': True, 'scan_id': scan_id}), 200
+
+
+@drone_bp.route('/scan/<scan_id>/manifest', methods=['GET'])
+def get_scan_manifest(scan_id):
+    """
+    GET /api/drone/scan/<scan_id>/manifest
+
+    Returns the detection manifest JSON for a completed MP4 scan.
+    The manifest contains timestamped bounding-box data for every processed
+    frame, ready for the frontend to load into BboxOverlay for synchronized
+    1× playback.
+
+    Security:
+    - scan_id is validated against the expected Firestore auto-ID format
+      (20 alphanumeric characters) — no path traversal possible.
+    - The manifest file is only ever written to _UPLOADS_DIR by the backend;
+      we never expose arbitrary filesystem paths to the client.
+    """
+    # Firestore auto-IDs are exactly 20 URL-safe alphanumeric characters.
+    # Reject anything that doesn't match — prevents any path traversal.
+    if not re.fullmatch(r'[A-Za-z0-9]{10,30}', scan_id):
+        return jsonify({'ok': False, 'error': 'invalid_scan_id'}), 400
+
+    manifest_path = os.path.join(_UPLOADS_DIR, f'{scan_id}_manifest.json')
+
+    if not os.path.isfile(manifest_path):
+        return jsonify({'ok': False, 'error': 'manifest_not_found',
+                        'message': 'Manifest not ready yet or scan not found.'}), 404
+
+    try:
+        with open(manifest_path, 'r', encoding='utf-8') as fh:
+            data = json.load(fh)
+        log.info('manifest: served %s (%d frames)', scan_id, len(data.get('frames', [])))
+        return jsonify(data), 200
+    except Exception:
+        log.exception('manifest: failed to read %s', manifest_path)
+        return jsonify({'ok': False, 'error': 'manifest_read_error'}), 500
 
 
 @drone_bp.route('/video-time', methods=['POST'])
