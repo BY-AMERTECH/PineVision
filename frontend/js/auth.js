@@ -168,6 +168,24 @@ var auth = (function () {
     }
 
     /**
+     * Record an authenticated user's activity in Firestore.
+     */
+    async function logActivity(action, extra) {
+        const user = getSession();
+        if (!user) return;
+
+        await db.collection('activity_logs').add(Object.assign({
+            userId: user.uid,
+            user: user.username,
+            action: action,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            status: 'success',
+            email: user.email,
+            role: user.role
+        }, extra || {}));
+    }
+
+    /**
      * Login function - connects to Firebase
      * Accepts username OR email
      */
@@ -324,6 +342,13 @@ var auth = (function () {
         // login as a different user never sees the previous user's data.
         if (window.pvCache) window.pvCache.invalidateAll();
         try {
+            try {
+                await logActivity('logout');
+                console.log('Logout activity logged to Firestore');
+            } catch (logError) {
+                console.error('Failed to log logout activity:', logError);
+            }
+
             await firebaseAuth.signOut();
             sessionStorage.removeItem(SESSION_KEY);
             localStorage.removeItem(REMEMBER_KEY);
