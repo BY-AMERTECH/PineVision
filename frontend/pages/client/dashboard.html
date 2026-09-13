@@ -258,9 +258,31 @@
                 </div>
               </div>
             </div>
-          </div>
+           </div>
 
-          <!-- Block Summary Table -->
+           <!-- Scan Trends Report -->
+           <section class="card chart-card shadow-sm rounded-4 mb-5" aria-labelledby="scan-trends-title">
+             <div class="chart-header d-flex flex-wrap justify-content-between align-items-start gap-3">
+               <div>
+                 <h3 class="chart-title" id="scan-trends-title">Scan Trends Report</h3>
+                 <p class="chart-subtitle mb-0">Farm-wide weighted averages from historical scans</p>
+               </div>
+               <div class="btn-group" role="tablist" aria-label="Scan trend aggregation period">
+                 <button type="button" class="btn btn-outline-secondary active" data-trend-period="week" role="tab" aria-selected="true">Weekly</button>
+                 <button type="button" class="btn btn-outline-secondary" data-trend-period="month" role="tab" aria-selected="false">Monthly</button>
+                 <button type="button" class="btn btn-outline-secondary" data-trend-period="year" role="tab" aria-selected="false">Yearly</button>
+               </div>
+             </div>
+             <div class="chart-body" style="height: 360px; position: relative;">
+               <canvas id="scan-trends-chart" aria-label="Bearing, non-bearing, and non-viable scan trends" role="img"></canvas>
+               <div id="scan-trends-empty" class="empty-state" hidden>
+                 <div class="empty-state-title">No historical scan data available</div>
+                 <div class="empty-state-text">Trends will appear after scans with plant totals have been recorded.</div>
+               </div>
+             </div>
+           </section>
+
+           <!-- Block Summary Table -->
           <div class="tcard">
             <div class="thead-row">
               <h3 class="thead-title">Block Summary</h3>

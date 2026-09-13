@@ -1,10 +1,12 @@
-flask==2.3.0
-flask-cors==4.0.0
+flask>=3.1
+flask-cors>=5.0
 firebase-admin==6.2.0
 opencv-python
 numpy
 
 # Core ML/CV
+setuptools<81          # v81 removed pkg_resources, which deep-sort-realtime imports
+pandas                 # required by ultralytics
 torch>=2.0.0
 torchvision>=0.15.0
 ultralytics>=8.0.0
@@ -22,7 +24,7 @@ av>=10.0.0
 ffmpeg-python>=0.2.0
 
 # Existing dependencies
-flask>=2.3.0
+flask>=3.1
 requests>=2.31.0
 python-dotenv>=1.0.0
 

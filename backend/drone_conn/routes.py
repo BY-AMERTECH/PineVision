@@ -246,10 +246,19 @@ def upload_video():
 
     block_id = (request.form.get('block_id') or '').strip()
     user_id  = (request.form.get('user_id')  or '').strip()
+
+    # How many source frames to skip per processed frame. Priority:
+    #   1. frame_skip from the request form (if the frontend sends one)
+    #   2. PINEVISION_PROCESS_EVERY env var
+    #   3. default 5
+    # On a CPU-only box, bumping this to 10-20 is the cheapest way to cut
+    # scan time — plantation plants barely move between adjacent frames.
+    _default_skip = int(os.environ.get('PINEVISION_PROCESS_EVERY', 5))
     try:
-        frame_skip = int(request.form.get('frame_skip', 2))
+        frame_skip = int(request.form.get('frame_skip') or _default_skip)
     except (ValueError, TypeError):
-        frame_skip = 2
+        frame_skip = _default_skip
+    frame_skip = max(1, frame_skip)
 
     if not block_id or not user_id:
         return jsonify({
@@ -262,20 +271,36 @@ def upload_video():
 
     safe_name  = secure_filename(f.filename)
     video_path = os.path.join(uploads_dir, safe_name)
-    f.save(video_path)
-    log.info('upload-video: saved %s (%d bytes)', video_path, os.path.getsize(video_path))
 
-    detector = get_detector()
-    scan_id  = detector.start_video_scan(
-        video_path=video_path,
-        block_id=block_id,
-        user_id=user_id,
-        process_every_n_frames=5,  # matches test_video_firebase.py stride
-        update_interval=2.0,
-    )
+    # Everything below can raise (disk full, YOLO weights missing, model load
+    # failure, Firebase error). Catch it so the frontend gets a JSON error with
+    # the real reason instead of an HTML 500 page it can't parse.
+    try:
+        f.save(video_path)
+        log.info('upload-video: saved %s (%d bytes)', video_path, os.path.getsize(video_path))
+
+        detector = get_detector()
+        log.info('upload-video: starting scan, process_every_n_frames=%d', frame_skip)
+        scan_id  = detector.start_video_scan(
+            video_path=video_path,
+            block_id=block_id,
+            user_id=user_id,
+            process_every_n_frames=frame_skip,
+            update_interval=2.0,
+        )
+    except FileNotFoundError as e:
+        log.exception('upload-video: model/weights file missing')
+        return jsonify({
+            'ok': False,
+            'message': f'Model file missing on the server: {e}. '
+                       f'Place best.pt in the backend/ folder.',
+        }), 500
+    except Exception as e:
+        log.exception('upload-video: scan failed to start')
+        return jsonify({'ok': False, 'message': f'{type(e).__name__}: {e}'}), 500
 
     if not scan_id:
-        return jsonify({'ok': False, 'message': 'Failed to start video scan'}), 500
+        return jsonify({'ok': False, 'message': 'Failed to start video scan (see backend log)'}), 500
 
     return jsonify({'ok': True, 'scan_id': scan_id}), 200
 

@@ -1,8 +1,10 @@
+
 """
 Real-time pineapple detection with YOLO + DeepSORT tracking.
 Prevents duplicate counting and updates Firebase in real-time.
 """
 
+import os
 import torch
 import cv2
 import numpy as np
@@ -13,6 +15,61 @@ from typing import Dict, Set, Optional
 from pathlib import Path
 
 from .stream_capture import HLSStreamCapture
+
+
+# ── CPU-load containment ────────────────────────────────────────────────────
+# The MP4 scan runs YOLO + DeepSORT on the CPU. Left unchecked, PyTorch and
+# OpenCV each spawn one worker thread per core and saturate the machine — which
+# is exactly what makes the browser <video> preview stutter while a scan runs.
+# Cap both libraries to ~half the cores so the OS keeps enough headroom to
+# render the page smoothly. Override with PINEVISION_SCAN_THREADS.
+_SCAN_THREADS = max(1, int(os.environ.get(
+    "PINEVISION_SCAN_THREADS",
+    max(1, (os.cpu_count() or 4) // 2),
+)))
+try:
+    torch.set_num_threads(_SCAN_THREADS)
+    cv2.setNumThreads(_SCAN_THREADS)
+except Exception:
+    pass
+
+# Seconds to sleep after each processed frame — a fixed cooperative yield point.
+# Left at 0 by default: the adaptive duty-cycle throttle below does the real work.
+_SCAN_FRAME_PAUSE = max(0.0, float(os.environ.get("PINEVISION_SCAN_FRAME_PAUSE", "0")))
+
+# Adaptive CPU throttle. The scan is allowed to use at most this fraction of
+# wall-clock time; after each frame's inference the detector sleeps for the
+# remaining slice. e.g. 0.6 → inference runs 60% of the time, the OS/browser
+# gets 40%, so the <video> preview stays smooth during a scan — but the scan
+# then takes ~1.7x longer. Default 1.0 (off): rely on the capped thread count
+# and below-normal priority instead. Set PINEVISION_SCAN_DUTY=0.6 if the live
+# video preview stutters and you don't mind a slower scan.
+_SCAN_DUTY = min(1.0, max(0.05, float(os.environ.get("PINEVISION_SCAN_DUTY", "1.0"))))
+
+_priority_lowered = False
+
+
+def _lower_current_process_priority() -> None:
+    """
+    Drop the scanning process to below-normal OS priority so interactive apps
+    (the browser rendering the video preview) always win the CPU. Idempotent;
+    safe no-op if the platform call isn't available.
+    """
+    global _priority_lowered
+    if _priority_lowered:
+        return
+    try:
+        if os.name == "nt":
+            import ctypes
+            BELOW_NORMAL_PRIORITY_CLASS = 0x00004000
+            handle = ctypes.windll.kernel32.GetCurrentProcess()
+            ctypes.windll.kernel32.SetPriorityClass(handle, BELOW_NORMAL_PRIORITY_CLASS)
+        else:
+            os.nice(10)
+        _priority_lowered = True
+        print(f"🐌 Scan process priority lowered (torch/cv2 threads capped at {_SCAN_THREADS})")
+    except Exception as e:
+        print(f"⚠️ Could not lower process priority: {e}")
 from .firebase_client import (
     get_firestore_client,
     get_block_population,
@@ -267,9 +324,13 @@ class PineappleDetector:
         pass  # intentional no-op — sequential scan drives itself
     
     # Maximum dimension (pixels) passed to YOLO and DeepSORT.
-    # YOLOv8 is trained at 640×640; processing larger frames wastes compute
-    # without improving accuracy. Resizing 1080p → 640px is ~9× fewer pixels.
-    _INFERENCE_SIZE = 640
+    # YOLO cost scales ~quadratically with this. Measured on the Ryzen 5 2400G
+    # (CPU only) with the 11M-param model:
+    #     640px ≈ 1160 ms/frame   480px ≈ 430 ms   320px ≈ 330 ms   256px ≈ 200 ms
+    # Default 480 is the usable compromise on a CPU box. Raise to 640 for max
+    # accuracy, or drop to 320 for a faster scan, via PINEVISION_INFERENCE_SIZE.
+    # Changing it changes detection counts.
+    _INFERENCE_SIZE = max(160, int(os.environ.get("PINEVISION_INFERENCE_SIZE", 480)))
 
     def detect_frame(self, frame: np.ndarray) -> Dict:
         """
@@ -281,6 +342,8 @@ class PineappleDetector:
         Returns:
             Dictionary with detection results and counts
         """
+        _work_start = time.perf_counter()
+
         # Downscale to inference size if the source frame is larger.
         # Both YOLO and DeepSORT receive the same smaller frame so
         # DeepSORT's feature extractor also benefits from the resize.
@@ -296,8 +359,11 @@ class PineappleDetector:
         else:
             inference_frame = frame
 
-        # Run YOLO detection on the (possibly resized) frame
-        results = self.model(inference_frame, verbose=False)
+        # Run YOLO detection on the (possibly resized) frame.
+        # inference_mode() skips all autograd bookkeeping — slightly faster and
+        # lighter on memory than a plain forward pass.
+        with torch.inference_mode():
+            results = self.model(inference_frame, verbose=False)
 
         # Prepare detections for DeepSORT
         detections_list = []
@@ -406,6 +472,16 @@ class PineappleDetector:
                     })
             except Exception:
                 pass
+
+        # Adaptive CPU throttle — sleep so this frame's total wall-clock time is
+        # (work / _SCAN_DUTY), i.e. inference used only _SCAN_DUTY of the time.
+        # This is what keeps the browser video preview smooth mid-scan; combined
+        # with the capped thread count and below-normal process priority.
+        if _SCAN_DUTY < 1.0:
+            _work = time.perf_counter() - _work_start
+            _rest = _work * (1.0 - _SCAN_DUTY) / _SCAN_DUTY
+            if _rest > 0:
+                time.sleep(_rest)
 
         return {
             'bearing':         bearing_count,
@@ -708,6 +784,7 @@ class PineappleDetector:
         Background thread for async video-file scanning.
         Respects self.detection_active so stop_detection() can cancel early.
         """
+        _lower_current_process_priority()
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
             print(f"❌ OpenCV could not open: {video_path}")
@@ -860,6 +937,7 @@ class PineappleDetector:
           • DeepSORT receives frames in a fixed, repeatable sequence so its
             Kalman filter and appearance features converge identically every run
         """
+        _lower_current_process_priority()
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
             print(f"❌ OpenCV could not open: {video_path}")
@@ -939,6 +1017,11 @@ class PineappleDetector:
                             daemon=True,
                         ).start()
                         last_firebase_update = now
+
+                    # Cooperative yield: hand a CPU slice back to the OS so the
+                    # browser video preview keeps rendering smoothly mid-scan.
+                    if _SCAN_FRAME_PAUSE:
+                        time.sleep(_SCAN_FRAME_PAUSE)
 
                 except Exception as e:
                     print(f"⚠️  Detection error at frame {frame_count}: {e}")
@@ -1066,6 +1149,7 @@ class PineappleDetector:
             return False
 
         self.reset_tracking()
+        _lower_current_process_priority()
         print(f"🎬 Opening video: {video_path}")
 
         cap = cv2.VideoCapture(video_path)

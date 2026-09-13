@@ -6,6 +6,17 @@ Run with:  python app.py
 """
 
 import os
+import sys
+
+# Force UTF-8 on stdout/stderr so the emoji in our print() / logging calls
+# (🔧 📦 ✅ …) can never raise UnicodeEncodeError on a legacy cp1252 Windows
+# console — which would otherwise crash a request handler mid-scan.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 from flask import Flask, send_from_directory, abort, request, jsonify
 from flask_cors import CORS
 import firebase_admin

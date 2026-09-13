@@ -623,13 +623,40 @@ async function stopDetection() {
 // ── Video Upload Mode ─────────────────────────────────────────
 
 async function apiUploadVideo(formData) {
-    const resp = await fetch(`${API_BASE}/api/drone/upload-video`, {
-        method: 'POST',
-        body:   formData,
-        // No Content-Type header — browser sets multipart boundary automatically
-        signal: AbortSignal.timeout(120_000),  // large file may take time
-    });
-    return resp.json();
+    let resp;
+    try {
+        resp = await fetch(`${API_BASE}/api/drone/upload-video`, {
+            method: 'POST',
+            body:   formData,
+            // No Content-Type header — browser sets multipart boundary automatically
+            signal: AbortSignal.timeout(120_000),  // large file may take time
+        });
+    } catch (err) {
+        // Genuine network-level failure: server down, DNS, CORS, or the 120s timeout.
+        const msg = err && err.name === 'TimeoutError'
+            ? 'Upload timed out after 120s.'
+            : 'Cannot reach backend. Ensure the Flask server is running on port 5000.';
+        return { ok: false, message: msg };
+    }
+
+    // Read the body once, then decide how to interpret it. A 500 from Flask is
+    // an HTML page, not JSON — surface its real content instead of choking on it.
+    const raw = await resp.text();
+    let data;
+    try {
+        data = raw ? JSON.parse(raw) : {};
+    } catch {
+        const snippet = raw.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 300);
+        return {
+            ok: false,
+            message: `Server error ${resp.status}. ${snippet || 'Check the Flask terminal for the traceback.'}`,
+        };
+    }
+
+    if (!resp.ok) {
+        return { ok: false, message: data.message || `Server error ${resp.status}.` };
+    }
+    return data;
 }
 
 function handleVideoUploadClick() {
@@ -681,11 +708,12 @@ async function handleFileSelect(event) {
         result = await apiUploadVideo(formData);
     } catch (err) {
         console.error('Video upload error:', err);
-        handleVideoFailed('Cannot reach backend. Ensure Flask server is running on port 5000.');
+        handleVideoFailed(`Upload failed: ${(err && err.message) || err}`);
         return;
     }
 
     if (!result.ok) {
+        console.error('Video upload rejected:', result.message);
         handleVideoFailed(result.message ?? 'Upload failed.');
         return;
     }

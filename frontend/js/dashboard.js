@@ -14,6 +14,8 @@
     let blocksData = [];
     let latestScanData = null;
     let currentUser = null;
+    let scanTrendData = [];
+    let scanTrendsChart = null;
 
     // ═══════════════════════════════════════════════════════════
     // INITIALIZATION
@@ -42,11 +44,18 @@
             console.log('📊 Loading dashboard data from Firestore...');
             utils.showLoading('metrics-grid');
 
-            // Fetch only this user's blocks
-            const blocksSnapshot = await firebase.firestore()
-                .collection('blocks')
-                .where('userId', '==', currentUser.uid)
-                .get();
+            // Fetch only this user's current blocks and historical scan records.
+            // Sorting happens in the browser so this query does not need a composite index.
+            const [blocksSnapshot, scansSnapshot] = await Promise.all([
+                firebase.firestore()
+                    .collection('blocks')
+                    .where('userId', '==', currentUser.uid)
+                    .get(),
+                firebase.firestore()
+                    .collection('scans')
+                    .where('userId', '==', currentUser.uid)
+                    .get()
+            ]);
 
             blocksData = [];
             blocksSnapshot.forEach(doc => {
@@ -69,6 +78,9 @@
 
             console.log(`✅ Loaded ${blocksData.length} blocks from Firestore`);
 
+            scanTrendData = normaliseScanTrendRecords(scansSnapshot);
+            console.log(`✅ Loaded ${scanTrendData.length} scan records for trends`);
+
             // Calculate farm totals
             calculateFarmTotals();
 
@@ -77,6 +89,7 @@
             renderMetrics();
             renderBlocksTable();
             renderCharts();
+            initialiseScanTrendsReport();
 
         } catch (error) {
             console.error('❌ Error loading dashboard data:', error);
@@ -463,6 +476,178 @@
                 }
             }
         });
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // SCAN TRENDS REPORT
+    // ═══════════════════════════════════════════════════════════
+
+    function normaliseScanTrendRecords(scansSnapshot) {
+        const timestampFields = ['startTime', 'scannedAt', 'timestamp', 'createdAt', 'lastScanned'];
+
+        return scansSnapshot.docs.map(doc => {
+            const scan = doc.data();
+            const timestamp = timestampFields
+                .map(field => scan[field])
+                .find(value => value != null);
+            const date = toJavaScriptDate(timestamp);
+            const total = Number(scan.total || scan.totalPineapples || scan.detectedPlants || 0);
+
+            if (!date || !total) return null;
+
+            return {
+                date,
+                total,
+                bearing: Number(scan.bearing || 0),
+                nonBearing: Number(scan.nonBearing || 0),
+                nonViable: Number(scan.nonViable || 0)
+            };
+        }).filter(Boolean).sort((a, b) => a.date - b.date);
+    }
+
+    function toJavaScriptDate(timestamp) {
+        if (!timestamp) return null;
+        if (typeof timestamp.toDate === 'function') return timestamp.toDate();
+        if (timestamp instanceof Date) return timestamp;
+
+        const date = new Date(timestamp);
+        return Number.isNaN(date.getTime()) ? null : date;
+    }
+
+    function initialiseScanTrendsReport() {
+        const trendTabs = document.querySelectorAll('[data-trend-period]');
+
+        trendTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                trendTabs.forEach(item => {
+                    const isSelected = item === tab;
+                    item.classList.toggle('active', isSelected);
+                    item.setAttribute('aria-selected', String(isSelected));
+                });
+                renderScanTrendsChart(tab.dataset.trendPeriod);
+            });
+        });
+
+        renderScanTrendsChart('week');
+    }
+
+    function aggregateScanTrends(period) {
+        const periods = new Map();
+
+        scanTrendData.forEach(scan => {
+            const key = getTrendPeriodKey(scan.date, period);
+            if (!periods.has(key)) {
+                periods.set(key, {
+                    label: formatTrendPeriodLabel(scan.date, period),
+                    total: 0,
+                    bearing: 0,
+                    nonBearing: 0,
+                    nonViable: 0
+                });
+            }
+
+            const bucket = periods.get(key);
+            // Summing counts before dividing by total applies the same total-plant weighting
+            // as calculateFarmTotals() to every scan in the selected period.
+            bucket.total += scan.total;
+            bucket.bearing += scan.bearing;
+            bucket.nonBearing += scan.nonBearing;
+            bucket.nonViable += scan.nonViable;
+        });
+
+        return [...periods.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([, bucket]) => ({
+            label: bucket.label,
+            bearing: (bucket.bearing / bucket.total) * 100,
+            nonBearing: (bucket.nonBearing / bucket.total) * 100,
+            nonViable: (bucket.nonViable / bucket.total) * 100
+        }));
+    }
+
+    function getTrendPeriodKey(date, period) {
+        const year = date.getFullYear();
+        if (period === 'year') return String(year);
+        if (period === 'month') return `${year}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+        // ISO week key: weeks start Monday and the first week contains 4 January.
+        const utcDate = new Date(Date.UTC(year, date.getMonth(), date.getDate()));
+        const day = utcDate.getUTCDay() || 7;
+        utcDate.setUTCDate(utcDate.getUTCDate() + 4 - day);
+        const weekYear = utcDate.getUTCFullYear();
+        const yearStart = new Date(Date.UTC(weekYear, 0, 1));
+        const week = Math.ceil((((utcDate - yearStart) / 86400000) + 1) / 7);
+        return `${weekYear}-W${String(week).padStart(2, '0')}`;
+    }
+
+    function formatTrendPeriodLabel(date, period) {
+        if (period === 'year') return String(date.getFullYear());
+        if (period === 'month') {
+            return date.toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+        }
+
+        return `Week ${getTrendPeriodKey(date, 'week').slice(-2)}, ${getTrendPeriodKey(date, 'week').slice(0, 4)}`;
+    }
+
+    function renderScanTrendsChart(period) {
+        const canvas = document.getElementById('scan-trends-chart');
+        const emptyState = document.getElementById('scan-trends-empty');
+        if (!canvas || !emptyState) return;
+
+        const trends = aggregateScanTrends(period);
+        canvas.hidden = trends.length === 0;
+        emptyState.hidden = trends.length > 0;
+
+        if (scanTrendsChart) {
+            scanTrendsChart.destroy();
+            scanTrendsChart = null;
+        }
+        if (trends.length === 0) return;
+
+        const isDark = document.documentElement.classList.contains('dark-mode');
+        const textClr = isDark ? '#a0a0a0' : '#666666';
+        const gridClr = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)';
+
+        scanTrendsChart = new Chart(canvas.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: trends.map(trend => trend.label),
+                datasets: [
+                    buildTrendDataset('Bearing %', trends.map(trend => trend.bearing), '#4caf78'),
+                    buildTrendDataset('Non-Bearing %', trends.map(trend => trend.nonBearing), '#e6a817'),
+                    buildTrendDataset('Non-Viable %', trends.map(trend => trend.nonViable), '#f0c430')
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { labels: { color: textClr, font: { family: 'Inter, sans-serif', size: 13 } } },
+                    tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)}%` } }
+                },
+                scales: {
+                    x: { grid: { color: gridClr }, ticks: { color: textClr, font: { family: 'Inter, sans-serif', size: 12 } } },
+                    y: {
+                        min: 0,
+                        max: 100,
+                        grid: { color: gridClr },
+                        ticks: { color: textClr, callback: value => value + '%', font: { family: 'Inter, sans-serif', size: 12 } }
+                    }
+                }
+            }
+        });
+    }
+
+    function buildTrendDataset(label, values, color) {
+        return {
+            label,
+            data: values,
+            borderColor: color,
+            backgroundColor: color,
+            borderWidth: 2,
+            pointRadius: 3,
+            pointHoverRadius: 5,
+            tension: 0.25
+        };
     }
 
     // ═══════════════════════════════════════════════════════════
