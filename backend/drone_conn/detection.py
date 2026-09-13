@@ -20,7 +20,22 @@ from .firebase_client import (
     save_detection_manifest,
     create_scan_session,
     complete_scan_session,
+    get_scan_status,
 )
+
+
+class ScanInProgressError(Exception):
+    """
+    Raised when a new scan (live or video) is requested while another scan
+    is already active on the shared PineappleDetector singleton.
+
+    The detector keeps a single tracker/unique_ids/detection_active set of
+    instance attributes (no per-scan isolation — see Issue D in the
+    drone-pipeline investigation), so starting a second scan while one is
+    active would otherwise silently reset the in-progress scan's state.
+    Callers (routes.py) should catch this and return a 409 to the frontend.
+    """
+    pass
 
 
 def _compute_population_estimates(
@@ -229,15 +244,28 @@ class PineappleDetector:
             'non_bearing': set(),
             'non_viable': set()
         }
-        
+
+        # Global track_id -> category map. A track's category is decided once,
+        # the first time it's confirmed, and never changed afterward — this is
+        # what actually prevents one physical pineapple from being counted in
+        # two different categories if the classifier's output for it flips
+        # between frames (see Issue B; self.unique_ids alone only prevented
+        # duplicates *within* one category, not across categories).
+        self.track_categories: Dict[int, str] = {}
+
         # Detection statistics
         self.total_frames_processed = 0
         self.detection_active = False
         self.detection_thread = None
 
+        # Guards detection_active + the scan-start sequence below against two
+        # concurrent start requests both passing the "no scan active" check
+        # before either has set detection_active = True (see Issue D).
+        self._scan_lock = threading.Lock()
+
         # Time-sync state — retained as stubs for API backwards-compatibility
         self._current_scan_id: Optional[str] = None
-        
+
     def reset_tracking(self):
         """Reset all tracking data for a new scan"""
         self.unique_ids = {
@@ -245,6 +273,7 @@ class PineappleDetector:
             'non_bearing': set(),
             'non_viable': set()
         }
+        self.track_categories = {}
         self.total_frames_processed = 0
         # Re-initialize the tracker so Kalman filter state and track-ID counters
         # from a previous scan don't influence the new one.  Without this, the
@@ -358,10 +387,21 @@ class PineappleDetector:
                 print(f"⚠️ Unknown class: {class_name}")
                 continue
 
-            # Add to unique set (automatically prevents duplicates!)
-            if track_id not in self.unique_ids[category]:
-                self.unique_ids[category].add(track_id)
-                new_detections += 1
+            # Each physical pineapple must be counted exactly once, in exactly
+            # one category, for the lifetime of the scan. track_categories
+            # locks in the category the first time a track is confirmed; if a
+            # later frame reclassifies the same track_id (e.g. a borderline
+            # plant flips from "non_bearing" to "bearing"), that reclassification
+            # is ignored for counting purposes instead of being added to a
+            # second category's set (see Issue B — the previous check only
+            # looked at membership within the one category being classified
+            # this frame, never the other two).
+            if track_id in self.track_categories:
+                continue
+
+            self.track_categories[track_id] = category
+            self.unique_ids[category].add(track_id)
+            new_detections += 1
 
         # Calculate current counts
         bearing_count = len(self.unique_ids['bearing'])
@@ -439,18 +479,35 @@ class PineappleDetector:
 
         Returns:
             Scan session ID if successful, None otherwise
+
+        Raises:
+            ScanInProgressError: if a scan (live or video) is already active
+                on this detector (see Issue D).
         """
+        with self._scan_lock:
+            if self.detection_active:
+                print(f"⚠️ start_detection rejected — a scan is already active "
+                      f"(scan_id={self._current_scan_id})")
+                raise ScanInProgressError(
+                    "A scan is already in progress. End it before starting a new one."
+                )
+            # Reserve the slot immediately, before any Firestore I/O, so a
+            # second concurrent request can't slip past this check while the
+            # first request is still creating its scan session below.
+            self.detection_active = True
+
         # Create scan session (Firebase app is already initialized by app.py)
         scan_id = create_scan_session(block_id, user_id)
         if not scan_id:
             print("❌ Failed to create scan session")
+            self.detection_active = False
             return None
 
         # Reset tracking data
         self.reset_tracking()
+        self._current_scan_id = scan_id
 
         # Start detection in background thread
-        self.detection_active = True
         self.detection_thread = threading.Thread(
             target=self._detection_loop,
             args=(hls_url, block_id, scan_id, user_id, fps, update_interval),
@@ -582,11 +639,28 @@ class PineappleDetector:
         
         print("🛑 Stopping detection...")
         self.detection_active = False
-        
+
         # Wait for detection thread to finish
         if self.detection_thread:
             self.detection_thread.join(timeout=5.0)
-        
+
+        # The background loop (_detection_loop for live streams,
+        # _video_scan_loop_sequential for uploaded video) may have already
+        # written a terminal status for this scan while we were joining above
+        # — e.g. the user clicked "End Scan" mid-analysis of an uploaded
+        # video, which the loop itself correctly records as 'failed' with no
+        # manifest ever written, or a live stream died before the user
+        # clicked stop. If we didn't check here, the code below would
+        # unconditionally overwrite that correct terminal status with a
+        # fabricated 'completed' + manifestReady=True referencing a manifest
+        # that (for an interrupted video scan) was never written to disk.
+        # See Issue A.
+        current_status = get_scan_status(scan_id)
+        if current_status in ('completed', 'failed', 'cancelled'):
+            print(f"ℹ️ Scan {scan_id} already reached terminal status "
+                  f"'{current_status}' — not overwriting it.")
+            return current_status == 'completed'
+
         # Get final counts
         bearing_count = len(self.unique_ids['bearing'])
         non_bearing_count = len(self.unique_ids['non_bearing'])
@@ -672,21 +746,37 @@ class PineappleDetector:
         process_every_n_frames: process 1 frame out of every N sequential
             frames (default 5, matching test_video_firebase.py). Higher values
             are faster but may miss fast-moving plants.
+
+        Raises:
+            ScanInProgressError: if a scan (live or video) is already active
+                on this detector (see Issue D).
         """
         import os
         if not os.path.isfile(video_path):
             print(f"❌ Video file not found: {video_path}")
             return None
 
+        with self._scan_lock:
+            if self.detection_active:
+                print(f"⚠️ start_video_scan rejected — a scan is already active "
+                      f"(scan_id={self._current_scan_id})")
+                raise ScanInProgressError(
+                    "A scan is already in progress. End it before starting a new one."
+                )
+            # Reserve the slot immediately, before any Firestore I/O, so a
+            # second concurrent request can't slip past this check while the
+            # first request is still creating its scan session below.
+            self.detection_active = True
+
         scan_id = create_scan_session(block_id, user_id)
         if not scan_id:
             print("❌ Failed to create scan session")
+            self.detection_active = False
             return None
 
         self.reset_tracking()
         self._current_scan_id = scan_id
 
-        self.detection_active = True
         self.detection_thread = threading.Thread(
             target=self._video_scan_loop_sequential,
             args=(video_path, block_id, scan_id, user_id,
@@ -709,6 +799,13 @@ class PineappleDetector:
         """
         Background thread for async video-file scanning.
         Respects self.detection_active so stop_detection() can cancel early.
+
+        NOT CURRENTLY USED: start_video_scan() always spawns
+        _video_scan_loop_sequential() instead. Kept only for reference —
+        editing this function has no effect on the running application.
+        Left in place rather than deleted to avoid risk in an unrelated
+        change; a future cleanup pass can remove it once confirmed
+        unreferenced by any external tooling/tests.
         """
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():

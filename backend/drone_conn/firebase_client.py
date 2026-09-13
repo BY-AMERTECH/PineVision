@@ -176,6 +176,28 @@ def create_scan_session(block_id: str, user_id: str) -> Optional[str]:
         return None
 
 
+def get_scan_status(scan_id: str) -> Optional[str]:
+    """
+    Return the current 'status' field of a scan document, or None if the
+    document doesn't exist or couldn't be read.
+
+    Used by PineappleDetector.stop_detection() to check whether a scan's
+    background loop already wrote a terminal status (e.g. 'failed', for a
+    video scan interrupted mid-analysis) before potentially overwriting it
+    with a fabricated 'completed' status. See Issue A in the drone-pipeline
+    investigation.
+    """
+    try:
+        db = get_firestore_client()
+        doc = db.collection('scans').document(scan_id).get()
+        if doc.exists:
+            return doc.to_dict().get('status')
+        return None
+    except Exception as e:
+        print(f"⚠️ Could not fetch scan status for {scan_id}: {e}")
+        return None
+
+
 def get_block_population(block_id: str) -> int:
     """Return the registered pineapple population for a block, or 0 if unset."""
     try:

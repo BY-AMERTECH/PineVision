@@ -327,7 +327,7 @@ async function apiStartDetection(hlsUrl, blockId, userId, fps = 2) {
         body: JSON.stringify({ hls_url: hlsUrl, block_id: blockId, user_id: userId, fps }),
         signal: AbortSignal.timeout(10_000)
     });
-    return resp.json();
+    return parseApiResponse(resp);
 }
 
 async function apiStopDetection(blockId, scanId, userId) {
@@ -337,7 +337,27 @@ async function apiStopDetection(blockId, scanId, userId) {
         body: JSON.stringify({ block_id: blockId, scan_id: scanId, user_id: userId }),
         signal: AbortSignal.timeout(10_000)
     });
-    return resp.json();
+    return parseApiResponse(resp);
+}
+
+// Reads a fetch Response's JSON body regardless of HTTP status. The backend
+// always returns a structured {ok, error, message} JSON body for both
+// success and failure (400/409/500/...) — see routes.py — so callers can
+// rely on `result.ok` / `result.message` without inspecting resp.status
+// themselves. This only falls back to a synthesized error object when the
+// body itself isn't valid JSON (e.g. a raw proxy/Flask error page), which
+// previously would throw out of resp.json() and get flattened into a
+// generic "Failed to start/stop detection" toast with no real detail.
+async function parseApiResponse(resp) {
+    try {
+        return await resp.json();
+    } catch {
+        return {
+            ok: false,
+            error: 'invalid_response',
+            message: `Unexpected server response (HTTP ${resp.status}).`,
+        };
+    }
 }
 
 // ── Auto-Prepare (MediaMTX startup + IPv4 detection) ─────────

@@ -12,7 +12,7 @@ import tempfile
 from flask import Blueprint, request, jsonify, send_file
 from werkzeug.utils import secure_filename
 from . import service
-from .detection import get_detector
+from .detection import get_detector, ScanInProgressError
 from .firebase_client import _UPLOADS_DIR
 
 log = logging.getLogger(__name__)
@@ -161,15 +161,23 @@ def start_detection():
     
     # Get detector instance
     detector = get_detector()
-    
+
     # Start detection
-    scan_id = detector.start_detection(
-        hls_url=hls_url,
-        block_id=block_id,
-        user_id=user_id,
-        fps=fps
-    )
-    
+    try:
+        scan_id = detector.start_detection(
+            hls_url=hls_url,
+            block_id=block_id,
+            user_id=user_id,
+            fps=fps
+        )
+    except ScanInProgressError as e:
+        log.warning('start-detection: rejected — %s', e)
+        return jsonify({
+            'ok': False,
+            'error': 'scan_in_progress',
+            'message': str(e),
+        }), 409
+
     if scan_id:
         return jsonify({
             'ok': True,
@@ -249,10 +257,18 @@ def upload_video():
 
     block_id = (request.form.get('block_id') or '').strip()
     user_id  = (request.form.get('user_id')  or '').strip()
+    # Default (5) matches the stride PineappleDetector.start_video_scan()
+    # itself defaults to, and what this endpoint always used in practice
+    # until now (see Issue C: this value used to be parsed and then
+    # discarded in favor of a hardcoded 5 below). The frontend doesn't
+    # currently send frame_skip, so this default is what actually runs
+    # today; keeping it here preserves that behavior while making the field
+    # genuinely configurable for any future caller that does send it.
     try:
-        frame_skip = int(request.form.get('frame_skip', 2))
+        frame_skip = int(request.form.get('frame_skip', 5))
     except (ValueError, TypeError):
-        frame_skip = 2
+        frame_skip = 5
+    frame_skip = max(1, frame_skip)  # guard against 0/negative -> ZeroDivisionError downstream
 
     if not block_id or not user_id:
         return jsonify({
@@ -277,13 +293,26 @@ def upload_video():
             'message': 'Detection model failed to initialize. Check server logs.',
         }), 503
 
-    scan_id  = detector.start_video_scan(
-        video_path=video_path,
-        block_id=block_id,
-        user_id=user_id,
-        process_every_n_frames=5,  # matches test_video_firebase.py stride
-        update_interval=2.0,
-    )
+    try:
+        scan_id = detector.start_video_scan(
+            video_path=video_path,
+            block_id=block_id,
+            user_id=user_id,
+            process_every_n_frames=frame_skip,
+            update_interval=2.0,
+        )
+    except ScanInProgressError as e:
+        log.warning('upload-video: rejected — %s', e)
+        # Clean up the temp file we just saved — no scan will process it.
+        try:
+            os.remove(video_path)
+        except OSError:
+            pass
+        return jsonify({
+            'ok': False,
+            'error': 'scan_in_progress',
+            'message': str(e),
+        }), 409
 
     if not scan_id:
         return jsonify({'ok': False, 'message': 'Failed to start video scan'}), 500
