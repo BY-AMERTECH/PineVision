@@ -68,6 +68,19 @@ service cloud.firestore {
     }
 
     // ─────────────────────────────────────────────────────────
+    // scheduled_scans — manual "Schedule Scan" bookings made from a
+    // fruit block's detail page. Owner-scoped like blocks/scans/missions
+    // above. No delete: cancellation is a status update (status ->
+    // 'cancelled') so history is preserved rather than removed.
+    // ─────────────────────────────────────────────────────────
+    match /scheduled_scans/{docId} {
+      allow read, update: if request.auth != null &&
+        (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if request.auth != null &&
+        request.resource.data.userId == request.auth.uid;
+    }
+
+    // ─────────────────────────────────────────────────────────
     // activity_logs and alerts
     //
     // Written by the client SDK including during unauthenticated
