@@ -100,7 +100,7 @@
                     </div>
                     <p class="dv-connecting-label mt-2">Connecting...</p>
                     <!-- Analysis progress bar — only shown during 'analyzing' phase -->
-                    <div id="dv-analyze-progress" class="dv-analyze-progress d-none">
+                    <div id="dv-analyze-progress" class="dv-analyze-progress d-none" hidden>
                         <div class="progress dv-progress-bar">
                             <div class="progress-bar" id="dv-analyze-progress-fill"
                                  style="width: 0%" role="progressbar"
@@ -189,16 +189,6 @@
                             <div class="progress-bar" id="stat-progress-fill" style="width: 0%"></div>
                         </div>
                     </div>
-                </div>
-
-                <!-- End Scan Button (stats panel) -->
-                <div class="col-auto">
-                    <button id="btn-end-scan-stats"
-                            class="btn dv-btn-end-scan-sm d-none"
-                            data-bs-toggle="modal"
-                            data-bs-target="#modal-end-scan">
-                        <i class="ti ti-square-x me-1" aria-hidden="true"></i>End Scan
-                    </button>
                 </div>
 
             </div>

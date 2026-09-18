@@ -403,26 +403,6 @@ body {
     color: var(--muted);
 }
 
-/* End scan button inside stats panel */
-.dv-btn-end-scan-sm {
-    font-size: var(--font-size-sm);
-    font-weight: 500;
-    background: rgba(245, 158, 11, 0.07);
-    border: 1px solid rgba(245, 158, 11, 0.40);
-    color: #f59e0b;
-    border-radius: var(--radius-md);
-    padding: 8px 18px;
-    white-space: nowrap;
-    font-family: var(--font-sans);
-    transition: all 0.2s ease;
-    cursor: pointer;
-}
-.dv-btn-end-scan-sm:hover {
-    border-color: #f59e0b;
-    background: rgba(245, 158, 11, 0.12);
-}
-
-
 /* ── 4. MODALS ──────────────────────────────────────────────── */
 
 #modal-connect,

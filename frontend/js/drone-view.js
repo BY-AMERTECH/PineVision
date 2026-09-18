@@ -269,7 +269,7 @@ function renderUI() {
     const isLoading   = s === 'connecting' || s === 'reconnecting' || s === 'analyzing';
     const isInactive  = s === 'idle' || s === 'failed';
     const isSession   = s === 'active' || s === 'reconnecting' || s === 'analyzing';
-    const isAnalyzing = DRONE_STATE.videoMode && s === 'analyzing';
+    const isMp4Analyzing = DRONE_STATE.videoMode === true && s === 'analyzing';
     const canStartLiveCounting =
         !DRONE_STATE.videoMode &&
         s === 'active' &&
@@ -284,17 +284,19 @@ function renderUI() {
             : 'Click "Connect Drone" or "Upload MP4" to begin a scan session';
 
     const connLabel = document.querySelector('.dv-connecting-label');
-    if (connLabel && !isAnalyzing) connLabel.textContent = s === 'reconnecting' ? 'Reconnecting...' : 'Connecting...';
+    if (connLabel && !isMp4Analyzing) connLabel.textContent = s === 'reconnecting' ? 'Reconnecting...' : 'Connecting...';
 
-    // Show/hide the analyze progress bar (only during the analyzing phase)
+    // This upload-only element must remain hidden for every live-HLS state.
     const analyzeBar = document.getElementById('dv-analyze-progress');
-    if (analyzeBar) analyzeBar.classList.toggle('d-none', !isAnalyzing);
+    if (analyzeBar) {
+        analyzeBar.classList.toggle('d-none', !isMp4Analyzing);
+        analyzeBar.hidden = !isMp4Analyzing;
+    }
 
     toggleEl('btn-connect',        isInactive);
     toggleEl('btn-upload-video',   isInactive);
     toggleEl('btn-start-counting', canStartLiveCounting);
     toggleEl('btn-end-scan',       isSession);
-    toggleEl('btn-end-scan-stats', isSession);
 
     toggleClass('drone-feed',         'dv-feed-active', isLive);
     toggleEl('dv-placeholder',        isInactive);
@@ -998,8 +1000,12 @@ function startScanCompletionListener() {
             if (!doc.exists) return;
             const data = doc.data();
 
-            // Analysis progress update (only during analyzing phase)
-            if (DRONE_STATE.status === 'analyzing' && typeof data.scanProgress === 'number') {
+            // Only an uploaded MP4 uses the scan-document analysis progress.
+            if (
+                DRONE_STATE.videoMode === true &&
+                DRONE_STATE.status === 'analyzing' &&
+                typeof data.scanProgress === 'number'
+            ) {
                 updateAnalysisProgress(
                     data.scanProgress,
                     data.processedFrames,
