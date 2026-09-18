@@ -573,6 +573,11 @@ class PineappleDetector:
                     _nb = results['non_bearing']
                     _nv = results['non_viable']
                     _t  = results['total']
+                    _live_frame = {
+                        'scanId': scan_id,
+                        'frame': results['frame_number'],
+                        'd': results.get('bbox_detections', []),
+                    }
                     threading.Thread(
                         target=update_detection_batch,
                         kwargs=dict(
@@ -582,6 +587,7 @@ class PineappleDetector:
                             non_bearing_count=_nb,
                             non_viable_count=_nv,
                             total_count=_t,
+                            live_frame=_live_frame,
                         ),
                         daemon=True,
                     ).start()

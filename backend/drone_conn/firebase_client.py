@@ -69,6 +69,7 @@ def update_detection_batch(
     scan_progress: float = 0.0,
     processed_frames: int = 0,
     total_frames: int = 0,
+    live_frame: Optional[dict] = None,
 ) -> bool:
     """
     Update both block stats AND scan analysis progress in a single Firestore
@@ -77,7 +78,9 @@ def update_detection_batch(
     scan_progress: 0–100 percentage of video frames already processed.
     processed_frames / total_frames: raw frame counts for the progress display.
 
-    NOTE: recentFrames is no longer written to Firestore. Detection bounding
+    NOTE: recentFrames is no longer written to Firestore for MP4 analysis.
+    Live HLS analysis can publish its newest processed frame in live_frame.
+    Detection bounding
     boxes are now accumulated locally and written as a single manifest JSON
     file when analysis is complete. The frontend fetches that manifest via
     GET /api/drone/scan/<scan_id>/manifest and uses it for synchronized
@@ -94,13 +97,16 @@ def update_detection_batch(
 
         # Write 1 — block aggregate stats (drives live stats panel)
         block_ref = db.collection('blocks').document(block_id)
-        batch.update(block_ref, {
+        block_update = {
             'bearingPercent':    round(bearing_pct,     1),
             'nonBearingPercent': round(non_bearing_pct, 1),
             'nonViable':         round(non_viable_pct,  1),
             'totalPineapples':   total_count,
             'lastUpdate':        firestore.SERVER_TIMESTAMP,
-        })
+        }
+        if live_frame is not None:
+            block_update['liveDetections'] = live_frame
+        batch.update(block_ref, block_update)
 
         # Write 2 — scan progress for frontend progress bar only (no recentFrames)
         scan_ref = db.collection('scans').document(scan_id)

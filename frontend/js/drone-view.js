@@ -83,6 +83,8 @@ const BboxOverlay = (() => {
 
     let frameTimes = [];        // sorted number[] — timestamps of stored frames
     let frameCache = new Map(); // time → detection[]
+    let liveDetections = [];    // newest live detector frame; no timestamp lookup
+    let renderMode = 'manifest';
     let rafId      = null;
     let active     = false;
     let canvas     = null;
@@ -93,9 +95,11 @@ const BboxOverlay = (() => {
         if (canvas) ctx = canvas.getContext('2d');
     }
 
-    function start() {
+    function start(mode = 'manifest') {
         if (!canvas) init();
         if (!canvas || !ctx) return;
+        renderMode = mode === 'live' ? 'live' : 'manifest';
+        if (active) return;
         active = true;
         canvas.classList.add('dv-bbox-active');
         _scheduleRaf();
@@ -110,11 +114,14 @@ const BboxOverlay = (() => {
         }
         frameTimes = [];
         frameCache.clear();
+        liveDetections = [];
     }
 
     // Load the full detection manifest — called once when analysis completes.
     // Replaces the old streaming ingestFrames() approach.
     function loadManifest(frames) {
+        renderMode = 'manifest';
+        liveDetections = [];
         frameTimes = [];
         frameCache.clear();
         if (!Array.isArray(frames)) return;
@@ -125,6 +132,12 @@ const BboxOverlay = (() => {
             frameCache.set(t, Array.isArray(f.d) ? f.d : []);
         }
         console.log(`📦 Manifest loaded: ${frameTimes.length} detection frames`);
+    }
+
+    // Live HLS frames have no stable, seekable timestamp. Replace the prior
+    // frame with the newest Firestore payload and draw it on the next RAF tick.
+    function setLiveDetections(detections) {
+        liveDetections = Array.isArray(detections) ? detections : [];
     }
 
     function _scheduleRaf() {
@@ -148,7 +161,9 @@ const BboxOverlay = (() => {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         if (videoEl.readyState >= 1 && videoEl.videoWidth) {
-            const dets = _findDetections(videoEl.currentTime);
+            const dets = renderMode === 'live'
+                ? liveDetections
+                : _findDetections(videoEl.currentTime);
             if (dets && dets.length > 0) {
                 const pr = _getVideoPaintRect(videoEl);
                 if (pr) _drawDetections(dets, pr);
@@ -237,7 +252,7 @@ const BboxOverlay = (() => {
         return lo;
     }
 
-    return { init, start, stop, loadManifest };
+    return { init, start, stop, loadManifest, setLiveDetections };
 })();
 
 // ── UI Rendering ──────────────────────────────────────────────
@@ -510,6 +525,10 @@ function loadHlsStream(hlsUrl, isReconnect) {
 }
 
 async function onHlsReady(isReconnect) {
+    // Reuse the MP4 overlay canvas/RAF loop, but select live detections rather
+    // than performing the manifest's video.currentTime lookup.
+    BboxOverlay.start('live');
+
     if (isReconnect) {
         DRONE_STATE.reconnectAttempts = 0;
         transitionTo('active');
@@ -901,7 +920,21 @@ function startFirebaseListener() {
         .collection('blocks')
         .doc(DRONE_STATE.blockId)
         .onSnapshot((doc) => {
-            if (doc.exists) updateStatsFromFirebase(doc.data());
+            if (!doc.exists) return;
+
+            const data = doc.data();
+            updateStatsFromFirebase(data);
+
+            // The block document is shared across scan sessions. Ignore
+            // upload mode and data written by a previous live scan.
+            const liveFrame = data.liveDetections;
+            if (
+                !DRONE_STATE.videoMode &&
+                liveFrame &&
+                liveFrame.scanId === DRONE_STATE.scanId
+            ) {
+                BboxOverlay.setLiveDetections(liveFrame.d);
+            }
         }, (error) => {
             console.error('❌ Firebase listener error:', error);
         });
