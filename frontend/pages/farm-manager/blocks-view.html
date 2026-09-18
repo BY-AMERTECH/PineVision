@@ -1,0 +1,951 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+    <link rel="dns-prefetch" href="https://firestore.googleapis.com">
+    <link rel="dns-prefetch" href="https://identitytoolkit.googleapis.com">
+    <script>
+      (function () {
+        try {
+          var s = JSON.parse(
+            localStorage.getItem("pinevision_settings") || "{}",
+          );
+          if (s.theme === "dark")
+            document.documentElement.classList.add("dark-mode");
+        } catch (e) {}
+      })();
+    </script>
+    <title>Block Detail - PineVision</title>
+    <link rel="stylesheet" href="../../bootstrap/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="../../css/tokens.css" />
+    <link rel="stylesheet" href="../../css/layout.css" />
+    <link rel="stylesheet" href="../../css/components.css" />
+    <style>
+      .btn-back {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-sm);
+        padding: var(--space-sm) var(--space-md);
+        font-size: var(--font-size-sm);
+        font-weight: var(--font-weight-medium);
+        border: var(--border-width-base) solid var(--border);
+        border-radius: var(--radius-md);
+        background-color: var(--surf);
+        color: var(--color-text-secondary);
+        cursor: pointer;
+        transition: all var(--transition-fast);
+        text-decoration: none;
+        white-space: nowrap;
+        line-height: 1.5;
+      }
+      .btn-back:hover {
+        border-color: var(--green);
+        color: var(--green);
+        background-color: var(--green-bg);
+      }
+
+      .block-page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: var(--space-lg);
+        flex-wrap: wrap;
+        margin-bottom: var(--space-xl);
+      }
+      .block-header-left {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--space-sm);
+      }
+      .block-title-row {
+        display: flex;
+        align-items: center;
+        gap: var(--space-md);
+        flex-wrap: wrap;
+      }
+      .block-page-title {
+        font-size: var(--font-size-2xl);
+        font-weight: var(--font-weight-semibold);
+        color: var(--color-text-primary);
+        line-height: 1.25;
+        margin: 0;
+      }
+      .block-page-subtitle {
+        font-size: var(--font-size-sm);
+        color: var(--muted);
+        margin-top: var(--space-xs);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .readonly-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 3px 10px;
+        border-radius: var(--radius-pill);
+        font-size: 11px;
+        font-weight: var(--font-weight-semibold);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        background-color: var(--surf2);
+        color: var(--color-text-secondary);
+        border: 1px solid var(--border);
+      }
+
+      .info-card {
+        background-color: var(--surf);
+        border: 1.5px solid var(--color-border-secondary);
+        border-radius: var(--radius-lg);
+        padding: var(--space-xl);
+        height: 100%;
+        box-shadow: var(--shadow-xs);
+      }
+      .info-card-title {
+        font-size: var(--font-size-xs);
+        font-weight: var(--font-weight-semibold);
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        margin-bottom: var(--space-md);
+        padding-bottom: var(--space-sm);
+        border-bottom: var(--border-width-thin) solid var(--border);
+      }
+      .stat-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: var(--space-sm) 0;
+        font-size: var(--font-size-sm);
+        border-bottom: var(--border-width-thin) solid var(--border);
+      }
+      .stat-row:last-child { border-bottom: none; }
+      .stat-label {
+        color: var(--muted);
+        display: flex;
+        align-items: center;
+        gap: 7px;
+      }
+      .stat-label svg { color: var(--color-text-tertiary); flex-shrink: 0; }
+      .stat-value {
+        font-family: var(--font-mono);
+        font-weight: var(--font-weight-medium);
+        color: var(--color-text-primary);
+      }
+
+      .trend-row {
+        display: flex;
+        align-items: center;
+        gap: var(--space-md);
+        padding: 6px 0;
+        border-bottom: var(--border-width-thin) solid var(--border);
+      }
+      .trend-row:last-child { border-bottom: none; }
+      .trend-date {
+        font-size: var(--font-size-xs);
+        font-family: var(--font-mono);
+        color: var(--muted);
+        min-width: 52px;
+      }
+      .trend-bar-wrap { flex: 1; }
+      .trend-val {
+        font-size: var(--font-size-xs);
+        font-family: var(--font-mono);
+        font-weight: var(--font-weight-medium);
+        color: var(--color-text-primary);
+        min-width: 44px;
+        text-align: right;
+      }
+      .trend-compact-card .thead-row { border-bottom: none; }
+      .trend-view-hint { font-size: var(--font-size-xs); color: var(--muted); }
+
+      .bar-wrap {
+        position: relative;
+        width: 100%;
+        height: 8px;
+        background-color: var(--surf2);
+        border-radius: var(--radius-pill);
+        overflow: hidden;
+        margin-bottom: 6px;
+      }
+      .bar-fill {
+        height: 100%;
+        border-radius: var(--radius-pill);
+        transition: width 0.3s ease;
+      }
+
+      .mcard {
+        background-color: var(--surf);
+        border: 1px solid var(--color-border-secondary);
+        border-radius: var(--radius-lg);
+        padding: var(--space-lg) var(--card-padding-x);
+        box-shadow: var(--shadow-card);
+        transition: all var(--transition-fast);
+        height: 100%;
+      }
+      .mcard:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+      .mc-green { background-color: var(--green-bg); border-color: rgba(76, 175, 120, 0.22); }
+      .mc-green .mc-val { color: var(--green); }
+      .mc-amber { background-color: var(--amber-bg); border-color: rgba(230, 168, 23, 0.22); }
+      .mc-amber .mc-val { color: var(--amber); }
+      .mc-red { background-color: var(--red-bg); border-color: rgba(217, 90, 90, 0.22); }
+      .mc-red .mc-val { color: var(--red); }
+
+      @media (max-width: 580px) {
+        .block-page-header { flex-direction: column; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-wrapper">
+      <!-- ── Sidebar ─────────────────────────────────────────────────── -->
+      <aside class="sidebar">
+        <div class="sidebar-brand">
+          <div class="sidebar-logo">
+            <img
+              src="/frontend/assets/images/pinevision-logo.svg"
+              alt="PineVision"
+              class="sidebar-logo-img"
+            />
+          </div>
+          <div class="sidebar-brand-text">
+            <div class="sidebar-brand-name">PineVision</div>
+            <div class="sidebar-brand-tagline">Farm Manager Panel</div>
+          </div>
+        </div>
+
+        <button
+          class="sidebar-collapse-btn"
+          onclick="app.toggleSidebar()"
+          aria-label="Toggle sidebar"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <polyline points="15,18 9,12 15,6" />
+          </svg>
+          <span class="nav-link-text">Collapse sidebar</span>
+        </button>
+
+        <nav class="sidebar-nav">
+          <div class="nav-section">
+            <div class="nav-section-title">Main</div>
+            <ul class="nav-links">
+              <li>
+                <a
+                  href="dashboard.html"
+                  class="nav-link"
+                  data-tooltip="Dashboard"
+                >
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-dashboard.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Dashboard</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div class="nav-section">
+            <div class="nav-section-title">Monitoring</div>
+            <ul class="nav-links">
+              <li>
+                <a href="users.html" class="nav-link" data-tooltip="Users">
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-users.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Users</span>
+                </a>
+              </li>
+              <li>
+                <a
+                  href="auditlogs.html"
+                  class="nav-link"
+                  data-tooltip="Audit Logs"
+                >
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-clipboard.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Audit Logs</span>
+                </a>
+              </li>
+              <li>
+                <a
+                  href="blocks.html"
+                  class="nav-link active"
+                  data-tooltip="Fruit Blocks"
+                >
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-leaf.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Fruit Blocks</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div class="nav-section">
+            <div class="nav-section-title">Operations</div>
+            <ul class="nav-links">
+              <li>
+                <a
+                  href="flights-scans.html"
+                  class="nav-link"
+                  data-tooltip="Flights &amp; Scans"
+                >
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-flights.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Flights &amp; Scans</span>
+                </a>
+              </li>
+              <li>
+                <a href="alerts.html" class="nav-link" data-tooltip="Alerts">
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-bell.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Alerts</span>
+                  <span
+                    class="nav-badge"
+                    id="nav-badge-alerts"
+                    style="display: none"
+                  ></span>
+                </a>
+              </li>
+              <li>
+                <a href="reports.html" class="nav-link" data-tooltip="Reports">
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-reports.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Reports</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div class="nav-section">
+            <div class="nav-section-title">System</div>
+            <ul class="nav-links">
+              <li>
+                <a
+                  href="settings.html"
+                  class="nav-link"
+                  data-tooltip="Settings"
+                >
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-cog.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Settings</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+        </nav>
+      </aside>
+
+      <!-- ── Main Content ─────────────────────────────────────────────── -->
+      <main class="main-content">
+        <!-- Topbar: page context (left) + signed-in account controls (right) -->
+        <header class="topbar">
+          <div class="topbar-page">
+            <span class="topbar-page-icon" aria-hidden="true"></span>
+            <div class="topbar-page-text">
+              <h1 class="topbar-page-title"></h1>
+              <p class="topbar-page-subtitle"></p>
+            </div>
+          </div>
+          <div class="topbar-account">
+            <button
+              type="button"
+              class="topbar-account-trigger"
+              id="topbar-account-trigger"
+              aria-haspopup="menu"
+              aria-expanded="false"
+              aria-controls="topbar-account-menu"
+              aria-label="Open account menu"
+            >
+              <span class="topbar-account-avatar" aria-hidden="true"></span>
+              <span class="topbar-account-info">
+                <span class="topbar-account-name"></span>
+                <span class="topbar-account-role"></span>
+              </span>
+              <svg
+                class="topbar-account-caret"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+            <div
+              class="topbar-account-menu"
+              id="topbar-account-menu"
+              role="menu"
+              aria-label="Account"
+              hidden
+            >
+              <div class="topbar-account-menu-header">
+                <div class="topbar-account-menu-name"></div>
+                <div class="topbar-account-menu-email"></div>
+              </div>
+              <button
+                type="button"
+                class="topbar-account-logout"
+                role="menuitem"
+                onclick="app.handleTopbarLogout()"
+              >
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+                Logout
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <div
+          class="page-container"
+          style="
+            padding: var(--page-padding);
+            max-width: var(--page-max-width);
+            margin: 0 auto;
+          "
+        >
+          <div id="block-detail-root">
+            <!-- Loading placeholder -->
+            <div style="padding: var(--space-4xl) 0; text-align: center; color: var(--muted); font-size: var(--font-size-sm);">
+              Loading block details…
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- BEARING RATE TREND MODAL -->
+    <div id="trend-modal" class="modal">
+      <div class="modal-content" style="max-width: 540px">
+        <div class="modal-header">
+          <h2 class="modal-title">Bearing Rate Trend</h2>
+          <button class="modal-close" onclick="closeTrendModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="trend-modal-content"></div>
+        <div class="modal-footer" style="justify-content: flex-end">
+          <button type="button" class="btn btn-secondary" onclick="closeTrendModal()">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+    <!-- Bootstrap JS -->
+    <script src="../../bootstrap/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Application JavaScript -->
+    <script src="../../js/auth.js"></script>
+    <script src="../../js/data.js"></script>
+    <script src="../../js/utils.js"></script>
+    <script src="../../js/app.js"></script>
+
+    <script>
+      if (!auth.requireFarmManager()) {
+        /* redirects */
+      }
+
+      const SCHEDULED_SCANS_COLLECTION = "scheduled_scans";
+      let currentBlock = null;
+
+      window.initPage = async function () {
+        utils.setupModalClose("trend-modal");
+
+        const blockId = new URLSearchParams(window.location.search).get("id");
+        if (!blockId) {
+          window.location.href = "blocks.html";
+          return;
+        }
+
+        await loadBlock(blockId);
+      };
+
+      async function loadBlock(blockId) {
+        try {
+          console.log("📥 Loading block", blockId, "from Firestore...");
+
+          const results = await Promise.all([
+            firebase.firestore().collection("blocks").doc(blockId).get(),
+            firebase.firestore().collection("users").limit(200).get(),
+          ]);
+
+          const blockDoc = results[0];
+          const usersSnap = results[1];
+
+          if (!blockDoc.exists) {
+            renderNotFound();
+            return;
+          }
+
+          const usersById = {};
+          usersSnap.forEach(function (doc) {
+            const d = doc.data();
+            usersById[doc.id] = d.fullName || d.username || d.email || doc.id;
+          });
+
+          const d = blockDoc.data();
+          currentBlock = {
+            id: blockDoc.id,
+            blockId: d.blockId || blockDoc.id,
+            blockName: d.blockName || d.blockId || blockDoc.id,
+            userId: d.userId || "",
+            operatorName: usersById[d.userId] || d.userId || "Unassigned",
+            section: d.section || "—",
+            area: typeof d.area === "number" ? d.area : parseFloat(d.area) || 0,
+            stage: d.stage || "",
+            daf: typeof d.daf === "number" ? d.daf : parseInt(d.daf, 10) || 0,
+            planted: d.planted || "",
+            forcingDate: d.forcingDate || "",
+            declaredPopulation: d.declaredPopulation || d.totalPineapples || 0,
+            bearing: d.bearingPercent || 0,
+            nonbearing: d.nonBearingPercent || 0,
+            nonViable: d.nonViable || 0,
+            plants: d.totalPineapples || 0,
+            totalScans: d.totalScans || 0,
+            lastScanned: d.lastScanned || null,
+          };
+
+          document.title = currentBlock.blockName + " — PineVision";
+          renderPage(currentBlock);
+          loadScheduledScans(currentBlock);
+        } catch (error) {
+          console.error("❌ Error loading block:", error);
+          renderNotFound();
+        }
+      }
+
+      function renderNotFound() {
+        document.getElementById("block-detail-root").innerHTML = `
+          <div class="fb-empty" style="padding: var(--space-4xl) 0; text-align:center;">
+            <p style="color: var(--muted); margin-bottom: var(--space-lg);">This Fruit Block could not be found.</p>
+            <a href="blocks.html" class="btn btn-secondary">&#8592; Back to Fruit Blocks</a>
+          </div>`;
+      }
+
+      // ── Render read-only page ──────────────────────────────────────
+
+      function renderPage(block) {
+        const statusClass = getStatusClass(block);
+        const hasScanData = block.plants > 0;
+
+        const bearingCount = hasScanData ? Math.round((block.bearing / 100) * block.plants) : 0;
+        const nonbearingCount = hasScanData ? Math.round((block.nonbearing / 100) * block.plants) : 0;
+        const nonViableCount = hasScanData ? Math.round((block.nonViable / 100) * block.plants) : 0;
+        const plantSub = (n) => (hasScanData ? formatNumber(n) + " plants" : "—");
+
+        document.getElementById("block-detail-root").innerHTML = `
+          <div class="block-page-header">
+            <div class="block-header-left">
+              <a href="blocks.html" class="btn-back">&#8592; All Fruit Blocks</a>
+              <div>
+                <div class="block-title-row">
+                  <h1 class="block-page-title">${escapeHtml(block.blockName)}</h1>
+                  ${statusBadge(statusClass)}
+                  <span class="readonly-chip">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M20 12c0 5-3.58 9-8 9s-8-4-8-9 3.58-9 8-9 8 4 8 9z"/>
+                    </svg>
+                    Read-Only View
+                  </span>
+                </div>
+                <div class="block-page-subtitle">
+                  ${escapeHtml(block.operatorName)} &middot; ${escapeHtml(block.section)} &middot; ${formatArea(block.area)} &middot; ${escapeHtml(growthStageLabel(block))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="row row-cols-2 row-cols-md-4 g-3 mb-4">
+            ${buildMetricCard("Declared Pop.", formatNumber(block.declaredPopulation) + " plants", "Registered Population", "")}
+            ${buildMetricCard("Bearing", formatPercent(block.bearing), plantSub(bearingCount), "green")}
+            ${buildMetricCard("Non-Bearing", formatPercent(block.nonbearing), plantSub(nonbearingCount), "amber")}
+            ${buildMetricCard("Non-Viable", formatPercent(block.nonViable), plantSub(nonViableCount), "red")}
+          </div>
+
+          <div class="row g-3 mb-4">
+            <div class="col-md-6">
+              <div class="info-card">
+                <div class="info-card-title">General Details</div>
+                <div class="stat-row">
+                  <span class="stat-label">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg>
+                    Block ID
+                  </span>
+                  <span class="stat-value">${escapeHtml(block.blockName)}</span>
+                </div>
+                <div class="stat-row">
+                  <span class="stat-label">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    Flight Operator
+                  </span>
+                  <span class="stat-value">${escapeHtml(block.operatorName)}</span>
+                </div>
+                <div class="stat-row">
+                  <span class="stat-label">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                    Section
+                  </span>
+                  <span class="stat-value">${escapeHtml(block.section)}</span>
+                </div>
+                <div class="stat-row">
+                  <span class="stat-label">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+                    Area
+                  </span>
+                  <span class="stat-value">${formatArea(block.area)}</span>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="info-card">
+                <div class="info-card-title">Crop &amp; Growth Details</div>
+                <div class="stat-row">
+                  <span class="stat-label">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    Planting Date
+                  </span>
+                  <span class="stat-value">${escapeHtml(formatDateValue(block.planted))}</span>
+                </div>
+                <div class="stat-row">
+                  <span class="stat-label">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg>
+                    Forcing Date
+                  </span>
+                  <span class="stat-value">${escapeHtml(formatDateValue(block.forcingDate))}</span>
+                </div>
+                <div class="stat-row">
+                  <span class="stat-label">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg>
+                    Growth Stage (DAF)
+                  </span>
+                  <span class="stat-value">${block.daf ? block.daf + " days" : "—"}</span>
+                </div>
+                <div class="stat-row">
+                  <span class="stat-label">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    Total Scans
+                  </span>
+                  <span class="stat-value">${formatNumber(block.totalScans)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="tcard trend-compact-card mb-4">
+            <div class="thead-row" style="padding: var(--space-md) var(--space-xl)">
+              <div class="d-flex align-items-center gap-3">
+                <span class="thead-title">Bearing Rate Trend</span>
+                <span class="trend-view-hint">View Bearing Rate Trend</span>
+              </div>
+              <button class="btn btn-sm btn-secondary" onclick="openTrendModal()">View</button>
+            </div>
+          </div>
+
+          <div class="tcard mb-4" id="condition-breakdown"></div>
+
+          <div class="tcard" id="scheduled-scans-card"></div>
+        `;
+
+        renderConditionBreakdown(block, hasScanData, bearingCount, nonbearingCount, nonViableCount);
+      }
+
+      function renderConditionBreakdown(block, hasScanData, bearingCount, nonbearingCount, nonViableCount) {
+        const fmtPlant = (n) => (hasScanData ? formatNumber(n) : "—");
+        document.getElementById("condition-breakdown").innerHTML = `
+        <div class="thead-row">
+            <span class="thead-title">Fruit Condition Breakdown</span>
+        </div>
+        <div class="twrap">
+            <table>
+                <colgroup>
+                    <col style="width:28%"><col style="width:13%"><col style="width:17%"><col style="width:42%">
+                </colgroup>
+                <thead>
+                    <tr><th>Condition</th><th>%</th><th>Plants</th><th>Distribution</th></tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><span class="badge good"><span class="bdot"></span>Bearing</span></td>
+                        <td style="font-family:var(--font-mono);">${formatPercent(block.bearing)}</td>
+                        <td style="font-family:var(--font-mono);">${fmtPlant(bearingCount)}</td>
+                        <td>
+                            <div style="display:flex;align-items:center;gap:var(--space-sm);">
+                                <div class="bar-wrap" style="margin-bottom:0;"><div class="bar-fill" style="width:${block.bearing}%;background:var(--green);"></div></div>
+                                <span style="font-family:var(--font-mono);font-size:var(--font-size-sm);color:var(--muted);min-width:45px;">${formatPercent(block.bearing)}</span>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><span class="badge warn"><span class="bdot"></span>Non-Bearing</span></td>
+                        <td style="font-family:var(--font-mono);">${formatPercent(block.nonbearing)}</td>
+                        <td style="font-family:var(--font-mono);">${fmtPlant(nonbearingCount)}</td>
+                        <td>
+                            <div style="display:flex;align-items:center;gap:var(--space-sm);">
+                                <div class="bar-wrap" style="margin-bottom:0;"><div class="bar-fill" style="width:${block.nonbearing}%;background:var(--amber);"></div></div>
+                                <span style="font-family:var(--font-mono);font-size:var(--font-size-sm);color:var(--muted);min-width:45px;">${formatPercent(block.nonbearing)}</span>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><span class="badge crit"><span class="bdot"></span>Non-Viable</span></td>
+                        <td style="font-family:var(--font-mono);">${formatPercent(block.nonViable)}</td>
+                        <td style="font-family:var(--font-mono);">${fmtPlant(nonViableCount)}</td>
+                        <td>
+                            <div style="display:flex;align-items:center;gap:var(--space-sm);">
+                                <div class="bar-wrap" style="margin-bottom:0;"><div class="bar-fill" style="width:${block.nonViable}%;background:var(--red);"></div></div>
+                                <span style="font-family:var(--font-mono);font-size:var(--font-size-sm);color:var(--muted);min-width:45px;">${formatPercent(block.nonViable)}</span>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>`;
+      }
+
+      // ── Scheduled scans (read-only) ─────────────────────────────────
+
+      async function loadScheduledScans(block) {
+        const container = document.getElementById("scheduled-scans-card");
+        if (!container) return;
+        container.innerHTML = `
+          <div class="thead-row"><span class="thead-title">Scheduled Scans</span></div>
+          <div style="padding:var(--space-xl);color:var(--muted);font-size:var(--font-size-sm);">Loading scheduled scans…</div>`;
+
+        try {
+          const snapshot = await firebase
+            .firestore()
+            .collection(SCHEDULED_SCANS_COLLECTION)
+            .where("blockId", "==", block.id)
+            .get();
+
+          const now = new Date();
+          const items = [];
+          snapshot.forEach(function (doc) {
+            const d = doc.data() || {};
+            const scheduledAt = d.scheduledAt && typeof d.scheduledAt.toDate === "function" ? d.scheduledAt.toDate() : null;
+            items.push({
+              scheduledAt: scheduledAt,
+              operator: d.operator || "",
+              notes: d.notes || "",
+              status: d.status === "cancelled" ? "cancelled" : "scheduled",
+            });
+          });
+          items.sort((a, b) => (a.scheduledAt ? a.scheduledAt.getTime() : 0) - (b.scheduledAt ? b.scheduledAt.getTime() : 0));
+
+          if (!items.length) {
+            container.innerHTML = `
+              <div class="thead-row"><span class="thead-title">Scheduled Scans</span></div>
+              <div style="padding:var(--space-xl);color:var(--muted);font-size:var(--font-size-sm);">
+                No scheduled scans found for this block. This is an informational view — scans are scheduled from the client account.
+              </div>`;
+            return;
+          }
+
+          const rows = items
+            .map(function (item) {
+              const isFuture = item.scheduledAt && item.scheduledAt.getTime() >= now.getTime();
+              let stateBadge;
+              if (item.status === "cancelled") {
+                stateBadge = '<span class="badge crit"><span class="bdot"></span>Cancelled</span>';
+              } else if (isFuture) {
+                stateBadge = '<span class="badge good"><span class="bdot"></span>Upcoming</span>';
+              } else {
+                stateBadge = '<span class="badge" style="background-color:var(--surf2);color:var(--color-text-secondary);border-color:var(--border);"><span class="bdot" style="background-color:var(--color-text-tertiary);"></span>Past</span>';
+              }
+              return `
+                <tr>
+                    <td style="font-family:var(--font-mono);white-space:nowrap;">${formatScheduledDateTime(item.scheduledAt)}</td>
+                    <td>${escapeHtml(item.operator || "—")}</td>
+                    <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(item.notes || "—")}</td>
+                    <td>${stateBadge}</td>
+                </tr>`;
+            })
+            .join("");
+
+          container.innerHTML = `
+            <div class="thead-row"><span class="thead-title">Scheduled Scans</span></div>
+            <div class="twrap">
+                <table>
+                    <thead><tr><th>Date &amp; Time</th><th>Operator</th><th>Notes</th><th>Status</th></tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>`;
+        } catch (error) {
+          console.error("❌ Error loading scheduled scans:", error);
+          container.innerHTML = `
+            <div class="thead-row"><span class="thead-title">Scheduled Scans</span></div>
+            <div style="padding:var(--space-xl);color:var(--muted);font-size:var(--font-size-sm);">
+              Failed to load scheduled scans.
+              <button type="button" class="btn btn-sm btn-secondary" style="margin-left:var(--space-md);" onclick="loadScheduledScans(currentBlock)">Retry</button>
+            </div>`;
+        }
+      }
+
+      // ── Bearing Rate Trend modal ─────────────────────────────────────
+
+      function openTrendModal() {
+        if (!currentBlock) return;
+        renderTrendModal(currentBlock);
+        utils.showModal("trend-modal");
+      }
+
+      function closeTrendModal() {
+        utils.hideModal("trend-modal");
+      }
+
+      function renderTrendModal(block) {
+        const labels = ["Mar 28", "Apr 04", "Apr 11", "Apr 18", "Apr 25", "May 02"];
+        const current = block.bearing || 0;
+        const offsets = [-6.5, -5.2, -3.8, -2.5, -1.1, 0];
+        const points = labels.map((date, i) => ({ date, pct: Math.max(0, Math.min(100, current + offsets[i])) }));
+
+        document.getElementById("trend-modal-content").innerHTML = points
+          .map(function (entry) {
+            const color = entry.pct >= 80 ? "var(--green)" : entry.pct >= 60 ? "var(--amber)" : "var(--red)";
+            return `
+                <div class="trend-row">
+                    <div class="trend-date">${entry.date}</div>
+                    <div class="trend-bar-wrap"><div class="bar-wrap"><div class="bar-fill" style="width:${entry.pct}%; background-color:${color};"></div></div></div>
+                    <div class="trend-val">${entry.pct.toFixed(1)}%</div>
+                </div>`;
+          })
+          .join("");
+      }
+
+      // ── Helpers ───────────────────────────────────────────────────
+
+      function getStatusClass(block) {
+        if (!block.totalScans || block.plants <= 0) return "none";
+        if (block.bearing >= 80) return "good";
+        if (block.bearing >= 60) return "warn";
+        return "crit";
+      }
+
+      function statusBadge(status) {
+        if (status === "none") {
+          return '<span class="badge" style="background-color:var(--surf2);color:var(--color-text-secondary);border-color:var(--border);"><span class="bdot" style="background-color:var(--color-text-tertiary);"></span>No Scan Data</span>';
+        }
+        const labels = { good: "Healthy", warn: "Watch", crit: "Critical" };
+        return `<span class="badge ${status}"><span class="bdot"></span>${labels[status]}</span>`;
+      }
+
+      function growthStageLabel(block) {
+        if (typeof block.daf === "number" && block.daf > 0) return block.daf + " DAF";
+        if (block.stage) return block.stage;
+        return "Stage unknown";
+      }
+
+      function buildMetricCard(label, value, sub, color) {
+        const colorClass = color ? "mc-" + color : "";
+        return `
+        <div class="col">
+            <div class="mcard ${colorClass}">
+                <div class="mc-label">${label}</div>
+                <div class="mc-val">${value}</div>
+                <div class="mc-sub">${sub}</div>
+            </div>
+        </div>`;
+      }
+
+      function formatNumber(num) { return (num || 0).toLocaleString("en-US"); }
+      function formatPercent(num) { return (num || 0).toFixed(1) + "%"; }
+      function formatArea(area) { return (area || 0) + " ha"; }
+
+      function formatDateValue(value) {
+        if (!value) return "—";
+        const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+        if (m) {
+          const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+          if (!isNaN(d.getTime())) {
+            return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "2-digit" });
+          }
+        }
+        return value;
+      }
+
+      function formatScheduledDateTime(date) {
+        if (!(date instanceof Date) || isNaN(date.getTime())) return "Unknown date";
+        const datePart = date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "2-digit" });
+        const timePart = date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+        return datePart + " · " + timePart;
+      }
+
+      function escapeHtml(str) {
+        return String(str == null ? "" : str).replace(/[&<>"']/g, function (c) {
+          return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+        });
+      }
+    </script>
+  </body>
+</html>
