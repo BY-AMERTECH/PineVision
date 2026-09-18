@@ -47,6 +47,7 @@ const DRONE_STATE = {
     videoBlobUrl:         null,     // object URL for the uploaded file
     videoEnded:           false,    // true when browser video element has finished playing
     backendCompleted:     false,    // true when manifest is loaded and analysis is done
+    countingStarting:     false,    // prevents duplicate live start requests
     stats: { total: 0, bearing: 0, nonBearing: 0, discolored: 0, progress: 0 },
 };
 
@@ -268,7 +269,12 @@ function renderUI() {
     const isLoading   = s === 'connecting' || s === 'reconnecting' || s === 'analyzing';
     const isInactive  = s === 'idle' || s === 'failed';
     const isSession   = s === 'active' || s === 'reconnecting' || s === 'analyzing';
-    const isAnalyzing = s === 'analyzing';
+    const isAnalyzing = DRONE_STATE.videoMode && s === 'analyzing';
+    const canStartLiveCounting =
+        !DRONE_STATE.videoMode &&
+        s === 'active' &&
+        !DRONE_STATE.scanId &&
+        !DRONE_STATE.countingStarting;
 
     document.querySelector('.dv-placeholder-title').textContent =
         s === 'failed' ? 'Connection Failed' : 'Awaiting Connection';
@@ -286,6 +292,7 @@ function renderUI() {
 
     toggleEl('btn-connect',        isInactive);
     toggleEl('btn-upload-video',   isInactive);
+    toggleEl('btn-start-counting', canStartLiveCounting);
     toggleEl('btn-end-scan',       isSession);
     toggleEl('btn-end-scan-stats', isSession);
 
@@ -525,11 +532,9 @@ function loadHlsStream(hlsUrl, isReconnect) {
 }
 
 async function onHlsReady(isReconnect) {
-    // Reuse the MP4 overlay canvas/RAF loop, but select live detections rather
-    // than performing the manifest's video.currentTime lookup.
-    BboxOverlay.start('live');
-
     if (isReconnect) {
+        // Counting may already be active when the HLS player reconnects.
+        if (DRONE_STATE.scanId) BboxOverlay.start('live');
         DRONE_STATE.reconnectAttempts = 0;
         transitionTo('active');
         utils.showToast('Stream reconnected', 'success');
@@ -541,10 +546,9 @@ async function onHlsReady(isReconnect) {
     closeBsModal('modal-connect');
 
     DRONE_STATE.scanStartTime = new Date();
+    DRONE_STATE.countingStarting = false;
     startScanTimer();
     startStatusPolling();
-
-    await startDetection();
 
     transitionTo('active');
     document.getElementById('dv-stream-quality').textContent = 'HLS';
@@ -577,10 +581,8 @@ function handleConnectFailed(message) {
 async function startDetection() {
     if (!DRONE_STATE.streamUrl || !DRONE_STATE.blockId || !DRONE_STATE.userId) {
         utils.showToast('Cannot start detection: missing block or user context.', 'error');
-        return;
+        return false;
     }
-
-    setConnectingLabel('Initializing live YOLOv8 detection...');
 
     try {
         const result = await apiStartDetection(
@@ -594,13 +596,36 @@ async function startDetection() {
             console.log('✅ Detection started:', result.scan_id);
             DRONE_STATE.scanId = result.scan_id;
             startFirebaseListener();
+            BboxOverlay.start('live');
+            return true;
         } else {
             console.error('❌ Failed to start detection:', result.message);
             utils.showToast('Failed to start detection: ' + result.message, 'error');
+            return false;
         }
     } catch (error) {
         console.error('❌ Detection start error:', error);
         utils.showToast('Failed to start detection', 'error');
+        return false;
+    }
+}
+
+async function handleStartCounting() {
+    if (
+        DRONE_STATE.videoMode ||
+        DRONE_STATE.status !== 'active' ||
+        DRONE_STATE.scanId ||
+        DRONE_STATE.countingStarting
+    ) return;
+
+    DRONE_STATE.countingStarting = true;
+    renderUI();
+
+    try {
+        await startDetection();
+    } finally {
+        DRONE_STATE.countingStarting = false;
+        renderUI();
     }
 }
 
@@ -769,6 +794,9 @@ function handleVideoFailed(message) {
 // Updates the analysis progress bar and connecting overlay label.
 // NEVER adjusts videoEl.playbackRate.
 function updateAnalysisProgress(pct, processedFrames, totalFrames) {
+    // This is exclusively the uploaded-MP4 two-phase analysis UI.
+    if (!DRONE_STATE.videoMode || DRONE_STATE.status !== 'analyzing') return;
+
     // Update the overlay label
     const label = document.querySelector('.dv-connecting-label');
     if (label) {
@@ -1135,6 +1163,7 @@ async function handleEndScan() {
     DRONE_STATE.streamPath        = null;
     DRONE_STATE.reconnectAttempts = 0;
     DRONE_STATE.scanId            = null;
+    DRONE_STATE.countingStarting  = false;
     DRONE_STATE.videoEnded        = false;
     DRONE_STATE.backendCompleted  = false;
 
@@ -1324,6 +1353,8 @@ function setupModalEvents() {
     });
     document.getElementById('btn-connect-submit')
         .addEventListener('click', handleConnect);
+    document.getElementById('btn-start-counting')
+        .addEventListener('click', handleStartCounting);
     document.getElementById('input-rtmp-url')
         .addEventListener('keydown', e => { if (e.key === 'Enter') handleConnect(); });
     document.getElementById('input-rtmp-url')
