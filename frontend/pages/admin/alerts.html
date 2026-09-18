@@ -906,10 +906,16 @@
       }
 
       /* ── Load Alerts from Firestore (real-time) ─────────────────────────── */
+      var alertsUnsub = null;
+
       function loadAlerts() {
         showLoadingState();
 
-        db.collection("alerts")
+        if (typeof alertsUnsub === "function") {
+          try { alertsUnsub(); } catch (e) { /* no-op — already detached */ }
+        }
+
+        alertsUnsub = db.collection("alerts")
           .orderBy("timestamp", "desc")
           .limit(200)
           .onSnapshot(
@@ -940,6 +946,13 @@
           );
       }
 
+      function detachAlertsListener() {
+        if (typeof alertsUnsub === "function") {
+          try { alertsUnsub(); } catch (e) { /* no-op — already detached */ }
+        }
+        alertsUnsub = null;
+      }
+
       function showLoadingState() {
         document.getElementById("alerts-content").innerHTML =
           '<div class="card"><div class="empty-state">' +
@@ -951,6 +964,8 @@
       /* ── Init ────────────────────────────────────────────────────────────── */
       window.initPage = function () {
         loadAlerts(); // replaces the old renderMetrics() / applyFilters() calls
+        window.addEventListener("pagehide", detachAlertsListener);
+        window.addEventListener("beforeunload", detachAlertsListener);
       };
 
       /* ── Nav Badge ───────────────────────────────────────────────────────── */
@@ -1423,28 +1438,72 @@
           });
       }
 
-      function suspendUser(username) {
-        if (typeof utils !== "undefined")
-          utils.showToast(
-            'User "' + username + '" has been suspended.',
-            "success",
-          );
-        var oc = bootstrap.Offcanvas.getInstance(
-          document.getElementById("detail-offcanvas"),
-        );
-        if (oc) oc.hide();
+      async function logUserAction(action, details) {
+        try {
+          var currentUser = firebase.auth().currentUser;
+          if (!currentUser) return;
+          var currentUserDoc = await db.collection("users").doc(currentUser.uid).get();
+          var currentUserData = currentUserDoc.exists ? currentUserDoc.data() : {};
+          await db.collection("activity_logs").add({
+            userId: currentUser.uid,
+            user: currentUserData.username || currentUser.email,
+            action: action,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            status: "success",
+            email: currentUserData.email,
+            role: currentUserData.role,
+            details: details,
+          });
+        } catch (logError) {
+          console.error("Failed to log action:", logError);
+        }
       }
 
-      function resetPassword(username) {
-        if (typeof utils !== "undefined")
-          utils.showToast(
-            'Password reset initiated for "' + username + '".',
-            "success",
+      async function suspendUser(username) {
+        try {
+          var snap = await db.collection("users").where("username", "==", username).limit(1).get();
+          if (snap.empty) {
+            utils.showToast('User "' + username + '" not found.', "error");
+            return;
+          }
+          await snap.docs[0].ref.update({ status: "disabled" });
+          await logUserAction("toggle_status", "Suspended user: " + username);
+
+          utils.showToast('User "' + username + '" has been suspended.', "success");
+          var oc = bootstrap.Offcanvas.getInstance(
+            document.getElementById("detail-offcanvas"),
           );
-        var oc = bootstrap.Offcanvas.getInstance(
-          document.getElementById("detail-offcanvas"),
-        );
-        if (oc) oc.hide();
+          if (oc) oc.hide();
+        } catch (err) {
+          console.error("Failed to suspend user:", err);
+          utils.showToast("Failed to suspend user. Please try again.", "error");
+        }
+      }
+
+      async function resetPassword(username) {
+        try {
+          var snap = await db.collection("users").where("username", "==", username).limit(1).get();
+          if (snap.empty) {
+            utils.showToast('User "' + username + '" not found.', "error");
+            return;
+          }
+          var userEmail = snap.docs[0].data().email;
+          if (!userEmail) {
+            utils.showToast("No email on file for this user.", "error");
+            return;
+          }
+          await firebase.auth().sendPasswordResetEmail(userEmail);
+          await logUserAction("reset_password", "Sent password reset email to: " + username);
+
+          utils.showToast('Password reset email sent to "' + username + '".', "success");
+          var oc = bootstrap.Offcanvas.getInstance(
+            document.getElementById("detail-offcanvas"),
+          );
+          if (oc) oc.hide();
+        } catch (err) {
+          console.error("Failed to send password reset:", err);
+          utils.showToast("Failed to send password reset email.", "error");
+        }
       }
 
       function refreshAlerts() {

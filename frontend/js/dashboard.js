@@ -53,7 +53,7 @@
                 const data = doc.data();
                 blocksData.push({
                     id: doc.id,
-                    name: data.name || `Block ${doc.id.substring(0, 6)}`,
+                    name: data.blockName || data.blockId || `Block ${doc.id.substring(0, 6)}`,
                     section: data.section || 'N/A',
                     area: data.area || 0,
                     daf: data.daysAfterFlowering || data.daf || 0,
@@ -262,9 +262,7 @@
             const statusClass = getStatusClass(block.bearing);
             const barColor = getBarColor(block.bearing);
 
-            // Generate "Block 1", "Block 2", etc.
-            const blockNumber = index + 1;
-            const blockName = `Block ${blockNumber}`;
+            const blockName = block.name || `Block ${index + 1}`;
 
             rowsHTML += `
             <tr>
@@ -421,8 +419,7 @@
         new Chart(blockCtx, {
             type: 'bar',
             data: {
-                // CHANGED: Generate "Block 1", "Block 2", etc.
-                labels: blocksData.map((b, index) => `Block ${index + 1}`),
+                labels: blocksData.map((b, index) => b.name || `Block ${index + 1}`),
                 datasets: [{
                     label: 'Bearing %',
                     data: blocksData.map(b => b.bearing),

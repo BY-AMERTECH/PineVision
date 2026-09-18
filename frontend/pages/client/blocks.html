@@ -659,7 +659,6 @@
 
     <!-- Application JavaScript -->
     <script src="../../js/auth.js"></script>
-    <script src="../../js/data.js"></script>
     <script src="../../js/utils.js"></script>
     <script src="../../js/app.js"></script>
 
@@ -697,18 +696,7 @@
 
           ALL_BLOCKS = [];
 
-          // Read frontend-only state from localStorage
-          const blockStatuses = (function () {
-            try { return JSON.parse(localStorage.getItem("pinevision_block_statuses") || "{}"); }
-            catch (e) { return {}; }
-          })();
-          const deletedBlocks = (function () {
-            try { return JSON.parse(localStorage.getItem("pinevision_deleted_blocks") || "[]"); }
-            catch (e) { return []; }
-          })();
-
           blocksSnapshot.forEach(function (doc) {
-            if (deletedBlocks.indexOf(doc.id) !== -1) return;
             const blockData = doc.data();
             ALL_BLOCKS.push({
               id: doc.id,
@@ -724,8 +712,10 @@
               plants: blockData.totalPineapples || 0,
               nonViable: blockData.nonViable || 0,
 
-              // Harvest status from localStorage (frontend only)
-              harvestStatus: blockStatuses[doc.id] || "Still Growing",
+              // Harvest status now lives on the block document itself
+              // (harvestStatus field), synced by blocks-view.html's edit
+              // form, instead of a localStorage-only value.
+              harvestStatus: blockData.harvestStatus || "Still Growing",
 
               // Metadata
               lastScanned: blockData.lastScanned,

@@ -1695,40 +1695,59 @@
       }
 
       /* ── Sessions ──────────────────────────────────────────────── */
+      // Derived from real login/logout events already present in the
+      // loaded activity_logs window (allLogs), rather than a fabricated
+      // single-row session with an invented IP. For each user, the most
+      // recent auth event is checked: a "login" with no later "logout"
+      // in the window is treated as still signed in. The signed-in admin
+      // themselves is marked "Live"; everyone else is shown honestly as
+      // "last seen" — this page has no real-time presence/heartbeat, so
+      // it never claims another account is live right now.
       function renderSessions() {
-        // Get current logged-in user
         var currentUser = auth.getCurrentUser();
 
-        if (!currentUser) {
-          ACTIVE_SESSIONS = [];
-          document.getElementById("session-count").textContent = "0 active";
-          document.getElementById("sessions-list").innerHTML =
-            '<p style="font-size:var(--font-size-xs);color:var(--color-text-tertiary);margin:0;">No active sessions.</p>';
-          return;
-        }
+        var authEvents = allLogs.filter(function (l) {
+          return l.action === "login" || l.action === "logout";
+        });
 
-        // Show only current session
-        ACTIVE_SESSIONS = [
-          {
-            id: "current_session",
-            user: currentUser.username,
-            role: currentUser.role,
-            ip: "192.168.1.100",
-            device: navigator.userAgent.includes("Chrome")
-              ? "Chrome / " +
-                (navigator.userAgent.includes("Windows")
-                  ? "Windows"
-                  : navigator.userAgent.includes("Mac")
-                    ? "macOS"
-                    : "Linux")
-              : "Browser",
-            login_at: currentUser.loginTime || new Date().toISOString(),
-            last_active: new Date().toISOString(),
-          },
-        ];
+        var latestByUser = {};
+        authEvents.forEach(function (l) {
+          var existing = latestByUser[l.user];
+          if (!existing || new Date(l.timestamp) > new Date(existing.timestamp)) {
+            latestByUser[l.user] = l;
+          }
+        });
+
+        ACTIVE_SESSIONS = Object.keys(latestByUser)
+          .map(function (u) {
+            return latestByUser[u];
+          })
+          .filter(function (l) {
+            return l.action === "login" && l.status !== "error";
+          })
+          .map(function (l) {
+            return {
+              id: l.user + "_" + l.timestamp,
+              user: l.user,
+              role: l.role,
+              device: l.device && l.device !== "Unknown" ? l.device : "Unknown device",
+              login_at: l.timestamp,
+              last_active: l.timestamp,
+              isCurrent: !!(currentUser && (l.user === currentUser.username || l.user === currentUser.email)),
+            };
+          })
+          .sort(function (a, b) {
+            return new Date(b.last_active) - new Date(a.last_active);
+          });
 
         document.getElementById("session-count").textContent =
           ACTIVE_SESSIONS.length + " active";
+
+        if (!ACTIVE_SESSIONS.length) {
+          document.getElementById("sessions-list").innerHTML =
+            '<p style="font-size:var(--font-size-xs);color:var(--color-text-tertiary);margin:0;">No login activity in the recent audit log.</p>';
+          return;
+        }
 
         var html = "";
         ACTIVE_SESSIONS.forEach(function (s) {
@@ -1746,6 +1765,8 @@
             hour12: true,
           });
           var lastStr = lastTs.toLocaleString("en-US", {
+            month: "short",
+            day: "2-digit",
             hour: "2-digit",
             minute: "2-digit",
             hour12: true,
@@ -1771,21 +1792,16 @@
             "</div>" +
             '<div class="session-meta">Login: ' +
             loginStr +
-            " · Last: " +
-            lastStr +
             "</div>" +
             "</div>" +
             '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;">' +
-            '<div class="session-live"><div class="live-dot"></div>Live (You)</div>' +
+            (s.isCurrent
+              ? '<div class="session-live"><div class="live-dot"></div>Live (You)</div>'
+              : '<div style="font-size:10px;color:var(--color-text-tertiary);">Last seen ' + lastStr + "</div>") +
             "</div>" +
             "</div>";
         });
         document.getElementById("sessions-list").innerHTML = html;
-      }
-
-      function revokeSession(id, e) {
-        e.stopPropagation();
-        utils.showToast("Session " + id + " revoked", "success");
       }
 
       function viewSessionActivity(user, e) {

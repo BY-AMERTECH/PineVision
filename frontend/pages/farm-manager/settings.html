@@ -1666,65 +1666,10 @@
                       </p>
                     </div>
 
-                    <div class="session-row">
-                      <div>
-                        <div class="session-device">Chrome on Windows</div>
-                        <div class="session-meta">
-                          Last active: Just now · 192.168.1.10
-                        </div>
-                      </div>
-                      <span class="badge good"
-                        ><span class="bdot"></span>Current</span
-                      >
-                    </div>
-                    <div class="session-row">
-                      <div>
-                        <div class="session-device">Safari on iPhone</div>
-                        <div class="session-meta">
-                          Last active: 2 hours ago · 10.0.0.5
-                        </div>
-                      </div>
-                      <button
-                        class="btn btn-secondary btn-sm"
-                        onclick="utils.showToast('Session revoked', 'success')"
-                      >
-                        Revoke
-                      </button>
-                    </div>
-                    <div class="session-row">
-                      <div>
-                        <div class="session-device">Firefox on macOS</div>
-                        <div class="session-meta">
-                          Last active: 1 day ago · 172.16.0.3
-                        </div>
-                      </div>
-                      <button
-                        class="btn btn-secondary btn-sm"
-                        onclick="utils.showToast('Session revoked', 'success')"
-                      >
-                        Revoke
-                      </button>
-                    </div>
-
-                    <div
-                      style="
-                        margin-top: var(--space-lg);
-                        padding-top: var(--space-md);
-                        border-top: var(--border-width-thin) solid var(--border);
-                      "
-                    >
-                      <button
-                        class="btn btn-secondary btn-sm"
-                        onclick="
-                          utils.showToast(
-                            'All other sessions revoked',
-                            'success',
-                          )
-                        "
-                      >
-                        Revoke All Other Sessions
-                      </button>
-                    </div>
+                    <div id="session-list"></div>
+                    <p style="font-size:var(--font-size-xs);color:var(--color-text-tertiary);margin:var(--space-md) 0 0;">
+                      This panel shows the device you're currently using. PineVision doesn't yet track sign-ins across other devices or browsers.
+                    </p>
                   </div>
                 </div>
                 <!-- /pane-security -->
@@ -1751,10 +1696,71 @@
     <script src="../../js/app.js"></script>
 
     <script>
+      if (!auth.requireFarmManager()) {
+      }
+
       window.initPage = function () {
         loadCurrentSettings();
         loadAccountInfo();
+        renderSessionList();
       };
+
+      function renderSessionList() {
+        const listEl = document.getElementById("session-list");
+        if (!listEl) return;
+
+        const session = auth.getSession();
+        const ua = navigator.userAgent || "";
+
+        function detectBrowser(ua) {
+          if (/Edg\//.test(ua)) return "Edge";
+          if (/OPR\//.test(ua)) return "Opera";
+          if (/Chrome\//.test(ua) && !/Chromium/.test(ua)) return "Chrome";
+          if (/Firefox\//.test(ua)) return "Firefox";
+          if (/Safari\//.test(ua) && !/Chrome/.test(ua)) return "Safari";
+          return "Unknown browser";
+        }
+
+        function detectOS(ua) {
+          if (/Windows/.test(ua)) return "Windows";
+          if (/Mac OS X/.test(ua)) return "macOS";
+          if (/Android/.test(ua)) return "Android";
+          if (/iPhone|iPad|iPod/.test(ua)) return "iOS";
+          if (/Linux/.test(ua)) return "Linux";
+          return "Unknown device";
+        }
+
+        const deviceLabel = detectBrowser(ua) + " on " + detectOS(ua);
+        const who = session
+          ? session.fullName || session.username || "This account"
+          : "This account";
+
+        listEl.innerHTML = "";
+
+        const row = document.createElement("div");
+        row.className = "session-row";
+
+        const left = document.createElement("div");
+        const deviceDiv = document.createElement("div");
+        deviceDiv.className = "session-device";
+        deviceDiv.textContent = deviceLabel;
+        const metaDiv = document.createElement("div");
+        metaDiv.className = "session-meta";
+        metaDiv.textContent = who + " · Signed in this browser";
+        left.appendChild(deviceDiv);
+        left.appendChild(metaDiv);
+
+        const badge = document.createElement("span");
+        badge.className = "badge good";
+        const bdot = document.createElement("span");
+        bdot.className = "bdot";
+        badge.appendChild(bdot);
+        badge.appendChild(document.createTextNode("Current"));
+
+        row.appendChild(left);
+        row.appendChild(badge);
+        listEl.appendChild(row);
+      }
 
       function loadCurrentSettings() {
         const settings = utils.getSettings();
@@ -1762,6 +1768,13 @@
           settings.theme === "dark";
         const fontRadio = document.getElementById("font-" + settings.fontSize);
         if (fontRadio) fontRadio.checked = true;
+
+        document.getElementById("auto-refresh-toggle").checked =
+          settings.autoRefresh === true;
+        document.getElementById("notif-toggle").checked =
+          settings.alertNotifications !== false;
+        document.getElementById("compact-toggle").checked =
+          settings.compactView === true;
       }
 
       function loadAccountInfo() {
@@ -1811,6 +1824,7 @@
 
       function handleAutoRefreshToggle() {
         const on = document.getElementById("auto-refresh-toggle").checked;
+        utils.updateSetting("autoRefresh", on);
         utils.showToast(
           "Auto-refresh " + (on ? "enabled" : "disabled"),
           "success",
@@ -1819,6 +1833,7 @@
 
       function handleNotifToggle() {
         const on = document.getElementById("notif-toggle").checked;
+        utils.updateSetting("alertNotifications", on);
         utils.showToast(
           "Alert notifications " + (on ? "enabled" : "disabled"),
           "success",
@@ -1827,6 +1842,7 @@
 
       function handleCompactToggle() {
         const on = document.getElementById("compact-toggle").checked;
+        utils.updateSetting("compactView", on);
         utils.showToast(
           "Compact view " + (on ? "enabled" : "disabled"),
           "success",
@@ -1835,22 +1851,61 @@
 
       /* ── New handlers ── */
 
-      function handleChangePassword() {
+      async function handleChangePassword() {
         const current = document.getElementById("pw-current").value;
         const newPw = document.getElementById("pw-new").value;
-        const confirm = document.getElementById("pw-confirm").value;
-        if (!current || !newPw || !confirm) {
+        const confirmPw = document.getElementById("pw-confirm").value;
+        if (!current || !newPw || !confirmPw) {
           utils.showToast("Please fill in all password fields", "error");
           return;
         }
-        if (newPw !== confirm) {
+        if (newPw !== confirmPw) {
           utils.showToast("New passwords do not match", "error");
           return;
         }
-        document.getElementById("pw-current").value = "";
-        document.getElementById("pw-new").value = "";
-        document.getElementById("pw-confirm").value = "";
-        utils.showToast("Password updated successfully", "success");
+        if (newPw.length < 6) {
+          utils.showToast(
+            "New password must be at least 6 characters",
+            "error",
+          );
+          return;
+        }
+
+        const firebaseUser = firebase.auth().currentUser;
+        if (!firebaseUser || !firebaseUser.email) {
+          utils.showToast(
+            "Unable to verify your account. Please log out and back in.",
+            "error",
+          );
+          return;
+        }
+
+        try {
+          const credential = firebase.auth.EmailAuthProvider.credential(
+            firebaseUser.email,
+            current,
+          );
+          await firebaseUser.reauthenticateWithCredential(credential);
+          await firebaseUser.updatePassword(newPw);
+
+          document.getElementById("pw-current").value = "";
+          document.getElementById("pw-new").value = "";
+          document.getElementById("pw-confirm").value = "";
+          utils.showToast("Password updated successfully", "success");
+        } catch (err) {
+          console.error("Password change failed:", err);
+          var msg = "Failed to update password";
+          if (err && err.code === "auth/wrong-password") {
+            msg = "Current password is incorrect";
+          } else if (err && err.code === "auth/weak-password") {
+            msg = "New password is too weak";
+          } else if (err && err.code === "auth/requires-recent-login") {
+            msg = "Please log out and log back in, then try again";
+          } else if (err && err.message) {
+            msg = err.message;
+          }
+          utils.showToast(msg, "error");
+        }
       }
 
       function handleSaveAll() {
@@ -1867,6 +1922,9 @@
           document.getElementById("auto-refresh-toggle").checked = false;
           document.getElementById("notif-toggle").checked = true;
           document.getElementById("compact-toggle").checked = false;
+          utils.updateSetting("autoRefresh", false);
+          utils.updateSetting("alertNotifications", true);
+          utils.updateSetting("compactView", false);
           clearUnsaved();
           utils.showToast("Settings reset to default", "success");
         }

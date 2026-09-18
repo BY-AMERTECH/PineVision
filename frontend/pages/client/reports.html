@@ -403,14 +403,6 @@
                   >
                   <select id="filter-block" class="filter-select">
                     <option value="all">All Blocks</option>
-                    <option value="1">Block 1 — North A</option>
-                    <option value="2">Block 2 — North B</option>
-                    <option value="3">Block 3 — South A</option>
-                    <option value="4">Block 4 — South B</option>
-                    <option value="5">Block 5 — East A</option>
-                    <option value="6">Block 6 — East B</option>
-                    <option value="7">Block 7 — West A</option>
-                    <option value="8">Block 8 — West B</option>
                   </select>
                 </div>
               </div>
@@ -426,6 +418,7 @@
                     <option value="good">Healthy</option>
                     <option value="warn">Watch</option>
                     <option value="crit">Critical</option>
+                    <option value="none">No Scan Data</option>
                   </select>
                 </div>
               </div>
@@ -452,6 +445,11 @@
                 <span>Clear Filters</span>
               </button>
             </div>
+          </div>
+
+          <!-- Loading / error placeholder (before block/scan data has loaded) -->
+          <div id="rp-status-placeholder" style="color: var(--muted); font-size: var(--font-size-sm); padding: var(--space-lg) 0;">
+            Loading your farm data…
           </div>
 
           <!-- Report Results (shown after Generate is clicked) -->
@@ -544,6 +542,22 @@
     <script src="../../js/app.js"></script>
 
     <script>
+      // ══════════════════════════════════════════════════════════════
+      // Reports — live Firestore sync (this client's own farm only)
+      //
+      // Blocks are fetched from the real `blocks` collection, scoped to
+      // the signed-in user (.where('userId','==',currentUser.uid)),
+      // exactly like blocks.html. Scans are fetched the same way and
+      // joined client-side to count how many scan sessions fall inside
+      // the selected date range for the filtered blocks. Report
+      // generation itself stays client-side/instant against this cached
+      // data, matching the existing filter-panel UX.
+      // ══════════════════════════════════════════════════════════════
+
+      let BLOCKS_RAW = [];  // [{id, blockName, section, stage, daf, area, bearing, nonbearing, nonViable, plants}]
+      let SCANS_RAW = [];   // [{id, blockId, startTime}]
+      let dataReady = false;
+
       window.initPage = function () {
         const today = new Date();
         const monthAgo = new Date(today);
@@ -556,28 +570,111 @@
           .toISOString()
           .split("T")[0];
 
-          
+        loadReportData();
       };
 
+      function loadReportData() {
+        const currentUser = auth.getCurrentUser();
+        if (!currentUser) {
+          console.warn("⚠️ No user logged in");
+          window.location.href = "/index.html";
+          return;
+        }
+
+        const placeholder = document.getElementById("rp-status-placeholder");
+        placeholder.style.display = "block";
+        placeholder.textContent = "Loading your farm data…";
+
+        Promise.all([
+          firebase.firestore().collection("blocks").where("userId", "==", currentUser.uid).get(),
+          firebase.firestore().collection("scans").where("userId", "==", currentUser.uid).get(),
+        ])
+          .then(function (results) {
+            const blocksSnap = results[0];
+            const scansSnap = results[1];
+
+            BLOCKS_RAW = [];
+            blocksSnap.forEach(function (doc) {
+              const d = doc.data();
+              BLOCKS_RAW.push({
+                id: doc.id,
+                blockName: d.blockName || d.blockId || doc.id,
+                section: d.section || "—",
+                stage: d.stage || "—",
+                daf: typeof d.daf === "number" ? d.daf : parseInt(d.daf, 10) || 0,
+                area: typeof d.area === "number" ? d.area : parseFloat(d.area) || 0,
+                bearing: d.bearingPercent || 0,
+                nonbearing: d.nonBearingPercent || 0,
+                nonViable: d.nonViable || 0,
+                plants: d.declaredPopulation || d.totalPineapples || 0,
+                totalScans: d.totalScans || 0,
+              });
+            });
+
+            SCANS_RAW = [];
+            scansSnap.forEach(function (doc) {
+              const d = doc.data();
+              SCANS_RAW.push({
+                id: doc.id,
+                blockId: d.blockId || "",
+                startTime: d.startTime && typeof d.startTime.toDate === "function" ? d.startTime.toDate() : null,
+              });
+            });
+
+            dataReady = true;
+            placeholder.style.display = "none";
+            populateBlockFilter();
+
+            // If a report is already open (e.g. re-load after an edit
+            // elsewhere), keep it live by re-running the same filters.
+            const resultsEl = document.getElementById("report-results");
+            if (resultsEl.classList.contains("visible")) generateReport();
+          })
+          .catch(function (error) {
+            console.error("❌ Error loading report data:", error);
+            placeholder.style.display = "block";
+            placeholder.innerHTML =
+              'Couldn\'t load your farm data. ' +
+              '<button class="btn btn-sm btn-secondary" onclick="loadReportData()">Retry</button>';
+          });
+      }
+
+      function populateBlockFilter() {
+        const select = document.getElementById("filter-block");
+        const current = select.value;
+        select.innerHTML =
+          '<option value="all">All Blocks</option>' +
+          BLOCKS_RAW.slice()
+            .sort((a, b) => a.blockName.localeCompare(b.blockName))
+            .map((b) => `<option value="${escapeHtml(b.id)}">${escapeHtml(b.blockName)} — ${escapeHtml(b.section)}</option>`)
+            .join("");
+        select.value = current || "all";
+      }
+
       function generateReport() {
+        if (!dataReady) return;
+
         const blockFilter = document.getElementById("filter-block").value;
         const statusFilter = document.getElementById("filter-status").value;
         const dateFrom = document.getElementById("date-from").value;
         const dateTo = document.getElementById("date-to").value;
 
-        let blocks = data.getBlocks();
+        let blocks = BLOCKS_RAW;
 
         if (blockFilter !== "all")
-          blocks = blocks.filter((b) => String(b.id) === blockFilter);
+          blocks = blocks.filter((b) => b.id === blockFilter);
         if (statusFilter !== "all")
-          blocks = blocks.filter((b) => b.status === statusFilter);
+          blocks = blocks.filter((b) => blockStatusClass(b) === statusFilter);
 
         const parts = [];
         if (dateFrom) parts.push("From " + dateFrom);
         if (dateTo) parts.push("To " + dateTo);
-        if (blockFilter !== "all") parts.push("Block " + blockFilter);
+        if (blockFilter !== "all") {
+          const b = BLOCKS_RAW.find((x) => x.id === blockFilter);
+          parts.push("Block " + (b ? b.blockName : blockFilter));
+        }
         if (statusFilter !== "all")
-          parts.push(utils.getStatusText(statusFilter) + " only");
+          parts.push(statusLabel(statusFilter) + " only");
 
         document.getElementById("report-title-text").textContent =
           "Farm Performance Report";
@@ -604,16 +701,16 @@
           blocks.reduce((s, b) => s + b.bearing, 0) / blocks.length;
         const avgNonbearing =
           blocks.reduce((s, b) => s + b.nonbearing, 0) / blocks.length;
-        const avgDiscolored =
-          blocks.reduce((s, b) => s + b.discolored, 0) / blocks.length;
+        const avgNonViable =
+          blocks.reduce((s, b) => s + b.nonViable, 0) / blocks.length;
         const totalArea = blocks.reduce((s, b) => s + b.area, 0);
 
         document.getElementById("report-metrics").innerHTML = `
-                ${utils.buildMetricCard("Blocks in Report", blocks.length, blocks.length + " of " + data.getBlocks().length + " total", "")}
+                ${utils.buildMetricCard("Blocks in Report", blocks.length, blocks.length + " of " + BLOCKS_RAW.length + " total", "")}
                 ${utils.buildMetricCard("Total Plants", utils.formatNumber(totalPlants), "across selected blocks", "")}
                 ${utils.buildMetricCard("Avg Bearing Rate", utils.formatPercent(avgBearing), "of selected blocks", "green")}
                 ${utils.buildMetricCard("Avg Non-Bearing", utils.formatPercent(avgNonbearing), "of selected blocks", "amber")}
-                ${utils.buildMetricCard("Avg Non-Viable", utils.formatPercent(avgDiscolored), "fruit yellowing", "yellow")}
+                ${utils.buildMetricCard("Avg Non-Viable", utils.formatPercent(avgNonViable), "fruit yellowing", "yellow")}
                 ${utils.buildMetricCard("Total Area", totalArea.toFixed(1) + " ha", "selected area coverage", "")}
             `;
       }
@@ -630,20 +727,43 @@
 
         document.getElementById("report-tbody").innerHTML = blocks
           .map((block) => {
-            const statusClass = utils.getStatusClass(block.bearing);
+            const statusClass = blockStatusClass(block);
             return `
                     <tr>
-                        <td><strong>Block ${block.id}</strong></td>
-                        <td>${block.section}</td>
-                        <td style="font-size:var(--font-size-sm);color:var(--muted);">${block.stage}</td>
+                        <td><strong>${escapeHtml(block.blockName)}</strong></td>
+                        <td>${escapeHtml(block.section)}</td>
+                        <td style="font-size:var(--font-size-sm);color:var(--muted);">${escapeHtml(block.stage)}</td>
                         <td style="font-family:var(--font-mono);">${block.daf}d</td>
                         <td style="font-family:var(--font-mono);">${utils.formatArea(block.area)}</td>
                         <td>${utils.buildInlineBar(block.bearing, utils.barColor(block.bearing))}</td>
-                        <td>${utils.buildInlineBar(block.discolored, "var(--yellow-mid)")}</td>
-                        <td>${utils.statusBadge(statusClass)}</td>
+                        <td>${utils.buildInlineBar(block.nonViable, "var(--yellow-mid)")}</td>
+                        <td>${blockStatusBadge(statusClass)}</td>
                     </tr>`;
           })
           .join("");
+      }
+
+      function blockStatusClass(block) {
+        if (!block.totalScans || block.plants <= 0) return "none";
+        return utils.getStatusClass(block.bearing);
+      }
+
+      function blockStatusBadge(status) {
+        if (status === "none") {
+          return '<span class="badge" style="background-color:var(--surf2);color:var(--color-text-secondary);border-color:var(--border);"><span class="bdot" style="background-color:var(--color-text-tertiary);"></span>No Scan Data</span>';
+        }
+        return utils.statusBadge(status);
+      }
+
+      function statusLabel(status) {
+        if (status === "none") return "No Scan Data";
+        return utils.getStatusText(status);
+      }
+
+      function escapeHtml(str) {
+        return String(str == null ? "" : str).replace(/[&<>"']/g, function (c) {
+          return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+        });
       }
 
       function clearFilters() {
