@@ -32,11 +32,18 @@
         flex-wrap: wrap;
         gap: var(--space-lg);
         align-items: center;
+        justify-content: space-between;
         padding: var(--space-md) var(--space-lg);
         background-color: var(--surf);
         border: var(--border-width-base) solid var(--border);
         border-radius: var(--radius-lg);
         margin-bottom: var(--space-lg);
+      }
+
+      .filter-bar-actions {
+        display: flex;
+        align-items: center;
+        margin-left: auto;
       }
 
       .filter-group {
@@ -76,13 +83,6 @@
         background-color: var(--green-bg);
         border-color: var(--green);
         color: var(--green);
-      }
-
-      .filter-divider {
-        width: 1px;
-        height: 22px;
-        background-color: var(--border);
-        flex-shrink: 0;
       }
 
       /* ── Block Card Redesign ────────────────────────────── */
@@ -185,9 +185,6 @@
         }
         .filter-bar {
           gap: var(--space-md);
-        }
-        .filter-divider {
-          display: none;
         }
         .block-detail-header {
           gap: var(--space-md);
@@ -311,7 +308,7 @@
                       width="20"
                     />
                   </span>
-                  <span class="nav-link-text">Flight Missions</span>
+                  <span class="nav-link-text">Flight Schedules</span>
                 </a>
               </li>
               <li>
@@ -413,33 +410,9 @@
         </header>
 
         <div class="container-fluid py-4 px-4 page-container">
-          <!-- Page Header -->
-          <div class="mb-4">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-              <div>
-              </div>
-              <button class="btn btn-primary" onclick="openAddBlockModal()">
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.5"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <line x1="12" y1="5" x2="12" y2="19" />
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
-                <span>Add New Block</span>
-              </button>
-            </div>
-          </div>
-
           <!-- BLOCK LIST VIEW -->
           <div id="blocks-list-view">
-            <!-- Filter Bar -->
+            <!-- Filter Bar (filters left, Add New Block action far right) -->
             <div class="filter-bar">
               <div class="filter-group">
                 <span class="filter-label">Status:</span>
@@ -476,48 +449,22 @@
                   Critical
                 </button>
               </div>
-              <div class="filter-divider"></div>
-              <div class="filter-group">
-                <span class="filter-label">Section:</span>
-                <button
-                  class="filter-btn active"
-                  data-filter="section"
-                  data-value="all"
-                  onclick="setFilter('section', 'all', this)"
-                >
-                  All
-                </button>
-                <button
-                  class="filter-btn"
-                  data-filter="section"
-                  data-value="north"
-                  onclick="setFilter('section', 'north', this)"
-                >
-                  North
-                </button>
-                <button
-                  class="filter-btn"
-                  data-filter="section"
-                  data-value="south"
-                  onclick="setFilter('section', 'south', this)"
-                >
-                  South
-                </button>
-                <button
-                  class="filter-btn"
-                  data-filter="section"
-                  data-value="east"
-                  onclick="setFilter('section', 'east', this)"
-                >
-                  East
-                </button>
-                <button
-                  class="filter-btn"
-                  data-filter="section"
-                  data-value="west"
-                  onclick="setFilter('section', 'west', this)"
-                >
-                  West
+              <div class="filter-bar-actions">
+                <button class="btn btn-primary" onclick="openAddBlockModal()">
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                  <span>Add New Block</span>
                 </button>
               </div>
             </div>
@@ -671,7 +618,7 @@
       // Set to true to re-enable declared population in calculations.
       const INCLUDE_DECLARED_POPULATION = false;
 
-      const activeFilters = { status: "all", section: "all" };
+      const activeFilters = { status: "all" };
       let ALL_BLOCKS = [];
 
       window.initPage = async function () {
@@ -754,14 +701,6 @@
           blocks = blocks.filter(function (b) {
             const statusClass = getStatusClass(b.bearing);
             return statusClass === activeFilters.status;
-          });
-        }
-
-        // Apply section filter
-        if (activeFilters.section !== "all") {
-          const s = activeFilters.section.toLowerCase();
-          blocks = blocks.filter(function (b) {
-            return b.section.toLowerCase().startsWith(s);
           });
         }
 

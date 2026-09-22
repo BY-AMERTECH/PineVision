@@ -2,125 +2,187 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ─────────────────────────────────────────────────────────
-    // Helpers: check role from the users collection.
-    // ─────────────────────────────────────────────────────────
+    // ───────────────────────────────────────────────────────────
+    // Role helpers
+    // ───────────────────────────────────────────────────────────
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
     function isAdmin() {
-      return request.auth != null &&
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
     function isFarmManager() {
-      return request.auth != null &&
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'farm_manager';
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'farm_manager';
     }
 
-    // ─────────────────────────────────────────────────────────
-    // users collection
-    //
-    // Both get and list are allowed for any authenticated user.
-    // This is consistent: list already exposes every user's
-    // email and profile data to any authenticated caller (needed
-    // for the username→email lookup in auth.js).  Restricting
-    // get-by-UID to owner/admin would be an inconsistency since
-    // the same data is reachable via list.
-    // Write still requires admin (Super Admin only).
-    // Move lookup to a Cloud Function to tighten read access.
-    // ─────────────────────────────────────────────────────────
+    // ───────────────────────────────────────────────────────────
+    // Users
+    // ───────────────────────────────────────────────────────────
+
     match /users/{userId} {
-      allow get:   if request.auth != null;
-      allow list:  if request.auth != null;
-      allow write: if isAdmin();
+      // Any signed-in user may fetch their own profile by id.
+      // Admin / Farm Manager may fetch any profile by id — used by the
+      // user-management and user-detail views on both roles' Users pages.
+      allow get: if isSignedIn() &&
+        (request.auth.uid == userId || isAdmin() || isFarmManager());
+
+      // Admin / Farm Manager list users for the management screens
+      // (admin/users.html, farm-manager/users.html, both dashboards,
+      // farm-manager blocks pages building a userId -> name map).
+      // The login flow (auth.js) looks up a username -> email BEFORE the
+      // user is signed in, via a single-result query. That one anonymous
+      // case is preserved, but capped to the exact shape the app uses
+      // (limit(1)) so an unauthenticated caller can never dump the whole
+      // collection in one call.
+      allow list: if isAdmin() || isFarmManager() ||
+        (request.auth == null && request.query.limit <= 1);
+
+      // Only Super Admin creates user documents through the client SDK.
+      // Farm Manager's "create user" flow calls the backend's
+      // /api/fm/users endpoint (verified server-side, Admin SDK), which
+      // bypasses these rules entirely and enforces its own
+      // "cannot create admin" check — so no farm_manager clause is
+      // needed, or safe to add, here.
+      allow create: if isAdmin();
+
+      // Update:
+      //  - Super Admin can update any user document.
+      //  - Any signed-in user may update their OWN document, but may
+      //    never change their own `role` — this is what stops a client
+      //    or farm_manager from self-escalating. (Needed for the
+      //    lastLogin timestamp every login writes via auth.js.)
+      //  - Farm Manager may update another user's document directly
+      //    (used by the "Suspend User" action on the Alerts page, which
+      //    writes straight to Firestore rather than the backend API),
+      //    but only when the target is not a Super Admin and the write
+      //    does not attempt to grant the admin role.
+      allow update: if isAdmin() ||
+        (isSignedIn() && request.auth.uid == userId &&
+          request.resource.data.role == resource.data.role) ||
+        (isFarmManager() &&
+          resource.data.role != 'admin' &&
+          request.resource.data.role != 'admin');
+
+      // Only Super Admin deletes user accounts.
+      allow delete: if isAdmin();
     }
 
-    // ─────────────────────────────────────────────────────────
-    // Per-user farm data: blocks, scans, missions, monitoring_alerts
-    //
-    // Read/write only if the document's userId matches the caller,
-    // OR the caller is an admin (preserves full admin visibility).
-    //
-    // Farm Managers get read-only, org-wide visibility on blocks,
-    // scans and monitoring_alerts (their Dashboard/Blocks/Flights &
-    // Scans/Reports pages already query these collections without a
-    // userId filter — they're an oversight role across every client).
-    // blocks also grants Farm Managers `update` because the Blocks
-    // page's Edit-Block action is available to them; no `create`/
-    // `delete`, matching what the Farm Manager UI actually offers.
-    // ─────────────────────────────────────────────────────────
+    // Per-user alert threshold preferences read/written by
+    // frontend/js/alerts.js (loadThresholds / handleSaveThresholds).
+    // This collection was missing from both the currently deployed rules
+    // and the proposed rules, which silently breaks "Save Thresholds"
+    // today. Added here, scoped strictly to the owning user, so existing
+    // functionality actually works.
+    match /user_settings/{userId} {
+      allow read, write: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    // ───────────────────────────────────────────────────────────
+    // Farm data
+    // ───────────────────────────────────────────────────────────
+
     match /blocks/{docId} {
-      allow read: if request.auth != null &&
+      allow read: if isSignedIn() &&
         (resource.data.userId == request.auth.uid || isAdmin() || isFarmManager());
-      allow update: if request.auth != null &&
+
+      // Farm Manager edits blocks (farm-manager/blocks.html "Edit Block"),
+      // but never creates or deletes one.
+      allow update: if isSignedIn() &&
         (resource.data.userId == request.auth.uid || isAdmin() || isFarmManager());
-      allow delete: if request.auth != null &&
+
+      allow delete: if isSignedIn() &&
         (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if request.auth != null &&
+
+      allow create: if isSignedIn() &&
         request.resource.data.userId == request.auth.uid;
     }
 
     match /scans/{docId} {
-      allow read: if request.auth != null &&
+      allow read: if isSignedIn() &&
         (resource.data.userId == request.auth.uid || isAdmin() || isFarmManager());
-      allow update, delete: if request.auth != null &&
+
+      allow update, delete: if isSignedIn() &&
         (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if request.auth != null &&
+
+      allow create: if isSignedIn() &&
         request.resource.data.userId == request.auth.uid;
     }
 
     match /missions/{docId} {
-      allow read, update, delete: if request.auth != null &&
+      // Not referenced anywhere in the current frontend (superseded by
+      // scheduled_scans) — kept locked down, unchanged from the proposal.
+      allow read, update, delete: if isSignedIn() &&
         (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if request.auth != null &&
+
+      allow create: if isSignedIn() &&
         request.resource.data.userId == request.auth.uid;
     }
 
     match /monitoring_alerts/{docId} {
-      allow read: if request.auth != null &&
+      allow read: if isSignedIn() &&
         (resource.data.userId == request.auth.uid || isAdmin() || isFarmManager());
-      allow update, delete: if request.auth != null &&
+
+      // Farm Manager resolves crop-health alerts belonging to any client
+      // from the shared Alerts page (markResolved() in
+      // admin/alerts.html & farm-manager/alerts.html), so isFarmManager()
+      // must be able to update, not just read.
+      allow update: if isSignedIn() &&
+        (resource.data.userId == request.auth.uid || isAdmin() || isFarmManager());
+
+      allow delete: if isSignedIn() &&
         (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if request.auth != null &&
+
+      allow create: if isSignedIn() &&
         request.resource.data.userId == request.auth.uid;
     }
 
-    // ─────────────────────────────────────────────────────────
-    // scheduled_scans — manual "Schedule Scan" bookings made from a
-    // fruit block's detail page. Owner-scoped like blocks/scans/missions
-    // above. No delete: cancellation is a status update (status ->
-    // 'cancelled') so history is preserved rather than removed.
-    //
-    // Farm Managers get read-only visibility (their block-detail page
-    // shows scheduled scans as an "informational view" — scheduling
-    // itself is a client-only action, by design).
-    // ─────────────────────────────────────────────────────────
     match /scheduled_scans/{docId} {
-      allow read: if request.auth != null &&
+      allow read: if isSignedIn() &&
         (resource.data.userId == request.auth.uid || isAdmin() || isFarmManager());
-      allow update: if request.auth != null &&
+
+      // Farm Manager only ever reads schedules (blocks.html /
+      // blocks-view.html show them read-only); it never edits or cancels
+      // one, so no isFarmManager() clause here.
+      allow update: if isSignedIn() &&
         (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if request.auth != null &&
+
+      allow create: if isSignedIn() &&
         request.resource.data.userId == request.auth.uid;
+
+      // No delete rule: the app only ever cancels a schedule (status
+      // update), never deletes one, so historical records stay protected
+      // by default-deny.
     }
 
-    // ─────────────────────────────────────────────────────────
-    // activity_logs and alerts
-    //
-    // Written by the client SDK including during unauthenticated
-    // failed-login attempts (auth.js catch block).  Open create
-    // is intentional here.  Admin reads all; users cannot list
-    // all logs (prevents enumeration of other users' activity).
-    // ─────────────────────────────────────────────────────────
+    // ───────────────────────────────────────────────────────────
+    // Logs & security alerts
+    // ───────────────────────────────────────────────────────────
+
     match /activity_logs/{docId} {
+      // Login / logout / failed-login logging happens before and
+      // immediately after authentication, so creation must stay open to
+      // unauthenticated callers.
       allow create: if true;
-      allow read:   if isAdmin() || isFarmManager();
+      allow read: if isAdmin() || isFarmManager();
       allow update, delete: if isAdmin();
     }
 
     match /alerts/{docId} {
+      // Failed-login security alerts are written before authentication.
       allow create: if true;
-      allow read:   if isAdmin() || isFarmManager();
-      allow update, delete: if isAdmin();
-    }
+      allow read: if isAdmin() || isFarmManager();
 
+      // Farm Manager resolves login-security alerts from the same Alerts
+      // page action as monitoring_alerts (markResolved() routes to
+      // whichever collection the alert actually came from), so
+      // isFarmManager() must be included here too.
+      allow update: if isAdmin() || isFarmManager();
+      allow delete: if isAdmin();
+    }
   }
 }
