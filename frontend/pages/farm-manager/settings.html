@@ -1775,6 +1775,55 @@
           settings.alertNotifications !== false;
         document.getElementById("compact-toggle").checked =
           settings.compactView === true;
+
+        restoreNotificationPreferences();
+      }
+
+      /* ── Notifications & Preferences tab ──────────────────────────
+       * These fields previously only called markUnsaved() on change —
+       * "Save Changes" (handleSaveAll(), below) showed a success toast
+       * without ever reading or persisting them, so every value reset
+       * to its HTML-authored default on reload. Persisted the same way
+       * theme/fontSize/autoRefresh already are, via utils.updateSetting
+       * (device-local, matches the existing settings store — these are
+       * personal notification preferences, not shared farm data). */
+      const NOTIF_PREF_FIELDS = [
+        { id: "account-email", type: "value" },
+        { id: "digest-toggle", type: "checked" },
+        { id: "date-range-default", type: "value" },
+        { id: "sound-toggle", type: "checked" },
+        { id: "email-alerts-toggle", type: "checked" },
+        { id: "push-toggle", type: "checked" },
+        { id: "inapp-toggle", type: "checked" },
+        { id: "sev-crit", type: "checked" },
+        { id: "sev-warn", type: "checked" },
+        { id: "sev-info", type: "checked" },
+        { id: "digest-freq", type: "value" },
+        { id: "quiet-hours", type: "checked" },
+        { id: "session-timeout", type: "value" },
+      ];
+
+      function restoreNotificationPreferences() {
+        const settings = utils.getSettings();
+        NOTIF_PREF_FIELDS.forEach(function (f) {
+          const el = document.getElementById(f.id);
+          if (!el) return;
+          const saved = settings[f.id];
+          if (saved === undefined) return; // keep the HTML-authored default
+          if (f.type === "checked") el.checked = !!saved;
+          else el.value = saved;
+        });
+      }
+
+      function saveNotificationPreferences() {
+        NOTIF_PREF_FIELDS.forEach(function (f) {
+          const el = document.getElementById(f.id);
+          if (!el) return;
+          utils.updateSetting(
+            f.id,
+            f.type === "checked" ? el.checked : el.value,
+          );
+        });
       }
 
       function loadAccountInfo() {
@@ -1909,6 +1958,7 @@
       }
 
       function handleSaveAll() {
+        saveNotificationPreferences();
         clearUnsaved();
         utils.showToast("Settings saved successfully", "success");
       }
@@ -1925,6 +1975,18 @@
           utils.updateSetting("autoRefresh", false);
           utils.updateSetting("alertNotifications", true);
           utils.updateSetting("compactView", false);
+
+          // Reset the Notifications & Preferences fields back to their
+          // HTML-authored defaults and clear their persisted overrides.
+          NOTIF_PREF_FIELDS.forEach(function (f) {
+            const el = document.getElementById(f.id);
+            if (!el) return;
+            if (f.type === "checked") el.checked = el.hasAttribute("checked");
+            else if (el.tagName === "SELECT") el.selectedIndex = 0;
+            else el.value = "";
+            utils.updateSetting(f.id, f.type === "checked" ? el.checked : el.value);
+          });
+
           clearUnsaved();
           utils.showToast("Settings reset to default", "success");
         }

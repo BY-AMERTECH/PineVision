@@ -863,6 +863,7 @@
         // Firestore stores these exact strings from auth.js:
         "Failed Login": "Failed Login",
         "Multiple Failed Login Attempts": "Failed Login",
+        crop_health: "Crop Health Alert",
       };
 
       /* ── Filter State ────────────────────────────────────────────────────── */
@@ -893,6 +894,7 @@
 
         return {
           id: doc.id,
+          source: "security",
           severity: sev,
           type: type,
           title: d.title || d.type || "Alert",
@@ -905,8 +907,84 @@
         };
       }
 
+      /* ── Map a monitoring_alerts doc (crop-health threshold alerts,
+       * written by the backend's check_thresholds_and_create_alerts())
+       * into the same row shape as mapAlert() above, so the existing
+       * table/detail/filter code renders both kinds of alert without
+       * changes. This collection was previously never read here — the
+       * page only ever showed failed-login events under "Alerts". ── */
+      var BLOCKS_BY_ID = {}; // blockId -> blockName, for crop-alert labels
+
+      function mapMonitoringAlert(doc) {
+        var d = doc.data();
+        var ts = d.detectedDate
+          ? d.detectedDate.toDate
+            ? d.detectedDate.toDate().toISOString()
+            : new Date(d.detectedDate).toISOString()
+          : new Date().toISOString();
+
+        var sev = (d.severity || "warn").toLowerCase();
+        if (sev === "critical") sev = "crit";
+        if (sev === "warning") sev = "warn";
+
+        var blockLabel = BLOCKS_BY_ID[d.blockId] || d.blockId || "Unknown block";
+
+        return {
+          id: doc.id,
+          source: "monitoring",
+          severity: sev,
+          type: "crop_health",
+          title: d.title || "Crop Health Alert",
+          // No account-level actions (Suspend/Reset Password) make sense for
+          // a crop alert, so leave user as "unknown" — the existing template
+          // already hides those buttons for a.user === "unknown".
+          user: "unknown",
+          ip: "—",
+          device: blockLabel,
+          timestamp: ts,
+          status: d.resolved ? "resolved" : "active",
+          details: d.description || "",
+        };
+      }
+
+      function loadBlocksForAlerts() {
+        return db.collection("blocks").limit(500).get()
+          .then(function (snap) {
+            var map = {};
+            snap.forEach(function (doc) {
+              map[doc.id] = (doc.data() || {}).blockName || doc.id;
+            });
+            BLOCKS_BY_ID = map;
+          })
+          .catch(function (err) {
+            console.error("Failed to load blocks for alert labels:", err);
+          });
+      }
+
       /* ── Load Alerts from Firestore (real-time) ─────────────────────────── */
       var alertsUnsub = null;
+      var monitoringAlertsUnsub = null;
+      var SECURITY_ALERTS = [];
+      var MONITORING_ALERTS = [];
+
+      function mergeAndRenderAlerts() {
+        ACCOUNT_ALERTS = SECURITY_ALERTS.concat(MONITORING_ALERTS).sort(
+          function (a, b) {
+            return new Date(b.timestamp) - new Date(a.timestamp);
+          },
+        );
+        renderMetrics();
+        renderSecondaryStats();
+        applyFilters();
+        updateNavBadge();
+        document.getElementById("last-updated").textContent =
+          "Updated " +
+          new Date().toLocaleTimeString("en-US", {
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+          });
+      }
 
       function loadAlerts() {
         showLoadingState();
@@ -914,36 +992,46 @@
         if (typeof alertsUnsub === "function") {
           try { alertsUnsub(); } catch (e) { /* no-op — already detached */ }
         }
+        if (typeof monitoringAlertsUnsub === "function") {
+          try { monitoringAlertsUnsub(); } catch (e) { /* no-op — already detached */ }
+        }
 
-        alertsUnsub = db.collection("alerts")
-          .orderBy("timestamp", "desc")
-          .limit(200)
-          .onSnapshot(
-            function (snapshot) {
-              ACCOUNT_ALERTS = snapshot.docs.map(mapAlert);
-              renderMetrics();
-              renderSecondaryStats();
-              applyFilters();
-              updateNavBadge();
-              document.getElementById("last-updated").textContent =
-                "Updated " +
-                new Date().toLocaleTimeString("en-US", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  hour12: true,
-                });
-            },
-            function (error) {
-              console.error("Firestore error:", error);
-              document.getElementById("alerts-content").innerHTML =
-                '<div class="card"><div class="empty-state">' +
-                '<div class="empty-state-title">Failed to load alerts</div>' +
-                '<div class="empty-state-text">' +
-                error.message +
-                "</div>" +
-                "</div></div>";
-            },
-          );
+        loadBlocksForAlerts().then(function () {
+          alertsUnsub = db.collection("alerts")
+            .orderBy("timestamp", "desc")
+            .limit(200)
+            .onSnapshot(
+              function (snapshot) {
+                SECURITY_ALERTS = snapshot.docs.map(mapAlert);
+                mergeAndRenderAlerts();
+              },
+              function (error) {
+                console.error("Firestore error:", error);
+                document.getElementById("alerts-content").innerHTML =
+                  '<div class="card"><div class="empty-state">' +
+                  '<div class="empty-state-title">Failed to load alerts</div>' +
+                  '<div class="empty-state-text">' +
+                  error.message +
+                  "</div>" +
+                  "</div></div>";
+              },
+            );
+
+          monitoringAlertsUnsub = db.collection("monitoring_alerts")
+            .orderBy("detectedDate", "desc")
+            .limit(200)
+            .onSnapshot(
+              function (snapshot) {
+                MONITORING_ALERTS = snapshot.docs.map(mapMonitoringAlert);
+                mergeAndRenderAlerts();
+              },
+              function (error) {
+                // Don't blank the whole page if only this listener fails —
+                // security alerts (above) still render.
+                console.error("Failed to load monitoring_alerts:", error);
+              },
+            );
+        });
       }
 
       function detachAlertsListener() {
@@ -951,6 +1039,10 @@
           try { alertsUnsub(); } catch (e) { /* no-op — already detached */ }
         }
         alertsUnsub = null;
+        if (typeof monitoringAlertsUnsub === "function") {
+          try { monitoringAlertsUnsub(); } catch (e) { /* no-op — already detached */ }
+        }
+        monitoringAlertsUnsub = null;
       }
 
       function showLoadingState() {
@@ -1393,16 +1485,20 @@
           '<div class="det-row"><span class="det-label">Detected</span><span class="det-value det-mono">' +
           ts +
           "</span></div>" +
-          '<div class="det-section">Access Information</div>' +
-          '<div class="det-row"><span class="det-label">User Account</span><span class="det-value">' +
-          a.user +
-          "</span></div>" +
-          '<div class="det-row"><span class="det-label">IP Address</span><span class="det-value det-mono">' +
-          a.ip +
-          "</span></div>" +
-          '<div class="det-row"><span class="det-label">Device</span><span class="det-value">' +
-          a.device +
-          "</span></div>" +
+          '<div class="det-section">' + (a.source === "monitoring" ? "Source" : "Access Information") + "</div>" +
+          (a.source === "monitoring"
+            ? '<div class="det-row"><span class="det-label">Block</span><span class="det-value">' +
+              a.device +
+              "</span></div>"
+            : '<div class="det-row"><span class="det-label">User Account</span><span class="det-value">' +
+              a.user +
+              "</span></div>" +
+              '<div class="det-row"><span class="det-label">IP Address</span><span class="det-value det-mono">' +
+              a.ip +
+              "</span></div>" +
+              '<div class="det-row"><span class="det-label">Device</span><span class="det-value">' +
+              a.device +
+              "</span></div>") +
           '<div class="det-section">Description</div>' +
           '<p style="font-size:var(--font-size-sm);color:var(--color-text-primary);line-height:1.6;margin:0;">' +
           a.details +
@@ -1419,8 +1515,13 @@
 
       /* ── Action Handlers ─────────────────────────────────────────────────── */
       function markResolved(id) {
-        // Update Firestore — the onSnapshot listener will re-render automatically
-        db.collection("alerts")
+        // Route to whichever collection this alert actually came from —
+        // "alerts" (login-security events) or "monitoring_alerts" (crop
+        // health threshold alerts). Update Firestore — the onSnapshot
+        // listener will re-render automatically.
+        var a = ACCOUNT_ALERTS.find(function (x) { return x.id === id; });
+        var collectionName = a && a.source === "monitoring" ? "monitoring_alerts" : "alerts";
+        db.collection(collectionName)
           .doc(id)
           .update({ resolved: true })
           .then(function () {

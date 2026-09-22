@@ -299,9 +299,17 @@
 
         try {
             // OPTIMIZATION: use the in-memory allMissions array that loadMissions()
-            // already fetched, instead of a separate Firestore round-trip that
-            // downloaded every mission document just to count them.
-            const missionNumber = `MISSION #${allMissions.length + 1}`;
+            // already fetched, instead of a separate Firestore round-trip.
+            // Derived from the highest existing mission number rather than
+            // allMissions.length + 1 — length-based numbering reproduces a
+            // deleted mission's number (e.g. delete #2 from a list of 5, then
+            // create one: length is 4, so "#5" already exists — a duplicate).
+            const highestNumber = allMissions.reduce((max, m) => {
+                const match = /#(\d+)/.exec(m.missionNumber || '');
+                const n = match ? parseInt(match[1], 10) : 0;
+                return Number.isFinite(n) && n > max ? n : max;
+            }, 0);
+            const missionNumber = `MISSION #${highestNumber + 1}`;
 
             // Format date
             const dateObj = new Date(missionDate);

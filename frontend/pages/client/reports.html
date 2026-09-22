@@ -135,6 +135,17 @@
         position: relative;
       }
 
+      /* Enabled export buttons (e.g. Export CSV, once wired up) get the
+         normal clickable look instead of the disabled-stub styling above. */
+      .btn-export:not(:disabled) {
+        cursor: pointer;
+        opacity: 1;
+      }
+
+      .btn-export:not(:disabled):hover {
+        border-color: var(--color-text-tertiary, var(--border));
+      }
+
       .btn-export-label {
         position: absolute;
         top: -8px;
@@ -463,15 +474,14 @@
                 <div class="report-subtitle" id="report-subtitle-text"></div>
               </div>
               <div class="export-actions">
-                <button class="btn-export" title="PDF export coming soon">
+                <button class="btn-export" title="PDF export coming soon" disabled>
                   <span>📄</span>
                   <span>Export PDF</span>
                   <span class="btn-export-label">Soon</span>
                 </button>
-                <button class="btn-export" title="CSV export coming soon">
+                <button class="btn-export" title="Download this report as CSV" onclick="exportReportCSV()">
                   <span>📊</span>
                   <span>Export CSV</span>
-                  <span class="btn-export-label">Soon</span>
                 </button>
               </div>
             </div>
@@ -557,6 +567,7 @@
       let BLOCKS_RAW = [];  // [{id, blockName, section, stage, daf, area, bearing, nonbearing, nonViable, plants}]
       let SCANS_RAW = [];   // [{id, blockId, startTime}]
       let dataReady = false;
+      let CURRENT_REPORT_BLOCKS = [];  // last filtered set rendered by generateReport(), used by exportReportCSV()
 
       window.initPage = function () {
         const today = new Date();
@@ -683,10 +694,55 @@
 
         renderMetrics(blocks);
         renderTable(blocks);
+        CURRENT_REPORT_BLOCKS = blocks;
 
         const results = document.getElementById("report-results");
         results.classList.add("visible");
         results.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+
+      /* ── Export CSV ────────────────────────────────────────────────
+       * Reuses the same Blob/createObjectURL pattern as
+       * admin/activity.html's exportCSV() — exports the report table
+       * exactly as currently filtered/generated. */
+      function exportReportCSV() {
+        if (!CURRENT_REPORT_BLOCKS.length) {
+          utils.showToast("Generate a report first.", "info");
+          return;
+        }
+        const rows = [
+          [
+            "Block",
+            "Section",
+            "Stage",
+            "Days After Flowering",
+            "Area (ha)",
+            "Bearing %",
+            "Non-Viable %",
+            "Status",
+          ],
+        ];
+        CURRENT_REPORT_BLOCKS.forEach((block) => {
+          rows.push([
+            '"' + (block.blockName || "").replace(/"/g, '""') + '"',
+            '"' + (block.section || "").replace(/"/g, '""') + '"',
+            '"' + (block.stage || "").replace(/"/g, '""') + '"',
+            block.daf,
+            block.area,
+            block.bearing.toFixed(1),
+            block.nonViable.toFixed(1),
+            statusLabel(blockStatusClass(block)),
+          ]);
+        });
+        const csv = rows.map((r) => r.join(",")).join("\n");
+        const blob = new Blob([csv], { type: "text/csv" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "pinevision-report-" + new Date().toISOString().slice(0, 10) + ".csv";
+        a.click();
+        URL.revokeObjectURL(url);
+        utils.showToast("Exported " + CURRENT_REPORT_BLOCKS.length + " block" + (CURRENT_REPORT_BLOCKS.length !== 1 ? "s" : ""), "success");
       }
 
       function renderMetrics(blocks) {

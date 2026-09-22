@@ -38,16 +38,30 @@ service cloud.firestore {
     //
     // Read/write only if the document's userId matches the caller,
     // OR the caller is an admin (preserves full admin visibility).
+    //
+    // Farm Managers get read-only, org-wide visibility on blocks,
+    // scans and monitoring_alerts (their Dashboard/Blocks/Flights &
+    // Scans/Reports pages already query these collections without a
+    // userId filter — they're an oversight role across every client).
+    // blocks also grants Farm Managers `update` because the Blocks
+    // page's Edit-Block action is available to them; no `create`/
+    // `delete`, matching what the Farm Manager UI actually offers.
     // ─────────────────────────────────────────────────────────
     match /blocks/{docId} {
-      allow read, update, delete: if request.auth != null &&
+      allow read: if request.auth != null &&
+        (resource.data.userId == request.auth.uid || isAdmin() || isFarmManager());
+      allow update: if request.auth != null &&
+        (resource.data.userId == request.auth.uid || isAdmin() || isFarmManager());
+      allow delete: if request.auth != null &&
         (resource.data.userId == request.auth.uid || isAdmin());
       allow create: if request.auth != null &&
         request.resource.data.userId == request.auth.uid;
     }
 
     match /scans/{docId} {
-      allow read, update, delete: if request.auth != null &&
+      allow read: if request.auth != null &&
+        (resource.data.userId == request.auth.uid || isAdmin() || isFarmManager());
+      allow update, delete: if request.auth != null &&
         (resource.data.userId == request.auth.uid || isAdmin());
       allow create: if request.auth != null &&
         request.resource.data.userId == request.auth.uid;
@@ -61,7 +75,9 @@ service cloud.firestore {
     }
 
     match /monitoring_alerts/{docId} {
-      allow read, update, delete: if request.auth != null &&
+      allow read: if request.auth != null &&
+        (resource.data.userId == request.auth.uid || isAdmin() || isFarmManager());
+      allow update, delete: if request.auth != null &&
         (resource.data.userId == request.auth.uid || isAdmin());
       allow create: if request.auth != null &&
         request.resource.data.userId == request.auth.uid;
@@ -72,9 +88,15 @@ service cloud.firestore {
     // fruit block's detail page. Owner-scoped like blocks/scans/missions
     // above. No delete: cancellation is a status update (status ->
     // 'cancelled') so history is preserved rather than removed.
+    //
+    // Farm Managers get read-only visibility (their block-detail page
+    // shows scheduled scans as an "informational view" — scheduling
+    // itself is a client-only action, by design).
     // ─────────────────────────────────────────────────────────
     match /scheduled_scans/{docId} {
-      allow read, update: if request.auth != null &&
+      allow read: if request.auth != null &&
+        (resource.data.userId == request.auth.uid || isAdmin() || isFarmManager());
+      allow update: if request.auth != null &&
         (resource.data.userId == request.auth.uid || isAdmin());
       allow create: if request.auth != null &&
         request.resource.data.userId == request.auth.uid;

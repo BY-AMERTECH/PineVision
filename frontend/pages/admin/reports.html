@@ -675,12 +675,51 @@
             '<td style="font-size:var(--font-size-sm);color:var(--color-text-secondary);">' + r.duration + "</td>" +
             "<td>" + scanStatusBadge(r.status) + "</td>" +
             "<td>" + bearBadge + "</td>" +
-            '<td><button class="btn btn-secondary btn-sm" style="font-size:11px;opacity:0.6;cursor:not-allowed;" disabled title="Report export is coming soon">Download</button></td>' +
+            '<td><button class="btn btn-secondary btn-sm" style="font-size:11px;" onclick="exportScanRowCSV(\'' + r.id + '\')" title="Download this report as CSV">Download</button></td>' +
             "</tr>";
         });
 
         html += "</tbody></table></div></div>";
         document.getElementById("rp-content").innerHTML = html;
+        LAST_RENDERED_ROWS = rows;
+      }
+
+      /* ── Per-scan CSV download ──────────────────────────────────────
+       * Reuses the same Blob/createObjectURL pattern as
+       * admin/activity.html's exportCSV(), applied to the single row
+       * the user clicked "Download" on (rows are already fully computed
+       * by buildScanRow() — no extra Firestore read needed). */
+      let LAST_RENDERED_ROWS = [];
+
+      function exportScanRowCSV(scanId) {
+        const r = LAST_RENDERED_ROWS.find((row) => row.id === scanId);
+        if (!r) {
+          utils.showToast("Couldn't find that report row — try refreshing.", "error");
+          return;
+        }
+        const dateLabel = r.startTime
+          ? r.startTime.toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" })
+          : "—";
+        const rows = [
+          ["Date", "Block", "Operator", "Duration", "Status", "Bearing Rate %"],
+          [
+            dateLabel,
+            '"' + (r.blockLabel || "").replace(/"/g, '""') + '"',
+            '"' + (r.operatorName || "").replace(/"/g, '""') + '"',
+            r.duration,
+            r.status,
+            r.hasData ? r.bearingPercent.toFixed(1) : "",
+          ],
+        ];
+        const csv = rows.map((row) => row.join(",")).join("\n");
+        const blob = new Blob([csv], { type: "text/csv" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "pinevision-scan-report-" + scanId + ".csv";
+        a.click();
+        URL.revokeObjectURL(url);
+        utils.showToast("Report downloaded", "success");
       }
 
       function renderError() {

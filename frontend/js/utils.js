@@ -125,12 +125,17 @@ var utils = (function() {
      */
     function buildInlineBar(percentage, color, label = null) {
         const displayLabel = label || formatPercent(percentage);
-        const barColor = color || barColor(percentage);
-        
+        // Named distinctly from the outer barColor() helper (below) — a
+        // `const barColor = color || barColor(percentage)` here would shadow
+        // that function in its own initializer and throw a ReferenceError
+        // ("Cannot access 'barColor' before initialization") whenever `color`
+        // is falsy.
+        const resolvedColor = color || barColor(percentage);
+
         return `
             <div class="ibar">
                 <div class="it">
-                    <div class="if" style="width: ${percentage}%; background-color: ${barColor};"></div>
+                    <div class="if" style="width: ${percentage}%; background-color: ${resolvedColor};"></div>
                 </div>
                 <div class="ip">${displayLabel}</div>
             </div>
