@@ -25,4 +25,5 @@ best.pt
 .vscode/
 .idea/
 *.swp
-*.swo
+*.swo/project-documentation/
+/test_videos/
