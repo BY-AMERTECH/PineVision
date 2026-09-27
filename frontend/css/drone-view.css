@@ -16,6 +16,26 @@ body {
     background: #0b0f13;
 }
 
+/* Short operator notice shown over the live feed after counting starts. */
+.dv-countdown-notice {
+    position: absolute;
+    z-index: 5;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    max-width: calc(100% - 32px);
+    padding: 14px 20px;
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    border-radius: 12px;
+    background: rgba(11, 15, 19, 0.82);
+    color: #fff;
+    font-size: clamp(1rem, 2.5vw, 1.35rem);
+    font-weight: 600;
+    text-align: center;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+    pointer-events: none;
+}
+
 
 /* ── 1. TOPBAR ──────────────────────────────────────────────── */
 

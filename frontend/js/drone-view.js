@@ -270,6 +270,10 @@ function renderUI() {
     const isInactive  = s === 'idle' || s === 'failed';
     const isSession   = s === 'active' || s === 'reconnecting' || s === 'analyzing';
     const isMp4Analyzing = DRONE_STATE.videoMode === true && s === 'analyzing';
+    const statProgressRow = document.getElementById('stat-progress-row');
+    if (statProgressRow) {
+        statProgressRow.classList.toggle('d-none', !DRONE_STATE.videoMode);
+    }
     const canStartLiveCounting =
         !DRONE_STATE.videoMode &&
         s === 'active' &&
@@ -599,6 +603,7 @@ async function startDetection() {
             DRONE_STATE.scanId = result.scan_id;
             startFirebaseListener();
             BboxOverlay.start('live');
+            startLiveCountdown();
             return true;
         } else {
             console.error('❌ Failed to start detection:', result.message);
@@ -610,6 +615,37 @@ async function startDetection() {
         utils.showToast('Failed to start detection', 'error');
         return false;
     }
+}
+
+// Informational countdown only: detection has already started before this runs.
+let liveCountdownTimer = null;
+
+function startLiveCountdown() {
+    const notice = document.getElementById('dv-countdown-notice');
+    const message = document.getElementById('dv-countdown-message');
+    if (!notice || !message) return;
+
+    if (liveCountdownTimer !== null) {
+        clearInterval(liveCountdownTimer);
+        liveCountdownTimer = null;
+    }
+
+    let seconds = 5;
+    message.textContent = `Please wait ${seconds}s before moving the drone...`;
+    notice.classList.remove('d-none');
+    notice.hidden = false;
+
+    liveCountdownTimer = setInterval(() => {
+        seconds -= 1;
+        if (seconds <= 0) {
+            clearInterval(liveCountdownTimer);
+            liveCountdownTimer = null;
+            notice.classList.add('d-none');
+            notice.hidden = true;
+            return;
+        }
+        message.textContent = `Please wait ${seconds}s before moving the drone...`;
+    }, 1000);
 }
 
 async function handleStartCounting() {

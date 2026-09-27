@@ -82,6 +82,12 @@
             <!-- Bounding-box overlay canvas (aligned via object-fit:cover mapping in JS) -->
             <canvas id="dv-bbox-canvas" class="dv-bbox-canvas" aria-hidden="true"></canvas>
 
+            <!-- Live counting notice; purely informational and shown after detection starts. -->
+            <div id="dv-countdown-notice" class="dv-countdown-notice d-none"
+                 role="status" aria-live="polite" aria-atomic="true" hidden>
+                <span id="dv-countdown-message">Please wait 5s before moving the drone...</span>
+            </div>
+
             <!-- Placeholder overlay (IDLE / FAILED) -->
             <div id="dv-placeholder" class="dv-overlay dv-overlay--center">
                 <div class="dv-placeholder-inner">
@@ -174,7 +180,7 @@
                 </div>
 
                 <!-- Scan Progress -->
-                <div class="col-3">
+                <div id="stat-progress-row" class="col-3">
                     <div class="mc">
                         <div class="mc-label d-flex justify-content-between">
                             <span>Scan Progress</span>
