@@ -724,6 +724,34 @@ async function apiUploadVideo(formData) {
     return resp.json();
 }
 
+function logVideoUploadActivity(blockId, scanId, fileName) {
+    try {
+        const session = typeof auth !== 'undefined' &&
+            (auth.getCurrentUser() || auth.getSession());
+        if (!session) return;
+
+        firebase.firestore().collection('activity_logs').add({
+            userId: session.uid,
+            user: session.username || session.name || session.email || session.uid,
+            role: session.role,
+            email: session.email,
+            action: 'upload_scan',
+            status: 'success',
+            ip: '—',
+            device: navigator.userAgent || 'Unknown',
+            details: `Uploaded MP4 scan for block ${blockId}`,
+            block_id: blockId,
+            scan_id: scanId || null,
+            file_name: fileName,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+        }).catch(error => {
+            console.error('Failed to log video upload activity:', error);
+        });
+    } catch (error) {
+        console.error('Failed to log video upload activity:', error);
+    }
+}
+
 function handleVideoUploadClick() {
     if (DRONE_STATE.status !== 'idle' && DRONE_STATE.status !== 'failed') return;
     document.getElementById('input-video-file').click();
@@ -788,6 +816,8 @@ async function handleFileSelect(event) {
         handleVideoFailed(result.message ?? 'Upload failed.');
         return;
     }
+
+    logVideoUploadActivity(DRONE_STATE.blockId, result.scan_id, file.name);
 
     // ── Upload complete — enter Analysis Phase ────────────────
     DRONE_STATE.scanId        = result.scan_id;

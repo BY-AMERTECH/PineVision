@@ -1587,6 +1587,32 @@
         utils.hideModal("edit-block-modal");
       }
 
+      function logBlockUpdateActivity(previousValues, newValues, blockId) {
+        try {
+          const session = auth.getCurrentUser() || auth.getSession();
+          if (!session) return;
+
+          firebase.firestore().collection("activity_logs").add({
+            userId: session.uid,
+            user: session.username || session.name || session.email || session.uid,
+            role: session.role,
+            email: session.email,
+            action: "update_block",
+            status: "success",
+            ip: "—",
+            device: navigator.userAgent || "Unknown",
+            prev_value: JSON.stringify(previousValues),
+            new_value: JSON.stringify(newValues),
+            details: "Updated block " + blockId,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+          }).catch(function (err) {
+            console.error("Failed to log block update activity:", err);
+          });
+        } catch (err) {
+          console.error("Failed to log block update activity:", err);
+        }
+      }
+
       function handleEditBlock(event) {
         event.preventDefault();
 
@@ -1603,6 +1629,27 @@
           utils.showFormError("edit-block-form", "Please fill in all required fields.");
           return;
         }
+
+        const previousValues = {
+          blockName: currentBlock.blockName,
+          section: currentBlock.section,
+          area: currentBlock.area,
+          planted: currentBlock.planted,
+          forcingDate: currentBlock.forcingDate,
+          daf: currentBlock.daf,
+          declaredPopulation: currentBlock.declaredPopulation,
+          harvestStatus: currentBlock.harvestStatus,
+        };
+        const newValues = {
+          blockName: blockName,
+          section: section,
+          area: area,
+          planted: planted,
+          forcingDate: forcingDate,
+          daf: daf,
+          declaredPopulation: declaredPopulation,
+          harvestStatus: harvestStatus,
+        };
 
         currentBlock.blockName = blockName;
         currentBlock.section = section;
@@ -1629,6 +1676,7 @@
             declaredPopulation: declaredPopulation,
           })
           .then(function () {
+            logBlockUpdateActivity(previousValues, newValues, currentBlock.id);
             renderPage(currentBlock);
             document.title = currentBlock.blockName + " — PineVision";
             closeEditModal();
