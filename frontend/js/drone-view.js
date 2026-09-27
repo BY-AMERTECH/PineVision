@@ -735,7 +735,8 @@ function logVideoUploadActivity(blockId, scanId, fileName) {
             user: session.username || session.name || session.email || session.uid,
             role: session.role,
             email: session.email,
-            action: 'upload_scan',
+            // Action Breakdown currently counts Upload with an exact match.
+            action: 'upload',
             status: 'success',
             ip: '—',
             device: navigator.userAgent || 'Unknown',
