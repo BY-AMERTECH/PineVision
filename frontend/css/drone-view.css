@@ -28,9 +28,11 @@ body {
     border: 1px solid rgba(255, 255, 255, 0.24);
     border-radius: 12px;
     background: rgba(11, 15, 19, 0.82);
-    color: #fff;
-    font-size: clamp(1rem, 2.5vw, 1.35rem);
-    font-weight: 600;
+    font-family: var(--font-sans);
+    color: rgba(255, 255, 255, 0.45);
+    font-size: var(--font-size-sm);
+    font-weight: 400;
+    letter-spacing: normal;
     text-align: center;
     box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
     pointer-events: none;

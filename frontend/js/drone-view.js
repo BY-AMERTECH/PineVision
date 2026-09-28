@@ -630,7 +630,7 @@ function startLiveCountdown() {
         liveCountdownTimer = null;
     }
 
-    let seconds = 5;
+    let seconds = 7;
     message.textContent = `Please wait ${seconds}s before moving the drone...`;
     notice.classList.remove('d-none');
     notice.hidden = false;
