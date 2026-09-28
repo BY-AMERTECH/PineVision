@@ -14,6 +14,11 @@
     let scansData = [];
     let currentUserId = null;
 
+    // Pagination — 5 scan entries per page (data/retrieval logic untouched;
+    // this only controls how many already-loaded entries are shown at once).
+    const SCANS_PAGE_SIZE = 5;
+    let currentScansPage = 1;
+
     // ═══════════════════════════════════════════════════════════
     // INITIALIZATION
     // ═══════════════════════════════════════════════════════════
@@ -136,7 +141,8 @@
 
             console.log(`✅ Loaded ${scansData.length} scans from Firestore`);
 
-            // Render page
+            // Render page (reset to first page on a fresh data load)
+            currentScansPage = 1;
             renderScanMetrics();
             renderScanList();
 
@@ -213,10 +219,82 @@
                     <div class="empty-state-text">Drone scan sessions will appear here after operations are logged.</div>
                 </div>
             `;
+            renderScanPagination(0);
             return;
         }
 
-        listEl.innerHTML = scansData.map(buildScanEntry).join('');
+        const totalPages = Math.max(1, Math.ceil(scansData.length / SCANS_PAGE_SIZE));
+        if (currentScansPage > totalPages) currentScansPage = totalPages;
+        if (currentScansPage < 1) currentScansPage = 1;
+
+        const start = (currentScansPage - 1) * SCANS_PAGE_SIZE;
+        const pageItems = scansData.slice(start, start + SCANS_PAGE_SIZE);
+
+        listEl.innerHTML = pageItems.map(buildScanEntry).join('');
+        renderScanPagination(totalPages);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // PAGINATION (client-side over already-loaded scansData —
+    // does not re-fetch or alter the Firestore data source)
+    // ═══════════════════════════════════════════════════════════
+
+    function changeScansPage(page) {
+        const totalPages = Math.max(1, Math.ceil(scansData.length / SCANS_PAGE_SIZE));
+        if (page < 1 || page > totalPages || page === currentScansPage) return;
+        currentScansPage = page;
+        renderScanList();
+    }
+    // Exposed for the inline onclick handlers rendered in renderScanPagination().
+    window.scansChangePage = changeScansPage;
+
+    function renderScanPagination(totalPages) {
+        const el = document.getElementById('scan-pagination');
+        if (!el) return;
+
+        if (!totalPages || totalPages < 1) {
+            el.innerHTML = '';
+            return;
+        }
+
+        const prevDisabled = currentScansPage <= 1;
+        const nextDisabled = currentScansPage >= totalPages;
+
+        const numbersHTML = getPageWindow(currentScansPage, totalPages)
+            .map(function (p) {
+                if (p === '...') {
+                    return '<span class="page-ellipsis">&hellip;</span>';
+                }
+                const activeClass = p === currentScansPage ? ' active' : '';
+                const current = p === currentScansPage ? ' aria-current="page"' : '';
+                return `<button type="button" class="page-num-btn${activeClass}" onclick="scansChangePage(${p})"${current}>${p}</button>`;
+            })
+            .join('');
+
+        el.innerHTML = `
+            <button type="button" class="page-nav-btn" onclick="scansChangePage(${currentScansPage - 1})" ${prevDisabled ? 'disabled' : ''} aria-label="Previous page">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            ${numbersHTML}
+            <button type="button" class="page-nav-btn" onclick="scansChangePage(${currentScansPage + 1})" ${nextDisabled ? 'disabled' : ''} aria-label="Next page">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+        `;
+    }
+
+    // Returns the set of page numbers/ellipses to render, e.g. [1,'...',4,5,6,'...',12]
+    function getPageWindow(current, total) {
+        if (total <= 5) {
+            return Array.from({ length: total }, function (_, i) { return i + 1; });
+        }
+        const pages = [1];
+        if (current > 3) pages.push('...');
+        const start = Math.max(2, current - 1);
+        const end = Math.min(total - 1, current + 1);
+        for (let p = start; p <= end; p++) pages.push(p);
+        if (current < total - 2) pages.push('...');
+        pages.push(total);
+        return pages;
     }
 
     function buildScanEntry(scan) {

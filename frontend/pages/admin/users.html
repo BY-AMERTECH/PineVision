@@ -2361,7 +2361,7 @@
       }
 
       function toggleRow(el) {
-        var id = parseInt(el.getAttribute("data-id"));
+        var id = el.getAttribute("data-id");
         var idx = selectedIds.indexOf(id);
         if (el.checked && idx === -1) selectedIds.push(id);
         if (!el.checked && idx !== -1) selectedIds.splice(idx, 1);
@@ -2400,34 +2400,100 @@
         } else bar.classList.remove("visible");
       }
 
-      function bulkAction(action) {
-        var count = selectedIds.length;
-        selectedIds.forEach(function (id) {
-          var u = ALL_USERS.filter(function (x) {
-            return x.id === id;
-          })[0];
-          if (!u) return;
-          if (action === "activate") u.status = "active";
-          if (action === "disable") u.status = "disabled";
-          if (action === "delete") u._del = true;
-        });
-        if (action === "delete")
-          ALL_USERS = ALL_USERS.filter(function (u) {
-            return !u._del;
-          });
-        selectedIds = [];
-        renderMetrics();
-        renderTable();
+      async function bulkAction(action) {
+        var ids = selectedIds.slice();
+        var count = ids.length;
+        if (count === 0) return;
+
+        if (
+          action === "delete" &&
+          !confirm(
+            "Permanently delete " +
+              count +
+              " user" +
+              (count !== 1 ? "s" : "") +
+              "? This cannot be undone.",
+          )
+        ) {
+          return;
+        }
+
         var label =
           action === "activate"
             ? "enabled"
             : action === "disable"
               ? "disabled"
               : "deleted";
-        utils.showToast(
-          count + " user" + (count !== 1 ? "s" : "") + " " + label,
-          action === "delete" ? "error" : "success",
-        );
+
+        try {
+          if (action === "delete") {
+            await Promise.all(
+              ids.map(function (id) {
+                return firebase.firestore().collection("users").doc(id).delete();
+              }),
+            );
+          } else {
+            var newStatus = action === "activate" ? "active" : "disabled";
+            await Promise.all(
+              ids.map(function (id) {
+                return firebase
+                  .firestore()
+                  .collection("users")
+                  .doc(id)
+                  .update({ status: newStatus });
+              }),
+            );
+          }
+
+          // Log bulk activity (best-effort — do not block the UI on failure)
+          try {
+            const currentUser = firebase.auth().currentUser;
+            if (currentUser) {
+              const currentUserDoc = await firebase
+                .firestore()
+                .collection("users")
+                .doc(currentUser.uid)
+                .get();
+              const currentUserData = currentUserDoc.data();
+              await firebase
+                .firestore()
+                .collection("activity_logs")
+                .add({
+                  userId: currentUser.uid,
+                  user: currentUserData.username,
+                  action: "bulk_" + action,
+                  timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                  status: "success",
+                  email: currentUserData.email,
+                  role: currentUserData.role,
+                  details:
+                    "Bulk " +
+                    label +
+                    " " +
+                    count +
+                    " user" +
+                    (count !== 1 ? "s" : ""),
+                });
+            }
+          } catch (logError) {
+            console.error("Failed to log bulk action activity:", logError);
+          }
+
+          selectedIds = [];
+          await loadUsersFromBackend();
+          await renderTimeline();
+
+          utils.showToast(
+            count + " user" + (count !== 1 ? "s" : "") + " " + label,
+            action === "delete" ? "error" : "success",
+          );
+        } catch (error) {
+          console.error("Error performing bulk action:", error);
+          utils.showToast(
+            "Failed to " + label + " selected users",
+            "error",
+          );
+        }
       }
 
       // ── Toggle Status ────────────────────────────────────────────────────

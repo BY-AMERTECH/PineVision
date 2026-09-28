@@ -211,7 +211,7 @@ const app = (function() {
         },
         'flight': {
             icon: 'flight',
-            default: { title: 'Flight Missions', subtitle: 'Plan and track drone scanning missions across all farm blocks' }
+            default: { title: 'Flight Schedules', subtitle: 'View and manage drone flight schedules configured across all fruit blocks' }
         },
         'flights-scans': {
             icon: 'flight',

@@ -433,6 +433,22 @@
                   <span class="nav-link-text">Audit Logs</span>
                 </a>
               </li>
+              <li>
+                <a
+                  href="blocks.html"
+                  class="nav-link"
+                  data-tooltip="Fruit Blocks"
+                >
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-leaf.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Fruit Blocks</span>
+                </a>
+              </li>
             </ul>
           </div>
 
@@ -780,6 +796,7 @@
       // Global data storage
       var dashboardUsers = [];
       var dashboardLogs = [];
+      var SCANS_LIMIT = 500;
 
       window.initPage = async function () {
         /*
@@ -801,6 +818,10 @@
           console.log("📥 Loading dashboard data in parallel...");
 
           var sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000);
+
+          var sixDaysAgo = new Date();
+          sixDaysAgo.setHours(0, 0, 0, 0);
+          sixDaysAgo.setDate(sixDaysAgo.getDate() - 5); // start of the 6-day trend window (today + 5 prior days)
 
           var results = await Promise.all([
             // [0] users — limit added; was fetching unbounded collection
@@ -835,6 +856,27 @@
                 firebase.firestore.Timestamp.fromDate(sixHoursAgo)
               )
               .get(),
+
+            // [5] scans (all client accounts) — powers Flights Today / Total
+            //     Scans / Scan Success Rate stat cards plus the Scan Volume
+            //     and Avg Bearing Rate sparklines. Was previously hardcoded.
+            firebase.firestore()
+              .collection("scans")
+              .orderBy("startTime", "desc")
+              .limit(SCANS_LIMIT)
+              .get(),
+
+            // [6] activity logs in the same 6-day window, for the User
+            //     Activity sparkline (distinct users active per day) —
+            //     separate from the 10-row feed query above ([1]).
+            firebase.firestore()
+              .collection("activity_logs")
+              .where(
+                "timestamp",
+                ">=",
+                firebase.firestore.Timestamp.fromDate(sixDaysAgo)
+              )
+              .get(),
           ]);
 
           var usersSnap        = results[0];
@@ -842,6 +884,8 @@
           var unresolvedSnap   = results[2];
           var recentAlertsSnap = results[3];
           var analyticsSnap    = results[4];
+          var scansSnap        = results[5];
+          var scanLogsSnap     = results[6];
 
           // ── Process users — Farm Managers never see Super Admin accounts ─────────────────────────
           dashboardUsers = [];
@@ -898,10 +942,64 @@
             }
           });
 
+          // ── Process scans + build 6-day scan stats/sparklines ─────────
+          var todayStart = new Date();
+          todayStart.setHours(0, 0, 0, 0);
+
+          var scanVolData = [0, 0, 0, 0, 0, 0];
+          var bearingSums = [0, 0, 0, 0, 0, 0];
+          var bearingCounts = [0, 0, 0, 0, 0, 0];
+          var flightsToday = 0;
+          var bearingTotalSum = 0;
+          var bearingTotalCount = 0;
+
+          scansSnap.forEach(function (doc) {
+            var d = doc.data();
+            var startTime = d.startTime && typeof d.startTime.toDate === "function" ? d.startTime.toDate() : null;
+            if (!startTime) return;
+
+            if (startTime >= todayStart) flightsToday++;
+
+            var total = d.total || 0;
+            var bearingPct = total > 0 ? ((d.bearing || 0) / total) * 100 : null;
+            if (bearingPct !== null) {
+              bearingTotalSum += bearingPct;
+              bearingTotalCount++;
+            }
+
+            var dayIdx = Math.floor((startTime - sixDaysAgo) / 86400000);
+            if (dayIdx >= 0 && dayIdx < 6) {
+              scanVolData[dayIdx]++;
+              if (bearingPct !== null) {
+                bearingSums[dayIdx] += bearingPct;
+                bearingCounts[dayIdx]++;
+              }
+            }
+          });
+
+          var bearingData = bearingSums.map(function (sum, i) {
+            return bearingCounts[i] > 0 ? sum / bearingCounts[i] : 0;
+          });
+          var totalScans = scansSnap.size;
+          var avgBearingRate = bearingTotalCount > 0 ? bearingTotalSum / bearingTotalCount : 0;
+
+          // ── Distinct active users per day, for the User Activity sparkline ──
+          var dayUserSets = [new Set(), new Set(), new Set(), new Set(), new Set(), new Set()];
+          scanLogsSnap.forEach(function (doc) {
+            var d = doc.data();
+            var ts = d.timestamp && typeof d.timestamp.toDate === "function" ? d.timestamp.toDate() : null;
+            if (!ts || !d.user) return;
+            var dayIdx = Math.floor((ts - sixDaysAgo) / 86400000);
+            if (dayIdx >= 0 && dayIdx < 6) dayUserSets[dayIdx].add(d.user);
+          });
+          var sessionData = dayUserSets.map(function (s) {
+            return s.size;
+          });
+
           // ── Render all sections synchronously from in-memory data ─────
-          loadSystemStats(pendingAlerts);
+          loadSystemStats(pendingAlerts, flightsToday, totalScans, avgBearingRate);
           loadRecentActivity();
-          loadAnalytics(alertBuckets, pendingAlerts);
+          loadAnalytics(alertBuckets, pendingAlerts, scanVolData, bearingData, sessionData);
           loadRecentAlerts(recentAlertsSnap);
           loadUserStats();
           updateTimestamp();
@@ -938,9 +1036,11 @@
         }, 600);
       }
 
-      // pendingAlerts is passed from initPage (already fetched via Promise.all),
-      // eliminating the duplicate unresolved-alerts query that used to live here.
-      function loadSystemStats(pendingAlerts) {
+      // pendingAlerts/flightsToday/totalScans/avgBearingRate are passed from
+      // initPage (already computed from the parallel Promise.all queries),
+      // eliminating duplicate queries and the scan-stat placeholders that
+      // used to be hardcoded here.
+      function loadSystemStats(pendingAlerts, flightsToday, totalScans, avgBearingRate) {
         var clients = dashboardUsers.filter(function (u) {
           return u.role === "client" || u.role === "farm_manager";
         }).length;
@@ -948,11 +1048,7 @@
           return u.status === "active";
         }).length;
         var totalUsers = dashboardUsers.length;
-
-        // Mock data for scans (keep for now)
-        var flightsToday = 6;
-        var totalScans = 6;
-        var successRate = 79;
+        var successRate = Math.round(avgBearingRate * 10) / 10;
 
         var cards = [
           {
@@ -960,8 +1056,6 @@
             value: clients,
             sub: activeOps + " active",
             color: "green",
-            trend: "up",
-            trendTxt: "+2 this month",
             icon: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
           },
           {
@@ -969,8 +1063,6 @@
             value: activeOps,
             sub: "of " + clients + " clients",
             color: "",
-            trend: "fl",
-            trendTxt: "No change",
             icon: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>',
           },
           {
@@ -1048,13 +1140,15 @@
             '<div class="mc-sub">' +
             c.sub +
             "</div>" +
-            '<div class="mc-trend ' +
-            c.trend +
-            '">' +
-            trendArrow +
-            " " +
-            c.trendTxt +
-            "</div>" +
+            (c.trendTxt
+              ? '<div class="mc-trend ' +
+                c.trend +
+                '">' +
+                trendArrow +
+                " " +
+                c.trendTxt +
+                "</div>"
+              : "") +
             "</div>";
         });
         document.getElementById("system-stats").innerHTML = html;
@@ -1135,24 +1229,28 @@
       // alertBuckets: 6-element array [oldest…newest] bucketed in initPage()
       // from a single 6-hour range query instead of 6 separate hourly queries.
       // totalAlerts: unresolved count, already fetched in initPage() — no duplicate query.
-      function loadAnalytics(alertBuckets, totalAlerts) {
-        var alertData   = alertBuckets;
-        var scanVolData = [2, 3, 3, 4, 5, 6];
-        var bearingData = [72, 74, 73, 76, 75, 79];
-        var sessionData = [3, 4, 5, 4, 6, 5];
+      // scanVolData/bearingData/sessionData: 6-day trends bucketed in initPage()
+      // from the live scans/activity_logs collections — previously hardcoded.
+      function loadAnalytics(alertBuckets, totalAlerts, scanVolData, bearingData, sessionData) {
+        var alertData = alertBuckets;
+
+        var todayScans = scanVolData[scanVolData.length - 1];
+        var scanTrendUp = todayScans >= (scanVolData[scanVolData.length - 2] || 0);
+        var todayBearing = bearingData[bearingData.length - 1];
+        var todaySessions = sessionData[sessionData.length - 1];
 
         var charts = [
           {
             label: "Scan Volume",
-            value: "6",
-            sub: '<span class="up">↑ +6</span> sessions logged',
+            value: String(todayScans),
+            sub: (scanTrendUp ? '<span class="up">↑</span> ' : '<span class="dn">↓</span> ') + "sessions today",
             data: scanVolData,
             color: "#4caf78",
           },
           {
             label: "Avg Bearing Rate",
-            value: "78.9%",
-            sub: '<span class="up">↑ Healthy</span>',
+            value: todayBearing > 0 ? todayBearing.toFixed(1) + "%" : "—",
+            sub: todayBearing >= 75 ? '<span class="up">↑ Healthy</span>' : todayBearing > 0 ? '<span class="dn">↓ Below target</span>' : "No scans today",
             data: bearingData,
             color: "#2d6a3f",
           },
@@ -1162,11 +1260,11 @@
             sub: '<span class="dn">↓ ' + totalAlerts + " active</span>",
             data: alertData,
             color: "#d94f4f",
-          }, // ← NOW REAL
+          },
           {
             label: "User Activity",
-            value: "5",
-            sub: '<span class="up">↑ Peak today</span>',
+            value: String(todaySessions),
+            sub: '<span class="up">↑ active today</span>',
             data: sessionData,
             color: "#8c5c00",
           },

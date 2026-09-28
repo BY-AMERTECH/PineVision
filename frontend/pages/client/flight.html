@@ -17,7 +17,7 @@
         } catch (e) {}
       })();
     </script>
-    <title>Flight Missions - PineVision</title>
+    <title>Flight Schedules - PineVision</title>
 
     <!-- CSS: Bootstrap first, then custom overrides -->
     <link rel="stylesheet" href="../../bootstrap/css/bootstrap.min.css" />
@@ -26,281 +26,375 @@
     <link rel="stylesheet" href="../../css/components.css" />
 
     <style>
-      /* ── Filter Bar ─────────────────────────────────────── */
-      .filter-bar {
+      /* ── Toolbar: search (left) + Add Schedule (right) ─────── */
+      /* Matches the toolbar pattern used on the User Management page,
+         for visual consistency across the app. */
+      .toolbar {
+        display: flex;
+        align-items: center;
+        gap: var(--space-md);
+        padding: var(--space-lg);
+        border-bottom: 1px solid var(--border);
+        flex-wrap: wrap;
+      }
+
+      .toolbar-search {
+        position: relative;
+        flex: 1;
+        min-width: 240px;
+        max-width: 420px;
+      }
+
+      .toolbar-search-icon {
+        position: absolute;
+        left: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--muted);
+        pointer-events: none;
+        display: flex;
+      }
+
+      .toolbar-search input {
+        width: 100%;
+        padding: 7px 12px 7px 34px;
+        font-size: var(--font-size-sm);
+        border: 1px solid var(--color-border-primary);
+        border-radius: var(--radius-md);
+        background: var(--color-background-primary);
+        color: var(--color-text-primary);
+        font-family: var(--font-sans);
+        transition:
+          border-color var(--transition-fast),
+          box-shadow var(--transition-fast);
+      }
+
+      .toolbar-search input:focus {
+        outline: none;
+        border-color: var(--green);
+        box-shadow: 0 0 0 3px var(--green-bg);
+      }
+
+      .toolbar-search input::placeholder {
+        color: var(--color-text-tertiary);
+      }
+
+      .toolbar-right {
+        display: flex;
+        align-items: center;
+        gap: var(--space-sm);
+        margin-left: auto;
+      }
+
+      /* ── Flight Schedule Cards ──────────────────────────────── */
+      /* Card-based replacement for the old schedule table. Reuses the
+         same design tokens/badges/buttons as the rest of the app so the
+         cards look native to the PineVision UI.
+
+         Layout: a single inline row — Date & Time → Block Name →
+         Section → Operator → Status → Actions — with flexbox (not fixed
+         breakpoints) handling graceful wrapping on narrow widths, plus a
+         lower-hierarchy Notes row underneath. */
+      .schedule-list {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-md);
+        margin-top: var(--space-lg);
+      }
+
+      .schedule-card {
+        background-color: var(--surf);
+        border: 1px solid var(--color-border-secondary);
+        border-radius: var(--radius-lg);
+        padding: var(--space-lg) var(--card-padding-x);
+        box-shadow: var(--shadow-card);
+        transition:
+          box-shadow var(--transition-fast),
+          background-color 0.3s ease,
+          border-color 0.3s ease;
+        min-width: 0;
+        overflow: hidden;
+      }
+
+      .schedule-card:hover {
+        box-shadow: var(--shadow-md);
+      }
+
+      .schedule-card-row {
         display: flex;
         flex-wrap: wrap;
-        gap: var(--space-md);
         align-items: center;
-        padding: var(--space-md) var(--space-lg);
-        background-color: var(--surf);
-        border: var(--border-width-base) solid var(--border);
-        border-radius: var(--radius-lg);
-        margin-bottom: var(--space-lg);
+        gap: var(--space-md) var(--space-xl);
+        min-width: 0;
       }
 
-      .filter-label {
-        font-size: var(--font-size-sm);
-        font-weight: var(--font-weight-medium);
+      /* ── Date & Time badge — always the leftmost element. Reuses the
+         day/month/year visual hierarchy from the Scan Log date badge
+         (scans.html: .sdate / .sdate-day / .sdate-month / .sdate-year),
+         wrapped in a bordered rectangle and with the scheduled time
+         appended below. ── */
+      .schedule-date-badge {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-width: 68px;
+        flex-shrink: 0;
+        padding: var(--space-sm) var(--space-md);
+        border: 1px solid var(--color-border-secondary);
+        border-radius: var(--radius-md);
+        background-color: var(--color-background-secondary);
+        line-height: 1.1;
+      }
+
+      .schedule-date-day {
+        font-size: var(--font-size-2xl);
+        font-weight: var(--font-weight-bold);
+        color: var(--color-text-primary);
+        line-height: 1;
+      }
+
+      .schedule-date-month {
+        margin-top: 2px;
+        font-size: 11px;
+        font-weight: var(--font-weight-semibold);
         color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+
+      .schedule-date-year {
+        font-size: 10px;
+        color: var(--color-text-tertiary);
+      }
+
+      .schedule-date-time {
+        margin-top: var(--space-xs);
+        padding-top: var(--space-xs);
+        border-top: 1px solid var(--color-border-secondary);
+        width: 100%;
+        text-align: center;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        font-weight: var(--font-weight-semibold);
+        color: var(--color-text-secondary);
         white-space: nowrap;
       }
 
-      .filter-btn {
-        padding: 4px var(--space-md);
+      /* Block Name, Section, Operator — inline fields between the date
+         badge and the status/actions group. */
+      .schedule-card-fields {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        row-gap: var(--space-md);
+        column-gap: var(--space-2xl);
+        flex: 1 1 320px;
+        min-width: 0;
+      }
+
+      .schedule-field {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        min-width: 0;
+      }
+
+      .schedule-field-label {
+        font-size: 11px;
+        font-weight: var(--font-weight-bold);
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        color: var(--muted);
+      }
+
+      .schedule-field-value {
         font-size: var(--font-size-sm);
         font-weight: var(--font-weight-medium);
-        border: var(--border-width-base) solid var(--border);
-        border-radius: var(--radius-pill);
-        background-color: var(--surf2);
+        color: var(--color-text-primary);
+        overflow-wrap: anywhere;
+      }
+
+      /* Block Name — highest hierarchy alongside Status. No internal
+         block ID/identifier is ever rendered here — only the
+         human-readable name (with the same existing-data fallback the
+         page already used). */
+      .schedule-field-block {
+        flex: 1 1 150px;
+        max-width: 280px;
+      }
+
+      .schedule-field-block .schedule-field-value {
+        font-size: var(--font-size-md);
+        font-weight: var(--font-weight-bold);
+        letter-spacing: -0.01em;
+        line-height: var(--line-height-tight);
+      }
+
+      .schedule-field-section {
+        flex: 0 1 110px;
+        max-width: 150px;
+      }
+
+      .schedule-field-operator {
+        flex: 1 1 140px;
+        max-width: 220px;
+      }
+
+      /* Section / Operator — secondary hierarchy */
+      .schedule-field-section .schedule-field-value,
+      .schedule-field-operator .schedule-field-value {
         color: var(--color-text-secondary);
-        cursor: pointer;
-        transition: all var(--transition-fast);
-        font-family: var(--font-sans);
-        line-height: 1.5;
+        font-weight: var(--font-weight-normal);
       }
 
-      .filter-btn:hover {
-        border-color: var(--green);
-        color: var(--green);
-      }
-
-      .filter-btn.active {
-        background-color: var(--green-bg);
-        border-color: var(--green);
-        color: var(--green);
-      }
-
-      /* ══════════════════════════════════════════════════════════
-   MISSION CARD
-   ══════════════════════════════════════════════════════════ */
-
-      .mission-card {
-        background-color: #f9fafb;
-        border: 1px solid #e5e7eb;
-        border-radius: 12px;
-        padding: 1.5rem;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
-        transition: all 0.2s;
-        margin-bottom: 0.75rem;
-      }
-
-      .mission-card:hover {
-        border-color: #d1d5db;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-        transform: translateY(-1px);
-        cursor: pointer;
-      }
-
-      /* Main row (first line) */
-      .mission-card-main {
+      /* Status + action icons — grouped together and pushed to the far
+         right via margin-left: auto (rather than a hardcoded width), so
+         they never force the row to overflow. */
+      .schedule-card-side {
         display: flex;
-        align-items: flex-start;
-        gap: 2rem;
-      }
-
-      /* Left column: identity */
-      .mission-card-identity {
+        align-items: center;
+        gap: var(--space-lg);
         flex-shrink: 0;
-        min-width: 200px;
-        padding-right: 2rem;
-        border-right: 1px solid #e5e7eb;
+        margin-left: auto;
       }
 
-      .mission-id {
-        font-size: 0.6875rem;
-        color: #9ca3af;
-        font-weight: 500;
-        text-transform: uppercase;
-        letter-spacing: 0.03em;
-        margin-bottom: 0.25rem;
+      .schedule-field-status {
+        align-items: flex-end;
       }
 
-      .mission-date {
-        font-size: 1.0625rem;
-        font-weight: 600;
-        color: #111827;
-        margin-bottom: 0.125rem;
-        line-height: 1.3;
-      }
-
-      .mission-title {
-        font-size: 0.8125rem;
-        color: #6b7280;
-        font-weight: 400;
-        line-height: 1.4;
-      }
-
-      /* Middle: stats grid */
-      .mission-stats-grid {
+      .schedule-card-actions {
         display: flex;
-        align-items: flex-start;
-        gap: 2.5rem;
-        flex: 1;
-        flex-wrap: nowrap;
-      }
-
-      .stat-item {
-        display: flex;
-        flex-direction: column;
-        gap: 0.25rem;
-        white-space: nowrap;
+        align-items: center;
+        gap: var(--space-xs);
         flex-shrink: 0;
       }
 
-      .stat-label {
-        font-size: 0.6875rem;
-        color: #9ca3af;
-        font-weight: 500;
-        text-transform: uppercase;
-        letter-spacing: 0.02em;
+      .schedule-card-no-actions {
+        color: var(--muted);
+        font-size: var(--font-size-xs);
       }
 
-      .stat-value {
-        font-size: 0.8125rem;
-        font-weight: 600;
-        color: #111827;
-        font-family: "Courier New", Courier, monospace;
-        line-height: 1.4;
-      }
-
-      /* Right: status badge */
-      .mission-card-status {
-        flex-shrink: 0;
-        margin-left: 1.5rem;
-      }
-
-      /* Notes row (second line) */
-      .mission-card-notes {
-        display: flex;
-        flex-direction: column;
-        gap: 0.25rem;
-        margin-top: 1rem;
-        padding-left: calc(200px + 2rem);
-      }
-
-      .notes-label {
-        font-size: 0.6875rem;
-        color: #9ca3af;
-        font-weight: 500;
-        text-transform: uppercase;
-        letter-spacing: 0.02em;
-      }
-
-      .notes-value {
-        font-size: 0.8125rem;
-        font-weight: 600;
-        color: #111827;
-        font-family: "Courier New", Courier, monospace;
-        line-height: 1.4;
-      }
-
-      /* Status badge */
-      .badge {
+      /* Icon action buttons — replace the old text buttons so actions
+         stay compact; the tooltip + aria-label preserve the label that
+         used to live in the button text. */
+      .icon-btn {
         display: inline-flex;
         align-items: center;
-        gap: 0.375rem;
-        padding: 0.375rem 0.75rem;
-        border-radius: 6px;
-        font-size: 0.8125rem;
-        font-weight: 500;
-        white-space: nowrap;
-      }
-
-      .badge .bdot {
-        width: 6px;
-        height: 6px;
-        border-radius: 50%;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        border: 1px solid var(--color-border-secondary);
+        border-radius: var(--radius-md);
+        background-color: var(--color-background-primary);
+        color: var(--color-text-secondary);
+        cursor: pointer;
+        position: relative;
         flex-shrink: 0;
+        transition:
+          background-color var(--transition-fast),
+          border-color var(--transition-fast),
+          color var(--transition-fast);
       }
 
-      .badge.scheduled {
-        background-color: #d1fae5;
-        color: #065f46;
+      .icon-btn svg {
+        pointer-events: none;
+        display: block;
       }
 
-      .badge.scheduled .bdot {
-        background-color: #10b981;
+      .icon-btn:hover,
+      .icon-btn:focus-visible {
+        background-color: var(--color-background-secondary);
+        border-color: var(--color-border-primary);
+        color: var(--color-text-primary);
       }
 
-      .badge.completed {
-        background-color: #e5e7eb;
-        color: #6b7280;
+      .icon-btn:focus-visible {
+        outline: none;
+        box-shadow: var(--shadow-focus);
       }
 
-      .badge.completed .bdot {
-        background-color: #9ca3af;
+      .icon-btn-danger:hover,
+      .icon-btn-danger:focus-visible {
+        background-color: var(--red-bg);
+        border-color: rgba(139, 32, 32, 0.3);
+        color: var(--red);
       }
 
-      .badge.in-progress {
-        background-color: #fef3c7;
-        color: #92400e;
+      /* Lightweight hover/focus tooltip — same dark-pill styling already
+         used for the collapsed sidebar's icon tooltips. */
+      .icon-btn[data-tooltip]:hover::after,
+      .icon-btn[data-tooltip]:focus-visible::after {
+        content: attr(data-tooltip);
+        position: absolute;
+        bottom: calc(100% + 7px);
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(16, 22, 18, 0.94);
+        color: #fff;
+        font-size: 11px;
+        font-weight: var(--font-weight-medium);
+        padding: 4px 8px;
+        border-radius: 4px;
+        white-space: nowrap;
+        pointer-events: none;
+        z-index: var(--z-tooltip);
       }
 
-      .badge.in-progress .bdot {
-        background-color: #f59e0b;
+      /* Notes — lowest hierarchy, full card width to give long text room
+         to wrap naturally instead of crowding the main info row. */
+      .schedule-card-notes {
+        display: flex;
+        gap: var(--space-sm);
+        margin-top: var(--space-md);
+        padding-top: var(--space-md);
+        border-top: 1px solid var(--border);
       }
 
-      .badge.cancelled {
-        background-color: #fee2e2;
-        color: #991b1b;
+      .schedule-card-notes-label {
+        flex-shrink: 0;
+        padding-top: 1px;
+        font-size: 11px;
+        font-weight: var(--font-weight-bold);
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        color: var(--color-text-tertiary);
       }
 
-      .badge.cancelled .bdot {
-        background-color: #dc2626;
+      .schedule-card-notes-text {
+        flex: 1;
+        min-width: 0;
+        font-size: var(--font-size-xs);
+        color: var(--color-text-tertiary);
+        line-height: var(--line-height-relaxed);
+        overflow-wrap: anywhere;
+        white-space: pre-line;
       }
 
-      /* Responsive */
-      @media (max-width: 1400px) {
-        .mission-stats-grid {
-          gap: 2rem;
-        }
-
-        .mission-card-main {
-          gap: 1.5rem;
-        }
+      /* Loading / empty / error / no-match states */
+      .schedule-card-message {
+        padding: var(--space-xl);
+        text-align: center;
+        color: var(--muted);
+        font-size: var(--font-size-sm);
+        background-color: var(--surf);
+        border: 1px dashed var(--color-border-secondary);
+        border-radius: var(--radius-lg);
       }
 
-      @media (max-width: 1200px) {
-        .mission-stats-grid {
-          gap: 1.5rem;
-        }
-      }
-
-      @media (max-width: 768px) {
-        .mission-card-main {
-          flex-direction: column;
-          align-items: flex-start;
-          gap: 1.5rem;
-        }
-
-        .mission-card-identity {
-          padding-right: 0;
-          padding-bottom: 1.5rem;
-          border-right: none;
-          border-bottom: 1px solid #e5e7eb;
-          width: 100%;
-        }
-
-        .mission-stats-grid {
-          width: 100%;
-          flex-wrap: wrap;
-          gap: 1rem 2rem;
-        }
-
-        .mission-card-status {
+      /* Below ~560px the status/actions group drops its right-alignment
+         so it doesn't get squeezed against wrapped fields. The Date &
+         Time badge itself never shrinks or wraps at any width. */
+      @media (max-width: 560px) {
+        .schedule-card-side {
           margin-left: 0;
+          width: 100%;
+          justify-content: space-between;
         }
 
-        .mission-card-notes {
-          padding-left: 0;
-          margin-top: 1rem;
-        }
-      }
-
-      @media (max-width: 576px) {
-        .stat-item {
-          min-width: 100%;
+        .schedule-field-status {
+          align-items: flex-start;
         }
       }
 
@@ -583,7 +677,7 @@
                       width="20"
                     />
                   </span>
-                  <span class="nav-link-text">Flight Missions</span>
+                  <span class="nav-link-text">Flight Schedules</span>
                 </a>
               </li>
               <li>
@@ -685,182 +779,139 @@
         </header>
 
         <div class="container-fluid py-4 px-4 page-container">
-          <!-- Page Header -->
-          <div class="mb-4">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-              <div>
+          <!-- Flight Schedules: search (left) + Add Schedule (right), then table -->
+          <div class="tcard" style="margin-bottom: 0">
+            <div class="toolbar">
+              <div class="toolbar-search">
+                <span class="toolbar-search-icon">
+                  <svg
+                    width="13"
+                    height="13"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                </span>
+                <input
+                  type="text"
+                  id="schedule-search"
+                  placeholder="Search by block, section, operator, notes or status…"
+                />
               </div>
-              <button class="btn btn-primary" onclick="openAddMissionModal()">
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.5"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <line x1="12" y1="5" x2="12" y2="19" />
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
-                <span>Add Mission</span>
-              </button>
+              <div class="toolbar-right">
+                <span
+                  id="schedule-result-count"
+                  style="
+                    font-size: 11px;
+                    color: var(--muted);
+                    font-family: var(--font-mono);
+                    white-space: nowrap;
+                  "
+                ></span>
+                <button class="btn btn-primary" onclick="openAddScheduleModal()">
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                  <span>Add Schedule</span>
+                </button>
+              </div>
             </div>
+
           </div>
 
-          <!-- Filter Bar -->
-          <div class="filter-bar">
-            <span class="filter-label">Status:</span>
-            <button
-              class="filter-btn active"
-              data-value="all"
-              onclick="setFilter('all', this)"
-            >
-              All
-            </button>
-            <button
-              class="filter-btn"
-              data-value="scheduled"
-              onclick="setFilter('scheduled', this)"
-            >
-              Scheduled
-            </button>
-            <button
-              class="filter-btn"
-              data-value="in-progress"
-              onclick="setFilter('in-progress', this)"
-            >
-              In Progress
-            </button>
-            <button
-              class="filter-btn"
-              data-value="completed"
-              onclick="setFilter('completed', this)"
-            >
-              Completed
-            </button>
-            <button
-              class="filter-btn"
-              data-value="cancelled"
-              onclick="setFilter('cancelled', this)"
-            >
-              Cancelled
-            </button>
-          </div>
-
-          <!-- Mission Cards Grid -->
-          <div class="row g-3" id="missions-grid">
+          <!-- Flight Schedules -->
+          <div class="schedule-list" id="schedules-list">
             <!-- Populated by JavaScript -->
           </div>
         </div>
       </main>
     </div>
 
-    <!-- Add Mission Modal -->
-    <div id="add-mission-modal" class="modal">
+    <!-- Add Schedule Modal -->
+    <div id="add-schedule-modal" class="modal">
       <div class="modal-content">
         <div class="modal-header">
-          <h2 class="modal-title">Add Flight Mission</h2>
-          <button class="modal-close" onclick="closeAddMissionModal()">
+          <h2 class="modal-title">Add Flight Schedule</h2>
+          <button class="modal-close" onclick="closeAddScheduleModal()">
             &times;
           </button>
         </div>
-        <form id="add-mission-form" onsubmit="handleAddMission(event)">
+        <form id="add-schedule-form" onsubmit="handleAddSchedule(event)">
           <div class="modal-body">
-            <div class="form-row">
-              <div class="form-group">
-                <label class="form-label" for="mission-date"
-                  >Mission Date *</label
-                >
-                <input
-                  type="date"
-                  id="mission-date"
-                  name="missionDate"
-                  class="form-input"
-                  required
-                />
-              </div>
-              <div class="form-group">
-                <label class="form-label" for="mission-time"
-                  >Scheduled Time *</label
-                >
-                <input
-                  type="time"
-                  id="mission-time"
-                  name="missionTime"
-                  class="form-input"
-                  required
-                />
-              </div>
-            </div>
-
+            <div class="form-error" id="add-schedule-form-error"></div>
             <div class="form-group">
-              <label class="form-label" for="mission-area"
-                >Area to Cover *</label
-              >
+              <label class="form-label" for="schedule-block">Fruit Block *</label>
               <select
-                id="mission-area"
-                name="missionArea"
+                id="schedule-block"
+                name="blockId"
                 class="form-select"
                 required
               >
-                <option value="">Select coverage area</option>
-                <option value="All 8 blocks (26.8 ha)">
-                  All 8 blocks (26.8 ha)
-                </option>
-                <option value="North A + North B (6.0 ha)">
-                  North A + North B (6.0 ha)
-                </option>
-                <option value="South A + South B (6.6 ha)">
-                  South A + South B (6.6 ha)
-                </option>
-                <option value="East A + East B (6.5 ha)">
-                  East A + East B (6.5 ha)
-                </option>
-                <option value="West A + West B (6.7 ha)">
-                  West A + West B (6.7 ha)
-                </option>
-                <option value="Custom">Custom</option>
+                <option value="">Select a fruit block</option>
               </select>
             </div>
 
             <div class="form-row">
               <div class="form-group">
-                <label class="form-label" for="mission-operator"
-                  >Operator *</label
+                <label class="form-label" for="schedule-date"
+                  >Flight Date *</label
                 >
-                <select
-                  id="mission-operator"
-                  name="operator"
-                  class="form-select"
+                <input
+                  type="date"
+                  id="schedule-date"
+                  name="scheduleDate"
+                  class="form-input"
                   required
-                >
-                  <option value="">Select operator</option>
-                  <option value="Juan Dela Cruz">Juan Dela Cruz</option>
-                  <option value="Maria Santos">Maria Santos</option>
-                  <option value="Pedro Reyes">Pedro Reyes</option>
-                </select>
+                />
               </div>
               <div class="form-group">
-                <label class="form-label" for="mission-drone">Drone *</label>
-                <select
-                  id="mission-drone"
-                  name="drone"
-                  class="form-select"
-                  required
+                <label class="form-label" for="schedule-time"
+                  >Scheduled Time *</label
                 >
-                  <option value="DJI Mavic 3 Multispectral">
-                    DJI Mavic 3 Multispectral
-                  </option>
-                </select>
+                <input
+                  type="time"
+                  id="schedule-time"
+                  name="scheduleTime"
+                  class="form-input"
+                  required
+                />
               </div>
             </div>
 
             <div class="form-group">
-              <label class="form-label" for="mission-notes">Notes</label>
+              <label class="form-label" for="schedule-operator"
+                >Operator *</label
+              >
+              <input
+                type="text"
+                id="schedule-operator"
+                name="operator"
+                class="form-input"
+                placeholder="e.g., Juan Dela Cruz"
+                required
+              />
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="schedule-notes">Notes</label>
               <textarea
-                id="mission-notes"
+                id="schedule-notes"
                 name="notes"
                 class="form-textarea"
                 placeholder="Optional: special instructions or objectives..."
@@ -871,51 +922,68 @@
             <button
               type="button"
               class="btn btn-secondary"
-              onclick="closeAddMissionModal()"
+              onclick="closeAddScheduleModal()"
             >
               Cancel
             </button>
             <button type="submit" class="btn btn-primary">
-              Schedule Mission
+              Schedule Flight
             </button>
           </div>
         </form>
       </div>
     </div>
 
-    <!-- Edit Mission Modal -->
-    <div id="edit-mission-modal" class="modal">
+    <!-- Edit Schedule Modal -->
+    <div id="edit-schedule-modal" class="modal">
       <div class="modal-content">
         <div class="modal-header">
-          <h2 class="modal-title">Edit Flight Mission</h2>
-          <button class="modal-close" onclick="closeEditMissionModal()">
+          <h2 class="modal-title">Edit Flight Schedule</h2>
+          <button class="modal-close" onclick="closeEditScheduleModal()">
             &times;
           </button>
         </div>
-        <form id="edit-mission-form" onsubmit="handleEditMission(event)">
-          <input type="hidden" id="edit-mission-id" name="missionId" />
+        <form id="edit-schedule-form" onsubmit="handleEditSchedule(event)">
+          <input type="hidden" id="edit-schedule-id" name="scheduleId" />
           <div class="modal-body">
+            <div class="form-error" id="edit-schedule-form-error"></div>
+            <div class="form-group">
+              <label class="form-label">Fruit Block</label>
+              <div
+                id="edit-schedule-block-display"
+                style="
+                  padding: 0.625rem 0.875rem;
+                  font-size: 0.9375rem;
+                  font-family: var(--font-mono);
+                  border: 1px solid #d1d5db;
+                  border-radius: 6px;
+                  background-color: #f9fafb;
+                  color: #374151;
+                "
+              ></div>
+            </div>
+
             <div class="form-row">
               <div class="form-group">
-                <label class="form-label" for="edit-mission-date"
-                  >Mission Date *</label
+                <label class="form-label" for="edit-schedule-date"
+                  >Flight Date *</label
                 >
                 <input
                   type="date"
-                  id="edit-mission-date"
-                  name="missionDate"
+                  id="edit-schedule-date"
+                  name="scheduleDate"
                   class="form-input"
                   required
                 />
               </div>
               <div class="form-group">
-                <label class="form-label" for="edit-mission-time"
+                <label class="form-label" for="edit-schedule-time"
                   >Scheduled Time *</label
                 >
                 <input
                   type="time"
-                  id="edit-mission-time"
-                  name="missionTime"
+                  id="edit-schedule-time"
+                  name="scheduleTime"
                   class="form-input"
                   required
                 />
@@ -923,72 +991,23 @@
             </div>
 
             <div class="form-group">
-              <label class="form-label" for="edit-mission-area"
-                >Area to Cover *</label
+              <label class="form-label" for="edit-schedule-operator"
+                >Operator *</label
               >
-              <select
-                id="edit-mission-area"
-                name="missionArea"
-                class="form-select"
+              <input
+                type="text"
+                id="edit-schedule-operator"
+                name="operator"
+                class="form-input"
+                placeholder="e.g., Juan Dela Cruz"
                 required
-              >
-                <option value="All 8 blocks (26.8 ha)">
-                  All 8 blocks (26.8 ha)
-                </option>
-                <option value="North A + North B (6.0 ha)">
-                  North A + North B (6.0 ha)
-                </option>
-                <option value="South A + South B (6.6 ha)">
-                  South A + South B (6.6 ha)
-                </option>
-                <option value="East A + East B (6.5 ha)">
-                  East A + East B (6.5 ha)
-                </option>
-                <option value="West A + West B (6.7 ha)">
-                  West A + West B (6.7 ha)
-                </option>
-                <option value="Custom">Custom</option>
-              </select>
-            </div>
-
-            <div class="form-row">
-              <div class="form-group">
-                <label class="form-label" for="edit-mission-operator"
-                  >Operator *</label
-                >
-                <select
-                  id="edit-mission-operator"
-                  name="operator"
-                  class="form-select"
-                  required
-                >
-                  <option value="Juan Dela Cruz">Juan Dela Cruz</option>
-                  <option value="Maria Santos">Maria Santos</option>
-                  <option value="Pedro Reyes">Pedro Reyes</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label class="form-label" for="edit-mission-status"
-                  >Status *</label
-                >
-                <select
-                  id="edit-mission-status"
-                  name="status"
-                  class="form-select"
-                  required
-                >
-                  <option value="scheduled">Scheduled</option>
-                  <option value="in-progress">In Progress</option>
-                  <option value="completed">Completed</option>
-                  <option value="cancelled">Cancelled</option>
-                </select>
-              </div>
+              />
             </div>
 
             <div class="form-group">
-              <label class="form-label" for="edit-mission-notes">Notes</label>
+              <label class="form-label" for="edit-schedule-notes">Notes</label>
               <textarea
-                id="edit-mission-notes"
+                id="edit-schedule-notes"
                 name="notes"
                 class="form-textarea"
                 placeholder="Optional: special instructions or objectives..."
@@ -999,13 +1018,50 @@
             <button
               type="button"
               class="btn btn-secondary"
-              onclick="closeEditMissionModal()"
+              onclick="closeEditScheduleModal()"
             >
               Cancel
             </button>
             <button type="submit" class="btn btn-primary">Save Changes</button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <!-- Cancel Schedule Confirmation Modal -->
+    <div id="cancel-schedule-modal" class="modal">
+      <div class="modal-content" style="max-width: 420px">
+        <div class="modal-header">
+          <h2 class="modal-title">Cancel Flight Schedule</h2>
+          <button class="modal-close" onclick="closeCancelScheduleModal()">
+            &times;
+          </button>
+        </div>
+        <div class="modal-body">
+          <p style="font-size: 0.9375rem; color: #374151; margin: 0">
+            Are you sure you want to cancel the flight scheduled for
+            <strong id="cancel-schedule-datetime"></strong> on block
+            <strong id="cancel-schedule-block"></strong>? This will mark it
+            as cancelled; it will remain in the schedule history.
+          </p>
+        </div>
+        <div class="modal-footer">
+          <button
+            type="button"
+            class="btn btn-secondary"
+            onclick="closeCancelScheduleModal()"
+          >
+            Keep Schedule
+          </button>
+          <button
+            type="button"
+            class="btn btn-primary"
+            onclick="confirmCancelSchedule()"
+            style="background-color: var(--red); border-color: var(--red)"
+          >
+            Cancel Schedule
+          </button>
+        </div>
       </div>
     </div>
 

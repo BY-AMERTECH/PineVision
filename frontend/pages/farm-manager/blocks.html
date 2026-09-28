@@ -1,0 +1,1546 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+    <link rel="dns-prefetch" href="https://firestore.googleapis.com">
+    <link rel="dns-prefetch" href="https://identitytoolkit.googleapis.com">
+    <script>
+      (function () {
+        try {
+          var s = JSON.parse(
+            localStorage.getItem("pinevision_settings") || "{}",
+          );
+          if (s.theme === "dark")
+            document.documentElement.classList.add("dark-mode");
+        } catch (e) {}
+      })();
+    </script>
+    <title>Fruit Blocks - PineVision</title>
+    <link rel="stylesheet" href="../../bootstrap/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="../../css/tokens.css" />
+    <link rel="stylesheet" href="../../css/layout.css" />
+    <link rel="stylesheet" href="../../css/components.css" />
+    <style>
+      /* ── Toolbar (search + filters) ──────────────────────────── */
+      .fb-toolbar {
+        display: flex;
+        align-items: center;
+        gap: var(--space-md);
+        padding: var(--space-md) var(--space-lg);
+        background-color: var(--surf);
+        border: 1px solid var(--color-border-secondary);
+        border-radius: var(--radius-lg);
+        margin-bottom: var(--space-xl);
+        flex-wrap: wrap;
+        box-shadow: var(--shadow-xs);
+      }
+
+      .fb-search {
+        position: relative;
+        flex: 1;
+        min-width: 220px;
+        max-width: 360px;
+      }
+
+      .fb-search-icon {
+        position: absolute;
+        left: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--muted);
+        pointer-events: none;
+        display: flex;
+      }
+
+      .fb-search input {
+        width: 100%;
+        padding: 8px 12px 8px 34px;
+        font-size: var(--font-size-sm);
+        border: 1px solid var(--color-border-primary);
+        border-radius: var(--radius-md);
+        background: var(--color-background-primary);
+        color: var(--color-text-primary);
+        font-family: var(--font-sans);
+        transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+      }
+
+      .fb-search input:focus {
+        outline: none;
+        border-color: var(--green);
+        box-shadow: 0 0 0 3px var(--green-bg);
+      }
+
+      .fb-search input::placeholder { color: var(--color-text-tertiary); }
+
+      .fb-filter-select {
+        padding: 7px 10px;
+        font-size: var(--font-size-sm);
+        border: 1px solid var(--color-border-primary);
+        border-radius: var(--radius-md);
+        background: var(--color-background-primary);
+        color: var(--color-text-primary);
+        font-family: var(--font-sans);
+        cursor: pointer;
+        transition: border-color var(--transition-fast);
+        max-width: 180px;
+      }
+
+      .fb-filter-select:focus {
+        outline: none;
+        border-color: var(--green);
+        box-shadow: 0 0 0 3px var(--green-bg);
+      }
+
+      .fb-toolbar-right {
+        display: flex;
+        align-items: center;
+        gap: var(--space-md);
+        margin-left: auto;
+      }
+
+      .fb-result-count {
+        font-size: 11px;
+        color: var(--muted);
+        font-family: var(--font-mono);
+        white-space: nowrap;
+      }
+
+      /* ── Card list ────────────────────────────────────────────── */
+      .fb-list {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-lg);
+      }
+
+      .fb-card {
+        display: flex;
+        align-items: stretch;
+        background-color: var(--surf);
+        border: 1px solid var(--color-border-secondary);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-card);
+        overflow: hidden;
+        transition: box-shadow var(--transition-fast), transform var(--transition-fast), border-color var(--transition-fast);
+      }
+
+      .fb-card:hover {
+        box-shadow: var(--shadow-md);
+        transform: translateY(-2px);
+        border-color: var(--green-300);
+      }
+
+      /* Left action rail */
+      .fb-rail {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: var(--space-sm);
+        padding: var(--space-lg) var(--space-md);
+        background-color: var(--surf2);
+        border-right: 1px solid var(--color-border-secondary);
+        flex-shrink: 0;
+      }
+
+      .fb-rail-btn {
+        position: relative;
+        width: 38px;
+        height: 38px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--color-border-primary);
+        border-radius: var(--radius-md);
+        background-color: var(--surf);
+        color: var(--color-text-secondary);
+        cursor: pointer;
+        transition: all var(--transition-fast);
+      }
+
+      .fb-rail-btn:hover {
+        background-color: var(--green-bg);
+        border-color: var(--green);
+        color: var(--green);
+        transform: translateY(-1px);
+      }
+
+      .fb-rail-btn:active { transform: translateY(0); }
+
+      /* Tooltip — anchored to the right so it never clips against the
+         card's left edge / viewport edge. */
+      .fb-rail-btn[data-tooltip]::after {
+        content: attr(data-tooltip);
+        position: absolute;
+        left: calc(100% + 10px);
+        top: 50%;
+        transform: translateY(-50%) translateX(-4px);
+        background-color: var(--color-text-primary);
+        color: var(--color-background-primary);
+        font-size: 11px;
+        font-weight: var(--font-weight-medium);
+        padding: 5px 9px;
+        border-radius: var(--radius-sm);
+        white-space: nowrap;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity var(--transition-fast), transform var(--transition-fast);
+        z-index: var(--z-tooltip);
+      }
+
+      .fb-rail-btn:hover[data-tooltip]::after {
+        opacity: 1;
+        transform: translateY(-50%) translateX(0);
+      }
+
+      /* Right info region */
+      .fb-body {
+        flex: 1;
+        min-width: 0;
+        padding: var(--space-lg) var(--space-xl);
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-md);
+        cursor: pointer;
+      }
+
+      .fb-head-row {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: var(--space-md);
+        flex-wrap: wrap;
+      }
+
+      .fb-block-id {
+        font-size: var(--font-size-2xl);
+        font-weight: var(--font-weight-semibold);
+        color: var(--color-text-primary);
+        letter-spacing: -0.01em;
+        line-height: 1.2;
+      }
+
+      .fb-head-badges {
+        display: flex;
+        align-items: center;
+        gap: var(--space-sm);
+        flex-shrink: 0;
+      }
+
+      .fb-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 4px 11px;
+        border-radius: var(--radius-pill);
+        font-size: 12px;
+        font-weight: var(--font-weight-semibold);
+        letter-spacing: 0.01em;
+        background-color: var(--green-bg);
+        color: var(--green);
+        border: 1px solid rgba(45, 106, 63, 0.18);
+        white-space: nowrap;
+      }
+
+      .fb-chip svg { flex-shrink: 0; }
+
+      .fb-operator-row {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-size: var(--font-size-sm);
+        color: var(--color-text-primary);
+        font-weight: var(--font-weight-medium);
+      }
+
+      .fb-operator-row svg { color: var(--muted); flex-shrink: 0; }
+
+      .fb-meta-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-lg);
+      }
+
+      .fb-meta-item {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-size: var(--font-size-sm);
+        color: var(--color-text-secondary);
+      }
+
+      .fb-meta-item svg { color: var(--color-text-tertiary); flex-shrink: 0; }
+
+      .fb-meta-item strong {
+        color: var(--color-text-primary);
+        font-weight: var(--font-weight-medium);
+      }
+
+      .fb-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: var(--space-md);
+        padding-top: var(--space-md);
+        border-top: 1px solid var(--border);
+        margin-top: var(--space-xs);
+      }
+
+      .fb-population {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-size: var(--font-size-sm);
+        color: var(--color-text-secondary);
+      }
+
+      .fb-population svg { color: var(--color-text-tertiary); flex-shrink: 0; }
+
+      .fb-population strong {
+        color: var(--color-text-primary);
+        font-weight: var(--font-weight-semibold);
+        font-family: var(--font-mono);
+      }
+
+      .fb-breakdown {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-lg);
+      }
+
+      .fb-stat {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: var(--font-size-xs);
+        font-family: var(--font-mono);
+        color: var(--muted);
+      }
+
+      .fb-stat-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+
+      .fb-stat-val {
+        font-weight: var(--font-weight-semibold);
+      }
+
+      /* ── Skeleton (loading) card ──────────────────────────────── */
+      .fb-skel-card {
+        display: flex;
+        background-color: var(--surf);
+        border: 1px solid var(--color-border-secondary);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+      }
+
+      .fb-skel-rail {
+        width: 70px;
+        flex-shrink: 0;
+        background-color: var(--surf2);
+        border-right: 1px solid var(--color-border-secondary);
+      }
+
+      .fb-skel-body {
+        flex: 1;
+        padding: var(--space-lg) var(--space-xl);
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-md);
+      }
+
+      .fb-skel-line { height: 14px; border-radius: var(--radius-sm); }
+
+      /* ── Empty / no-results state ─────────────────────────────── */
+      .fb-empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: var(--space-4xl) var(--space-xl);
+        background-color: var(--surf);
+        border: 1px solid var(--color-border-secondary);
+        border-radius: var(--radius-lg);
+        color: var(--muted);
+      }
+
+      .fb-empty-icon {
+        width: 52px;
+        height: 52px;
+        border-radius: var(--radius-xl);
+        background: var(--green-bg);
+        color: var(--green-500);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: var(--space-lg);
+      }
+
+      .fb-empty-title {
+        font-size: var(--font-size-md);
+        font-weight: var(--font-weight-semibold);
+        color: var(--color-text-primary);
+        margin-bottom: var(--space-sm);
+      }
+
+      .fb-empty-text {
+        font-size: var(--font-size-sm);
+        color: var(--muted);
+        max-width: 380px;
+        line-height: var(--line-height-relaxed);
+        margin-bottom: var(--space-lg);
+      }
+
+      /* ── Trend modal rows (reused pattern) ───────────────────── */
+      .trend-row {
+        display: flex;
+        align-items: center;
+        gap: var(--space-md);
+        padding: 7px 0;
+        border-bottom: var(--border-width-thin) solid var(--border);
+      }
+      .trend-row:last-child { border-bottom: none; }
+      .trend-date {
+        font-size: var(--font-size-xs);
+        font-family: var(--font-mono);
+        color: var(--muted);
+        min-width: 52px;
+      }
+      .trend-bar-wrap { flex: 1; }
+      .trend-val {
+        font-size: var(--font-size-xs);
+        font-family: var(--font-mono);
+        font-weight: var(--font-weight-medium);
+        color: var(--color-text-primary);
+        min-width: 44px;
+        text-align: right;
+      }
+      .bar-wrap {
+        position: relative;
+        width: 100%;
+        height: 8px;
+        background-color: var(--surf2);
+        border-radius: var(--radius-pill);
+        overflow: hidden;
+      }
+      .bar-fill {
+        height: 100%;
+        border-radius: var(--radius-pill);
+        transition: width 0.3s ease;
+      }
+
+      @media (max-width: 860px) {
+        .fb-card { flex-direction: column; }
+        .fb-rail {
+          flex-direction: row;
+          justify-content: flex-start;
+          border-right: none;
+          border-bottom: 1px solid var(--color-border-secondary);
+          padding: var(--space-sm) var(--space-lg);
+        }
+        .fb-rail-btn[data-tooltip]::after {
+          left: 50%;
+          top: calc(100% + 8px);
+          transform: translateX(-50%) translateY(-4px);
+        }
+        .fb-rail-btn:hover[data-tooltip]::after {
+          transform: translateX(-50%) translateY(0);
+        }
+      }
+
+      @media (max-width: 580px) {
+        .fb-toolbar { gap: var(--space-sm); }
+        .fb-search { max-width: none; min-width: 100%; }
+        .fb-toolbar-right { margin-left: 0; width: 100%; justify-content: space-between; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-wrapper">
+      <!-- ── Sidebar ─────────────────────────────────────────────────── -->
+      <aside class="sidebar">
+        <div class="sidebar-brand">
+          <div class="sidebar-logo">
+            <img
+              src="/frontend/assets/images/pinevision-logo.svg"
+              alt="PineVision"
+              class="sidebar-logo-img"
+            />
+          </div>
+          <div class="sidebar-brand-text">
+            <div class="sidebar-brand-name">PineVision</div>
+            <div class="sidebar-brand-tagline">Farm Manager Panel</div>
+          </div>
+        </div>
+
+        <button
+          class="sidebar-collapse-btn"
+          onclick="app.toggleSidebar()"
+          aria-label="Toggle sidebar"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <polyline points="15,18 9,12 15,6" />
+          </svg>
+          <span class="nav-link-text">Collapse sidebar</span>
+        </button>
+
+        <nav class="sidebar-nav">
+          <div class="nav-section">
+            <div class="nav-section-title">Main</div>
+            <ul class="nav-links">
+              <li>
+                <a
+                  href="dashboard.html"
+                  class="nav-link"
+                  data-tooltip="Dashboard"
+                >
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-dashboard.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Dashboard</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div class="nav-section">
+            <div class="nav-section-title">Monitoring</div>
+            <ul class="nav-links">
+              <li>
+                <a href="users.html" class="nav-link" data-tooltip="Users">
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-users.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Users</span>
+                </a>
+              </li>
+              <li>
+                <a
+                  href="auditlogs.html"
+                  class="nav-link"
+                  data-tooltip="Audit Logs"
+                >
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-clipboard.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Audit Logs</span>
+                </a>
+              </li>
+              <li>
+                <a
+                  href="blocks.html"
+                  class="nav-link active"
+                  data-tooltip="Fruit Blocks"
+                >
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-leaf.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Fruit Blocks</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div class="nav-section">
+            <div class="nav-section-title">Operations</div>
+            <ul class="nav-links">
+              <li>
+                <a
+                  href="flights-scans.html"
+                  class="nav-link"
+                  data-tooltip="Flights &amp; Scans"
+                >
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-flights.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Flights &amp; Scans</span>
+                </a>
+              </li>
+              <li>
+                <a href="alerts.html" class="nav-link" data-tooltip="Alerts">
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-bell.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Alerts</span>
+                  <span
+                    class="nav-badge"
+                    id="nav-badge-alerts"
+                    style="display: none"
+                  ></span>
+                </a>
+              </li>
+              <li>
+                <a href="reports.html" class="nav-link" data-tooltip="Reports">
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-reports.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Reports</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div class="nav-section">
+            <div class="nav-section-title">System</div>
+            <ul class="nav-links">
+              <li>
+                <a
+                  href="settings.html"
+                  class="nav-link"
+                  data-tooltip="Settings"
+                >
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-cog.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Settings</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+        </nav>
+      </aside>
+
+      <!-- ── Main Content ─────────────────────────────────────────────── -->
+      <main class="main-content">
+        <!-- Topbar: page context (left) + signed-in account controls (right) -->
+        <header class="topbar">
+          <div class="topbar-page">
+            <span class="topbar-page-icon" aria-hidden="true"></span>
+            <div class="topbar-page-text">
+              <h1 class="topbar-page-title"></h1>
+              <p class="topbar-page-subtitle"></p>
+            </div>
+          </div>
+          <div class="topbar-account">
+            <button
+              type="button"
+              class="topbar-account-trigger"
+              id="topbar-account-trigger"
+              aria-haspopup="menu"
+              aria-expanded="false"
+              aria-controls="topbar-account-menu"
+              aria-label="Open account menu"
+            >
+              <span class="topbar-account-avatar" aria-hidden="true"></span>
+              <span class="topbar-account-info">
+                <span class="topbar-account-name"></span>
+                <span class="topbar-account-role"></span>
+              </span>
+              <svg
+                class="topbar-account-caret"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+            <div
+              class="topbar-account-menu"
+              id="topbar-account-menu"
+              role="menu"
+              aria-label="Account"
+              hidden
+            >
+              <div class="topbar-account-menu-header">
+                <div class="topbar-account-menu-name"></div>
+                <div class="topbar-account-menu-email"></div>
+              </div>
+              <button
+                type="button"
+                class="topbar-account-logout"
+                role="menuitem"
+                onclick="app.handleTopbarLogout()"
+              >
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+                Logout
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <div
+          class="page-container"
+          style="
+            padding: var(--page-padding);
+            max-width: var(--page-max-width);
+            margin: 0 auto;
+          "
+        >
+          <!-- Toolbar: search + filters -->
+          <div class="fb-toolbar">
+            <div class="fb-search">
+              <span class="fb-search-icon">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+              </span>
+              <input
+                type="text"
+                id="fb-search-input"
+                placeholder="Search by Block ID, section or flight operator…"
+                oninput="filterAndRender()"
+              />
+            </div>
+            <select class="fb-filter-select" id="fb-status-filter" onchange="filterAndRender()">
+              <option value="">All Statuses</option>
+              <option value="good">Healthy</option>
+              <option value="warn">Watch</option>
+              <option value="crit">Critical</option>
+              <option value="none">No Scan Data</option>
+            </select>
+            <select class="fb-filter-select" id="fb-section-filter" onchange="filterAndRender()">
+              <option value="">All Sections</option>
+            </select>
+            <select class="fb-filter-select" id="fb-operator-filter" onchange="filterAndRender()">
+              <option value="">All Flight Operators</option>
+            </select>
+            <select class="fb-filter-select" id="fb-sort-select" onchange="filterAndRender()">
+              <option value="blockid-asc">Block ID A→Z</option>
+              <option value="bearing-desc">Bearing Rate ↓</option>
+              <option value="bearing-asc">Bearing Rate ↑</option>
+              <option value="daf-desc">Growth Stage (DAF) ↓</option>
+              <option value="area-desc">Area ↓</option>
+            </select>
+            <div class="fb-toolbar-right">
+              <span class="fb-result-count" id="fb-result-count"></span>
+              <button class="btn btn-secondary btn-sm" onclick="loadBlocks()" id="fb-refresh-btn">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="23 4 23 10 17 10" />
+                  <polyline points="1 20 1 14 7 14" />
+                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                </svg>
+                <span>Refresh</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Block list -->
+          <div id="fb-list-container">
+            <div class="fb-list" id="fb-loading-list">
+              <!-- Skeleton loading cards, replaced once data resolves -->
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- EDIT BLOCK MODAL -->
+    <div id="edit-block-modal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title">Edit Block</h2>
+          <button class="modal-close" onclick="closeEditModal()">&times;</button>
+        </div>
+        <form id="edit-block-form" onsubmit="handleEditBlock(event)">
+          <div class="modal-body">
+            <div class="form-error" id="edit-form-error"></div>
+
+            <div class="form-group">
+              <label class="form-label" for="edit-blockName">Block ID *</label>
+              <input type="text" id="edit-blockName" name="blockName" class="form-input" placeholder="e.g., Block A1" required />
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" for="edit-section">Section *</label>
+                <input type="text" id="edit-section" name="section" class="form-input" placeholder="e.g., North A" required />
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="edit-area">Area (hectares) *</label>
+                <input type="number" id="edit-area" name="area" class="form-input" step="0.1" placeholder="e.g., 2.8" required />
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" for="edit-planted">Planting Date *</label>
+                <input type="text" id="edit-planted" name="planted" class="form-input" placeholder="e.g., Jan 2024" required />
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="edit-forcingDate">Forcing Date *</label>
+                <input type="text" id="edit-forcingDate" name="forcingDate" class="form-input" placeholder="e.g., Aug 15, 2024" required />
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" for="edit-daf">Growth Stage (DAF)</label>
+                <input type="number" id="edit-daf" name="daf" class="form-input" placeholder="e.g., 245" min="0" />
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="edit-declaredPopulation">Declared Population *</label>
+                <input type="number" id="edit-declaredPopulation" name="declaredPopulation" class="form-input" placeholder="e.g., 12500" required />
+              </div>
+            </div>
+
+            <p class="form-hint">
+              Changes save directly to this block's record. The assigned flight operator and scan history are not affected.
+            </p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- BEARING RATE TREND MODAL -->
+    <div id="trend-modal" class="modal">
+      <div class="modal-content" style="max-width: 540px">
+        <div class="modal-header">
+          <h2 class="modal-title" id="trend-modal-title">Bearing Rate Trend</h2>
+          <button class="modal-close" onclick="closeTrendModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="trend-modal-content"></div>
+        <div class="modal-footer" style="justify-content: flex-end">
+          <button type="button" class="btn btn-secondary" onclick="closeTrendModal()">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SCHEDULED SCANS MODAL (informational — no scan-start action) -->
+    <div id="scheduled-scans-modal" class="modal">
+      <div class="modal-content" style="max-width: 620px">
+        <div class="modal-header">
+          <h2 class="modal-title" id="scheduled-scans-modal-title">Scheduled Scans</h2>
+          <button class="modal-close" onclick="closeScheduledScansModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="scheduled-scans-modal-content" style="padding: 0"></div>
+        <div class="modal-footer" style="justify-content: flex-end">
+          <button type="button" class="btn btn-secondary" onclick="closeScheduledScansModal()">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+    <!-- Bootstrap JS -->
+    <script src="../../bootstrap/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Application JavaScript -->
+    <script src="../../js/auth.js"></script>
+    <script src="../../js/data.js"></script>
+    <script src="../../js/utils.js"></script>
+    <script src="../../js/app.js"></script>
+
+    <script>
+      if (!auth.requireFarmManager()) {
+        /* redirects */
+      }
+
+      const SCHEDULED_SCANS_COLLECTION = "scheduled_scans";
+
+      // In-memory caches
+      let ALL_BLOCKS = [];      // every block, farm-wide, enriched with operator name
+      let USERS_BY_ID = {};     // userId -> { fullName, email, role }
+      let currentActionBlockId = null; // block a rail action modal is currently open for
+
+      window.initPage = async function () {
+        setupModalClose();
+        renderSkeleton();
+        await loadBlocks();
+      };
+
+      function setupModalClose() {
+        utils.setupModalClose("edit-block-modal");
+        utils.setupModalClose("trend-modal");
+        utils.setupModalClose("scheduled-scans-modal");
+      }
+
+      // ── Load blocks + users (farm-wide, not scoped to a single account) ──
+
+      async function loadBlocks() {
+        renderSkeleton();
+        try {
+          console.log("📥 Loading all fruit blocks for Farm Manager review...");
+
+          const results = await Promise.all([
+            firebase.firestore().collection("blocks").get(),
+            firebase.firestore().collection("users").limit(200).get(),
+          ]);
+
+          const blocksSnap = results[0];
+          const usersSnap = results[1];
+
+          USERS_BY_ID = {};
+          usersSnap.forEach(function (doc) {
+            const d = doc.data();
+            USERS_BY_ID[doc.id] = {
+              fullName: d.fullName || d.username || d.email || doc.id,
+              email: d.email || "",
+              role: d.role || "",
+            };
+          });
+
+          ALL_BLOCKS = [];
+          blocksSnap.forEach(function (doc) {
+            const d = doc.data();
+            const operator = USERS_BY_ID[d.userId];
+
+            ALL_BLOCKS.push({
+              id: doc.id,
+              blockId: d.blockId || doc.id,
+              blockName: d.blockName || d.blockId || doc.id,
+              userId: d.userId || "",
+              operatorName: operator ? operator.fullName : (d.userId || "Unassigned"),
+              section: d.section || "—",
+              area: typeof d.area === "number" ? d.area : parseFloat(d.area) || 0,
+              stage: d.stage || "",
+              daf: typeof d.daf === "number" ? d.daf : (parseInt(d.daf, 10) || 0),
+              planted: d.planted || "",
+              forcingDate: d.forcingDate || "",
+              declaredPopulation: d.declaredPopulation || d.totalPineapples || 0,
+              bearing: d.bearingPercent || 0,
+              nonbearing: d.nonBearingPercent || 0,
+              nonViable: d.nonViable || 0,
+              plants: d.totalPineapples || 0,
+              totalScans: d.totalScans || 0,
+              lastScanned: d.lastScanned || null,
+            });
+          });
+
+          console.log("✅ Loaded", ALL_BLOCKS.length, "blocks across", usersSnap.size, "accounts");
+
+          populateFilterOptions();
+          filterAndRender();
+        } catch (error) {
+          console.error("❌ Error loading fruit blocks:", error);
+          ALL_BLOCKS = [];
+          renderError();
+        }
+      }
+
+      function populateFilterOptions() {
+        const sectionSelect = document.getElementById("fb-section-filter");
+        const operatorSelect = document.getElementById("fb-operator-filter");
+        const currentSection = sectionSelect.value;
+        const currentOperator = operatorSelect.value;
+
+        const sections = Array.from(new Set(ALL_BLOCKS.map((b) => b.section).filter(Boolean))).sort();
+        const operators = Array.from(new Set(ALL_BLOCKS.map((b) => b.operatorName).filter(Boolean))).sort();
+
+        sectionSelect.innerHTML =
+          '<option value="">All Sections</option>' +
+          sections.map((s) => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("");
+        operatorSelect.innerHTML =
+          '<option value="">All Flight Operators</option>' +
+          operators.map((o) => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join("");
+
+        sectionSelect.value = currentSection;
+        operatorSelect.value = currentOperator;
+      }
+
+      // ── Filter + sort + render ─────────────────────────────────────
+
+      function filterAndRender() {
+        const search = (document.getElementById("fb-search-input").value || "").toLowerCase().trim();
+        const statusFilter = document.getElementById("fb-status-filter").value;
+        const sectionFilter = document.getElementById("fb-section-filter").value;
+        const operatorFilter = document.getElementById("fb-operator-filter").value;
+        const sortValue = document.getElementById("fb-sort-select").value;
+
+        let blocks = ALL_BLOCKS.slice();
+
+        if (search) {
+          blocks = blocks.filter(function (b) {
+            return (
+              (b.blockName || "").toLowerCase().indexOf(search) !== -1 ||
+              (b.blockId || "").toLowerCase().indexOf(search) !== -1 ||
+              (b.section || "").toLowerCase().indexOf(search) !== -1 ||
+              (b.operatorName || "").toLowerCase().indexOf(search) !== -1
+            );
+          });
+        }
+
+        if (statusFilter) {
+          blocks = blocks.filter(function (b) {
+            return blockStatusClass(b) === statusFilter;
+          });
+        }
+
+        if (sectionFilter) {
+          blocks = blocks.filter((b) => b.section === sectionFilter);
+        }
+
+        if (operatorFilter) {
+          blocks = blocks.filter((b) => b.operatorName === operatorFilter);
+        }
+
+        blocks.sort(function (a, b) {
+          switch (sortValue) {
+            case "bearing-desc": return b.bearing - a.bearing;
+            case "bearing-asc": return a.bearing - b.bearing;
+            case "daf-desc": return (b.daf || 0) - (a.daf || 0);
+            case "area-desc": return (b.area || 0) - (a.area || 0);
+            default: return (a.blockName || "").localeCompare(b.blockName || "");
+          }
+        });
+
+        renderList(blocks);
+      }
+
+      // ── Render: loading / empty / no-results / cards ────────────────
+
+      function renderSkeleton() {
+        const container = document.getElementById("fb-list-container");
+        let html = '<div class="fb-list">';
+        for (let i = 0; i < 3; i++) {
+          html += `
+            <div class="fb-skel-card">
+              <div class="fb-skel-rail"></div>
+              <div class="fb-skel-body">
+                <div class="fb-skel-line skel" style="width:30%;height:22px;"></div>
+                <div class="fb-skel-line skel" style="width:45%;"></div>
+                <div class="fb-skel-line skel" style="width:60%;"></div>
+                <div class="fb-skel-line skel" style="width:40%;"></div>
+              </div>
+            </div>`;
+        }
+        html += "</div>";
+        container.innerHTML = html;
+      }
+
+      function renderError() {
+        const container = document.getElementById("fb-list-container");
+        container.innerHTML = `
+          <div class="fb-empty">
+            <div class="fb-empty-icon">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+            </div>
+            <div class="fb-empty-title">Couldn't load Fruit Blocks</div>
+            <div class="fb-empty-text">Something went wrong while fetching block data. Please try again.</div>
+            <button class="btn btn-primary btn-sm" onclick="loadBlocks()">Retry</button>
+          </div>`;
+        document.getElementById("fb-result-count").textContent = "";
+      }
+
+      function renderList(blocks) {
+        const container = document.getElementById("fb-list-container");
+        const countEl = document.getElementById("fb-result-count");
+        countEl.textContent = blocks.length + (blocks.length === 1 ? " block" : " blocks");
+
+        if (ALL_BLOCKS.length === 0) {
+          container.innerHTML = `
+            <div class="fb-empty">
+              <div class="fb-empty-icon">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z" />
+                  <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12" />
+                </svg>
+              </div>
+              <div class="fb-empty-title">No Fruit Blocks Yet</div>
+              <div class="fb-empty-text">No client accounts have created a Fruit Block yet. Blocks will appear here as soon as one is added.</div>
+            </div>`;
+          return;
+        }
+
+        if (blocks.length === 0) {
+          container.innerHTML = `
+            <div class="fb-empty">
+              <div class="fb-empty-icon">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+              </div>
+              <div class="fb-empty-title">No blocks match your filters</div>
+              <div class="fb-empty-text">Try adjusting or clearing your search and filters.</div>
+              <button class="btn btn-secondary btn-sm" onclick="clearFilters()">Clear Filters</button>
+            </div>`;
+          return;
+        }
+
+        container.innerHTML = '<div class="fb-list">' + blocks.map(buildBlockCard).join("") + "</div>";
+      }
+
+      function clearFilters() {
+        document.getElementById("fb-search-input").value = "";
+        document.getElementById("fb-status-filter").value = "";
+        document.getElementById("fb-section-filter").value = "";
+        document.getElementById("fb-operator-filter").value = "";
+        filterAndRender();
+      }
+
+      // ── Card builder ─────────────────────────────────────────────
+
+      function buildBlockCard(block) {
+        const statusClass = blockStatusClass(block);
+        const hasScanData = block.plants > 0;
+
+        const bearingCount = hasScanData ? Math.round((block.bearing / 100) * block.plants) : null;
+        const nonBearingCount = hasScanData ? Math.round((block.nonbearing / 100) * block.plants) : null;
+        const nonViableCount = hasScanData ? Math.round((block.nonViable / 100) * block.plants) : null;
+
+        return `
+        <div class="fb-card">
+          <div class="fb-rail">
+            <button type="button" class="fb-rail-btn" data-tooltip="Edit Block" onclick="event.stopPropagation(); openEditModal('${block.id}')" aria-label="Edit Block">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+              </svg>
+            </button>
+            <button type="button" class="fb-rail-btn" data-tooltip="Bearing Rate Trend" onclick="event.stopPropagation(); openTrendModal('${block.id}')" aria-label="Bearing Rate Trend">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
+                <polyline points="16 7 22 7 22 13" />
+              </svg>
+            </button>
+            <button type="button" class="fb-rail-btn" data-tooltip="Scheduled Scans" onclick="event.stopPropagation(); openScheduledScansModal('${block.id}')" aria-label="Scheduled Scans">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                <line x1="16" y1="2" x2="16" y2="6" />
+                <line x1="8" y1="2" x2="8" y2="6" />
+                <line x1="3" y1="10" x2="21" y2="10" />
+              </svg>
+            </button>
+          </div>
+
+          <div class="fb-body" onclick="viewBlock('${block.id}')">
+            <div class="fb-head-row">
+              <div class="fb-block-id">${escapeHtml(block.blockName)}</div>
+              <div class="fb-head-badges">
+                ${blockStatusBadge(statusClass)}
+                <span class="fb-chip">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z" />
+                    <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12" />
+                  </svg>
+                  ${escapeHtml(growthStageLabel(block))}
+                </span>
+              </div>
+            </div>
+
+            <div class="fb-operator-row">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
+              ${escapeHtml(block.operatorName)}
+            </div>
+
+            <div class="fb-meta-row">
+              <span class="fb-meta-item">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" />
+                </svg>
+                <strong>${escapeHtml(block.section)}</strong>
+              </span>
+              <span class="fb-meta-item">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="15 3 21 3 21 9" /><polyline points="9 21 3 21 3 15" /><line x1="21" y1="3" x2="14" y2="10" /><line x1="3" y1="21" x2="10" y2="14" />
+                </svg>
+                <strong>${formatArea(block.area)}</strong>
+              </span>
+            </div>
+
+            <div class="fb-meta-row">
+              <span class="fb-meta-item">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+                </svg>
+                Planted <strong>${escapeHtml(formatDateValue(block.planted))}</strong>
+              </span>
+              <span class="fb-meta-item">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z" />
+                  <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12" />
+                </svg>
+                Forced <strong>${escapeHtml(formatDateValue(block.forcingDate))}</strong>
+              </span>
+            </div>
+
+            <div class="fb-footer">
+              <span class="fb-population">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+                Declared Population <strong>${formatNumber(block.declaredPopulation)}</strong>
+              </span>
+              <div class="fb-breakdown">
+                <span class="fb-stat"><span class="fb-stat-dot" style="background:var(--green-500);"></span>Bearing <span class="fb-stat-val" style="color:var(--green);">${formatPercent(block.bearing)}</span>${bearingCount !== null ? " (" + formatNumber(bearingCount) + ")" : ""}</span>
+                <span class="fb-stat"><span class="fb-stat-dot" style="background:var(--amber-mid);"></span>Non-Bearing <span class="fb-stat-val" style="color:var(--amber);">${formatPercent(block.nonbearing)}</span>${nonBearingCount !== null ? " (" + formatNumber(nonBearingCount) + ")" : ""}</span>
+                <span class="fb-stat"><span class="fb-stat-dot" style="background:var(--red-mid);"></span>Non-Viable <span class="fb-stat-val" style="color:var(--red);">${formatPercent(block.nonViable)}</span>${nonViableCount !== null ? " (" + formatNumber(nonViableCount) + ")" : ""}</span>
+              </div>
+            </div>
+          </div>
+        </div>`;
+      }
+
+      function viewBlock(id) {
+        window.location.href = "blocks-view.html?id=" + encodeURIComponent(id);
+      }
+
+      // ── Status helpers ───────────────────────────────────────────
+
+      function blockStatusClass(block) {
+        if (!block.totalScans || block.plants <= 0) return "none";
+        if (block.bearing >= 80) return "good";
+        if (block.bearing >= 60) return "warn";
+        return "crit";
+      }
+
+      function blockStatusBadge(status) {
+        if (status === "none") {
+          return '<span class="badge" style="background-color:var(--surf2);color:var(--color-text-secondary);border-color:var(--border);"><span class="bdot" style="background-color:var(--color-text-tertiary);"></span>No Scan Data</span>';
+        }
+        const labels = { good: "Healthy", warn: "Watch", crit: "Critical" };
+        return `<span class="badge ${status}"><span class="bdot"></span>${labels[status]}</span>`;
+      }
+
+      function growthStageLabel(block) {
+        if (typeof block.daf === "number" && block.daf > 0) return block.daf + " DAF";
+        if (block.stage) return block.stage;
+        return "Stage unknown";
+      }
+
+      // ── Formatting helpers ───────────────────────────────────────
+
+      function formatNumber(num) {
+        return (num || 0).toLocaleString("en-US");
+      }
+
+      function formatPercent(num) {
+        return (num || 0).toFixed(1) + "%";
+      }
+
+      function formatArea(area) {
+        return (area || 0) + " ha";
+      }
+
+      function formatDateValue(value) {
+        if (!value) return "—";
+        const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+        if (m) {
+          const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+          if (!isNaN(d.getTime())) {
+            return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "2-digit" });
+          }
+        }
+        return value;
+      }
+
+      function escapeHtml(str) {
+        return String(str == null ? "" : str).replace(/[&<>"']/g, function (c) {
+          return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+        });
+      }
+
+      function findBlock(id) {
+        return ALL_BLOCKS.filter((b) => b.id === id)[0] || null;
+      }
+
+      // ── Edit Block modal ──────────────────────────────────────────
+
+      function openEditModal(id) {
+        const block = findBlock(id);
+        if (!block) return;
+        currentActionBlockId = id;
+
+        document.getElementById("edit-blockName").value = block.blockName || "";
+        document.getElementById("edit-section").value = block.section || "";
+        document.getElementById("edit-area").value = block.area || "";
+        document.getElementById("edit-planted").value = block.planted || "";
+        document.getElementById("edit-forcingDate").value = block.forcingDate || "";
+        document.getElementById("edit-daf").value = block.daf || "";
+        document.getElementById("edit-declaredPopulation").value = block.declaredPopulation || "";
+        utils.showModal("edit-block-modal");
+      }
+
+      function closeEditModal() {
+        utils.hideModal("edit-block-modal");
+        utils.resetForm("edit-block-form");
+      }
+
+      function handleEditBlock(event) {
+        event.preventDefault();
+        const block = findBlock(currentActionBlockId);
+        if (!block) return;
+
+        const blockName = document.getElementById("edit-blockName").value.trim();
+        const section = document.getElementById("edit-section").value.trim();
+        const area = parseFloat(document.getElementById("edit-area").value);
+        const planted = document.getElementById("edit-planted").value.trim();
+        const forcingDate = document.getElementById("edit-forcingDate").value.trim();
+        const daf = parseInt(document.getElementById("edit-daf").value, 10) || 0;
+        const declaredPopulation = parseInt(document.getElementById("edit-declaredPopulation").value, 10);
+
+        if (!blockName || !section || !area || !planted || !forcingDate || !declaredPopulation) {
+          utils.showFormError("edit-block-form", "Please fill in all required fields.");
+          return;
+        }
+
+        firebase
+          .firestore()
+          .collection("blocks")
+          .doc(block.id)
+          .update({
+            blockName: blockName,
+            section: section,
+            area: area,
+            planted: planted,
+            forcingDate: forcingDate,
+            daf: daf,
+            declaredPopulation: declaredPopulation,
+          })
+          .then(function () {
+            block.blockName = blockName;
+            block.blockId = block.blockId || blockName;
+            block.section = section;
+            block.area = area;
+            block.planted = planted;
+            block.forcingDate = forcingDate;
+            block.daf = daf;
+            block.declaredPopulation = declaredPopulation;
+
+            populateFilterOptions();
+            filterAndRender();
+            closeEditModal();
+            utils.showToast("Block updated successfully!", "success");
+          })
+          .catch(function (err) {
+            console.error("❌ Failed to update block:", err);
+            utils.showFormError("edit-block-form", "Failed to save changes: " + err.message);
+          });
+      }
+
+      // ── Bearing Rate Trend modal (read-only) ──────────────────────
+
+      function openTrendModal(id) {
+        const block = findBlock(id);
+        if (!block) return;
+        currentActionBlockId = id;
+
+        document.getElementById("trend-modal-title").textContent =
+          "Bearing Rate Trend — " + block.blockName;
+        renderTrendModal(block);
+        utils.showModal("trend-modal");
+      }
+
+      function closeTrendModal() {
+        utils.hideModal("trend-modal");
+      }
+
+      function renderTrendModal(block) {
+        // Synthetic recent-scan trend ending at the block's current bearing
+        // rate — a lightweight preview until per-scan history is wired up.
+        const labels = ["Mar 28", "Apr 04", "Apr 11", "Apr 18", "Apr 25", "May 02"];
+        const current = block.bearing || 0;
+        const offsets = [-6.5, -5.2, -3.8, -2.5, -1.1, 0];
+        const points = labels.map(function (date, i) {
+          const pct = Math.max(0, Math.min(100, current + offsets[i]));
+          return { date: date, pct: pct };
+        });
+
+        document.getElementById("trend-modal-content").innerHTML = points
+          .map(function (entry) {
+            const color = entry.pct >= 80 ? "var(--green)" : entry.pct >= 60 ? "var(--amber)" : "var(--red)";
+            return `
+                <div class="trend-row">
+                    <div class="trend-date">${entry.date}</div>
+                    <div class="trend-bar-wrap">
+                        <div class="bar-wrap">
+                            <div class="bar-fill" style="width:${entry.pct}%; background-color:${color};"></div>
+                        </div>
+                    </div>
+                    <div class="trend-val">${entry.pct.toFixed(1)}%</div>
+                </div>`;
+          })
+          .join("");
+      }
+
+      // ── Scheduled Scans modal (informational only) ────────────────
+
+      function openScheduledScansModal(id) {
+        const block = findBlock(id);
+        if (!block) return;
+        currentActionBlockId = id;
+
+        document.getElementById("scheduled-scans-modal-title").textContent =
+          "Scheduled Scans — " + block.blockName;
+        utils.showModal("scheduled-scans-modal");
+        loadScheduledScansForModal(block);
+      }
+
+      function closeScheduledScansModal() {
+        utils.hideModal("scheduled-scans-modal");
+      }
+
+      async function loadScheduledScansForModal(block) {
+        const content = document.getElementById("scheduled-scans-modal-content");
+        content.innerHTML = `<div style="padding:var(--space-xl);color:var(--muted);font-size:var(--font-size-sm);">Loading scheduled scans…</div>`;
+
+        try {
+          // Farm Manager view: every schedule recorded against this block,
+          // regardless of which account created it (no userId filter).
+          const snapshot = await firebase
+            .firestore()
+            .collection(SCHEDULED_SCANS_COLLECTION)
+            .where("blockId", "==", block.id)
+            .get();
+
+          const now = new Date();
+          const items = [];
+
+          snapshot.forEach(function (doc) {
+            const d = doc.data() || {};
+            const scheduledAt =
+              d.scheduledAt && typeof d.scheduledAt.toDate === "function" ? d.scheduledAt.toDate() : null;
+            items.push({
+              id: doc.id,
+              scheduledAt: scheduledAt,
+              operator: d.operator || "",
+              notes: d.notes || "",
+              status: d.status === "cancelled" ? "cancelled" : "scheduled",
+            });
+          });
+
+          items.sort(function (a, b) {
+            const at = a.scheduledAt ? a.scheduledAt.getTime() : 0;
+            const bt = b.scheduledAt ? b.scheduledAt.getTime() : 0;
+            return at - bt;
+          });
+
+          renderScheduledScansModalList(items, now);
+        } catch (error) {
+          console.error("❌ Error loading scheduled scans:", error);
+          content.innerHTML = `
+            <div style="padding:var(--space-xl);color:var(--muted);font-size:var(--font-size-sm);">
+              Failed to load scheduled scans.
+              <button type="button" class="btn btn-sm btn-secondary" style="margin-left:var(--space-md);" onclick="loadScheduledScansForModal(findBlock('${block.id}'))">Retry</button>
+            </div>`;
+        }
+      }
+
+      function renderScheduledScansModalList(items, now) {
+        const content = document.getElementById("scheduled-scans-modal-content");
+
+        if (!items.length) {
+          content.innerHTML = `
+            <div style="padding:var(--space-xl);color:var(--muted);font-size:var(--font-size-sm);">
+              No scheduled scans found for this block. This view is informational only — scans are scheduled from the client account.
+            </div>`;
+          return;
+        }
+
+        const rows = items
+          .map(function (item) {
+            const isFuture = item.scheduledAt && item.scheduledAt.getTime() >= now.getTime();
+            let stateBadge;
+            if (item.status === "cancelled") {
+              stateBadge = '<span class="badge crit"><span class="bdot"></span>Cancelled</span>';
+            } else if (isFuture) {
+              stateBadge = '<span class="badge good"><span class="bdot"></span>Upcoming</span>';
+            } else {
+              stateBadge = '<span class="badge" style="background-color:var(--surf2);color:var(--color-text-secondary);border-color:var(--border);"><span class="bdot" style="background-color:var(--color-text-tertiary);"></span>Past</span>';
+            }
+            return `
+                <tr>
+                    <td style="font-family:var(--font-mono);white-space:nowrap;">${formatScheduledDateTime(item.scheduledAt)}</td>
+                    <td>${escapeHtml(item.operator || "—")}</td>
+                    <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(item.notes || "—")}</td>
+                    <td>${stateBadge}</td>
+                </tr>`;
+          })
+          .join("");
+
+        content.innerHTML = `
+        <div class="twrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date &amp; Time</th>
+                        <th>Operator</th>
+                        <th>Notes</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>`;
+      }
+
+      function formatScheduledDateTime(date) {
+        if (!(date instanceof Date) || isNaN(date.getTime())) return "Unknown date";
+        const datePart = date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "2-digit" });
+        const timePart = date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+        return datePart + " · " + timePart;
+      }
+    </script>
+  </body>
+</html>

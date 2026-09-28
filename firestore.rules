@@ -1,104 +1,61 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // ─────────────────────────────────────────────────────────
-    // Helpers: check role from the users collection.
-    // ─────────────────────────────────────────────────────────
-    function isAdmin() {
-      return request.auth != null &&
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-    }
-
-    function isFarmManager() {
-      return request.auth != null &&
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'farm_manager';
-    }
-
-    // ─────────────────────────────────────────────────────────
-    // users collection
-    //
-    // Both get and list are allowed for any authenticated user.
-    // This is consistent: list already exposes every user's
-    // email and profile data to any authenticated caller (needed
-    // for the username→email lookup in auth.js).  Restricting
-    // get-by-UID to owner/admin would be an inconsistency since
-    // the same data is reachable via list.
-    // Write still requires admin (Super Admin only).
-    // Move lookup to a Cloud Function to tighten read access.
-    // ─────────────────────────────────────────────────────────
+    // Users collection
     match /users/{userId} {
-      allow get:   if request.auth != null;
-      allow list:  if request.auth != null;
-      allow write: if isAdmin();
+      allow read: if true;  // Anyone can read (for username lookup)
+      allow create: if request.auth != null;  // Authenticated users can create
+      allow update: if request.auth != null;  // Authenticated users can update
+      allow delete: if request.auth != null;  // Authenticated users can delete
     }
 
-    // ─────────────────────────────────────────────────────────
-    // Per-user farm data: blocks, scans, missions, monitoring_alerts
-    //
-    // Read/write only if the document's userId matches the caller,
-    // OR the caller is an admin (preserves full admin visibility).
-    // ─────────────────────────────────────────────────────────
-    match /blocks/{docId} {
-      allow read, update, delete: if request.auth != null &&
-        (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if request.auth != null &&
-        request.resource.data.userId == request.auth.uid;
-    }
-
-    match /scans/{docId} {
-      allow read, update, delete: if request.auth != null &&
-        (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if request.auth != null &&
-        request.resource.data.userId == request.auth.uid;
-    }
-
-    match /missions/{docId} {
-      allow read, update, delete: if request.auth != null &&
-        (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if request.auth != null &&
-        request.resource.data.userId == request.auth.uid;
-    }
-
-    match /monitoring_alerts/{docId} {
-      allow read, update, delete: if request.auth != null &&
-        (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if request.auth != null &&
-        request.resource.data.userId == request.auth.uid;
-    }
-
-    // ─────────────────────────────────────────────────────────
-    // scheduled_scans — manual "Schedule Scan" bookings made from a
-    // fruit block's detail page. Owner-scoped like blocks/scans/missions
-    // above. No delete: cancellation is a status update (status ->
-    // 'cancelled') so history is preserved rather than removed.
-    // ─────────────────────────────────────────────────────────
+    // Scheduled Scans
     match /scheduled_scans/{docId} {
       allow read, update: if request.auth != null &&
-        (resource.data.userId == request.auth.uid || isAdmin());
+    resource.data.userId == request.auth.uid;
       allow create: if request.auth != null &&
-        request.resource.data.userId == request.auth.uid;
+    request.resource.data.userId == request.auth.uid;
     }
 
-    // ─────────────────────────────────────────────────────────
-    // activity_logs and alerts
-    //
-    // Written by the client SDK including during unauthenticated
-    // failed-login attempts (auth.js catch block).  Open create
-    // is intentional here.  Admin reads all; users cannot list
-    // all logs (prevents enumeration of other users' activity).
-    // ─────────────────────────────────────────────────────────
-    match /activity_logs/{docId} {
-      allow create: if true;
-      allow read:   if isAdmin() || isFarmManager();
-      allow update, delete: if isAdmin();
+    // Activity logs collection
+    match /activity_logs/{logId} {
+      allow read: if request.auth != null;  // Logged-in users can read
+      allow create: if true;  // Anyone can create (for login logging)
     }
-
-    match /alerts/{docId} {
-      allow create: if true;
-      allow read:   if isAdmin() || isFarmManager();
-      allow update, delete: if isAdmin();
+    
+    // Alerts collection - NEW
+    match /alerts/{alertId} {
+      allow read: if request.auth != null;  // Logged-in users can read alerts
+      allow create: if true;  // Anyone can create (for failed login alerts)
+      allow update: if request.auth != null;  // Authenticated users can update (mark as resolved)
+      allow delete: if request.auth != null;  // Authenticated users can delete
     }
+    
+    match /blocks/{blockId} {
+      allow read: if request.auth != null;  // ← CHANGED: Allow all logged-in users to read
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+      allow delete: if request.auth != null;
+   }
 
+      // Scans collection - ADD THIS NEW SECTION
+    match /scans/{scanId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+   }
+   
+    match /monitoring_alerts/{alertId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+      allow delete: if request.auth != null;
+   }
+   
+    match /missions/{missionId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+      allow delete: if request.auth != null;
+    }
   }
 }

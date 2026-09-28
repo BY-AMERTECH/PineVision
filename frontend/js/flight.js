@@ -1,22 +1,47 @@
 /**
- * Flight Missions Page - Firebase Integration
+ * Flight Schedules Page - Firebase Integration
+ *
+ * Displays the SAME schedule data configured from an individual Fruit
+ * Block (blocks-view.html → "Schedule Scan"). That flow is the source of
+ * truth: every record lives in the `scheduled_scans` Firestore collection,
+ * keyed by blockId + userId. This page reads that same collection (joined
+ * with `blocks` for the human-readable Block ID / Section) instead of
+ * keeping a second, disconnected copy — so a schedule created, edited or
+ * cancelled from a fruit block appears here automatically, and vice versa.
  */
 
 'use strict';
 
 (function () {
 
-    let allMissions = [];
-    let activeFilter = 'all';
-    let operators = [];
+    // Raw docs from `scheduled_scans`, before being joined with block info.
+    let rawSchedules = [];
+
+    // Joined + display-ready schedules (Block ID, Section, etc. attached).
+    let allSchedules = [];
+
+    // This user's fruit blocks: { id, blockId, blockName, section }.
+    // Used both to populate the "Add Schedule" block picker and to resolve
+    // Block ID / Section for each schedule.
+    let userBlocks = [];
+    let blocksById = {};
+
     let currentUserId = null;
+    let currentUserName = '';
+    let searchQuery = '';
+
+    const SCHEDULED_SCANS_COLLECTION = 'scheduled_scans';
+
+    function scheduledScanCollection() {
+        return firebase.firestore().collection(SCHEDULED_SCANS_COLLECTION);
+    }
 
     // ═══════════════════════════════════════════════════════════
     // INITIALIZATION
     // ═══════════════════════════════════════════════════════════
 
     window.initPage = async function () {
-        console.log('🚀 Initializing Flight Missions Page...');
+        console.log('🚀 Initializing Flight Schedules Page...');
 
         // Set active nav link
         document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
@@ -31,418 +56,604 @@
         }
 
         currentUserId = currentUser.uid;
+        currentUserName = currentUser.fullName || currentUser.username || '';
         console.log('👤 Logged in as:', currentUser.email);
         console.log('🆔 User ID:', currentUserId);
 
-        // Set default date to tomorrow
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        document.getElementById('mission-date').value = tomorrow.toISOString().split('T')[0];
-        document.getElementById('mission-time').value = '06:00';
+        renderLoadingRow();
 
-        // Load operators and missions in parallel — they are independent queries.
-        await Promise.all([loadOperators(), loadMissions()]);
+        // Blocks (for the picker + Block ID/Section join) and the schedules
+        // themselves are independent queries — load them in parallel, then
+        // join and render once both are back.
+        await Promise.all([loadBlocks(), loadSchedules()]);
+        combineAndRender();
 
         // Setup modals
-        utils.setupModalClose('add-mission-modal');
-        utils.setupModalClose('edit-mission-modal');
+        utils.setupModalClose('add-schedule-modal');
+        utils.setupModalClose('edit-schedule-modal');
+        utils.setupModalClose('cancel-schedule-modal');
+
+        const searchInput = document.getElementById('schedule-search');
+        if (searchInput) {
+            searchInput.addEventListener('input', function () {
+                searchQuery = searchInput.value.trim().toLowerCase();
+                render();
+            });
+        }
 
         console.log('✅ Page ready');
     };
 
     // ═══════════════════════════════════════════════════════════
-    // LOAD OPERATORS
+    // LOAD BLOCKS (for the Add Schedule picker + Block ID/Section join)
     // ═══════════════════════════════════════════════════════════
 
-    async function loadOperators() {
+    async function loadBlocks() {
         try {
-            const cached = window.pvCache && window.pvCache.get('operators');
-            if (cached) {
-                operators = cached;
-                populateOperatorDropdowns();
-                console.log('✅ Operators from cache:', operators.length);
-                return;
-            }
-
             const snapshot = await firebase.firestore()
-                .collection('users')
-                .where('role', '==', 'client')
-                .get();
-
-            operators = [];
-            snapshot.forEach(doc => {
-                const data = doc.data();
-                const name = data.fullName || data.email || 'Unknown Operator';
-                operators.push(name.trim());
-            });
-
-            if (operators.length === 0) {
-                operators = ['Juan Dela Cruz', 'Maria Santos', 'Pedro Reyes'];
-            }
-
-            if (window.pvCache) {
-                window.pvCache.set('operators', operators, 120_000); // 2-minute TTL
-            }
-
-            populateOperatorDropdowns();
-            console.log('✅ Loaded', operators.length, 'operators:', operators);
-
-        } catch (error) {
-            console.error('❌ Error loading operators:', error);
-            operators = ['Juan Dela Cruz', 'Maria Santos', 'Pedro Reyes'];
-            populateOperatorDropdowns();
-        }
-    }
-
-    function populateOperatorDropdowns() {
-        const addDropdown = document.getElementById('mission-operator');
-        const editDropdown = document.getElementById('edit-mission-operator');
-
-        if (addDropdown) {
-            addDropdown.innerHTML = '<option value="">Select operator</option>';
-            operators.forEach(op => {
-                const option = document.createElement('option');
-                option.value = op;
-                option.textContent = op;
-                addDropdown.appendChild(option);
-            });
-        }
-
-        if (editDropdown) {
-            editDropdown.innerHTML = '<option value="">Select operator</option>';
-            operators.forEach(op => {
-                const option = document.createElement('option');
-                option.value = op;
-                option.textContent = op;
-                editDropdown.appendChild(option);
-            });
-        }
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    // LOAD MISSIONS
-    // ═══════════════════════════════════════════════════════════
-
-    async function loadMissions() {
-        try {
-            console.log('📊 Loading missions for user:', currentUserId);
-            utils.showLoading('missions-grid');
-
-            const snapshot = await firebase.firestore()
-                .collection('missions')
+                .collection('blocks')
                 .where('userId', '==', currentUserId)
                 .get();
 
-            console.log('📦 Found', snapshot.size, 'missions');
+            userBlocks = [];
+            blocksById = {};
 
-            allMissions = [];
             snapshot.forEach(doc => {
-                const data = doc.data();
-                allMissions.push({
+                const data = doc.data() || {};
+                const block = {
                     id: doc.id,
-                    missionNumber: data.missionNumber || 'MISSION',
-                    date: data.date || '',
-                    time: data.time || '06:00',
-                    drone: data.drone || 'DJI Mavic 3 Multispectral',
-                    area: data.area || 'All 8 blocks (26.8 ha)',
-                    operator: data.operator || 'Unknown',
-                    duration: data.duration || '~2h 20m',
+                    blockId: data.blockId || doc.id,
+                    blockName: data.blockName || data.blockId || doc.id,
+                    section: data.section || '—'
+                };
+                userBlocks.push(block);
+                blocksById[doc.id] = block;
+            });
+
+            // Keep the picker in a sensible order for a dropdown.
+            userBlocks.sort((a, b) => String(a.blockId).localeCompare(String(b.blockId)));
+
+            populateBlockDropdown();
+        } catch (error) {
+            console.error('❌ Error loading blocks:', error);
+            userBlocks = [];
+            blocksById = {};
+            populateBlockDropdown();
+        }
+    }
+
+    function populateBlockDropdown() {
+        const dropdown = document.getElementById('schedule-block');
+        if (!dropdown) return;
+
+        const previousValue = dropdown.value;
+        dropdown.innerHTML = '<option value="">Select a fruit block</option>';
+        userBlocks.forEach(block => {
+            const option = document.createElement('option');
+            option.value = block.id;
+            option.textContent = block.blockName && block.blockName !== block.blockId
+                ? `${block.blockId} — ${block.blockName} (${block.section})`
+                : `${block.blockId} (${block.section})`;
+            dropdown.appendChild(option);
+        });
+        if (previousValue) dropdown.value = previousValue;
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // LOAD SCHEDULES — from `scheduled_scans`, the same collection
+    // blocks-view.html reads and writes. This is the sync fix: the old
+    // Flight Missions page read a separate `missions` collection that
+    // block-level "Schedule Scan" never wrote to.
+    // ═══════════════════════════════════════════════════════════
+
+    async function loadSchedules() {
+        try {
+            console.log('📊 Loading flight schedules for user:', currentUserId);
+
+            const snapshot = await scheduledScanCollection()
+                .where('userId', '==', currentUserId)
+                .get();
+
+            console.log('📦 Found', snapshot.size, 'scheduled scans');
+
+            rawSchedules = [];
+            snapshot.forEach(doc => {
+                const data = doc.data() || {};
+                const scheduledAt =
+                    data.scheduledAt && typeof data.scheduledAt.toDate === 'function'
+                        ? data.scheduledAt.toDate()
+                        : null;
+
+                rawSchedules.push({
+                    id: doc.id,
+                    blockDocId: data.blockId || '',
+                    scheduledAt: scheduledAt,
+                    operator: data.operator || '',
                     notes: data.notes || '',
-                    status: data.status || 'scheduled'
+                    status: data.status === 'cancelled' ? 'cancelled' : 'scheduled'
                 });
             });
-
-            // Sort by date (newest first)
-            allMissions.sort((a, b) => {
-                const dateA = new Date(a.date);
-                const dateB = new Date(b.date);
-                return dateB - dateA;
-            });
-
-            console.log('✅ Missions loaded:', allMissions.length);
-            render();
-
         } catch (error) {
-            console.error('❌ Error loading missions:', error);
-            allMissions = [];
-            render();
+            console.error('❌ Error loading flight schedules:', error);
+            rawSchedules = [];
         }
     }
 
     // ═══════════════════════════════════════════════════════════
-    // FILTER
+    // JOIN + RENDER
     // ═══════════════════════════════════════════════════════════
 
-    window.setFilter = function (value, btn) {
-        activeFilter = value;
-        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
+    function combineAndRender() {
+        allSchedules = rawSchedules.map(item => {
+            const block = blocksById[item.blockDocId] || null;
+            return Object.assign({}, item, {
+                blockDisplayId: block ? block.blockId : (item.blockDocId || 'Unknown block'),
+                blockName: block ? block.blockName : '',
+                section: block ? block.section : '—'
+            });
+        });
+
+        // Newest scheduled date first — same convention the old missions
+        // list used.
+        allSchedules.sort((a, b) => {
+            const t1 = a.scheduledAt ? a.scheduledAt.getTime() : 0;
+            const t2 = b.scheduledAt ? b.scheduledAt.getTime() : 0;
+            return t2 - t1;
+        });
+
         render();
-    };
+    }
 
-    // ═══════════════════════════════════════════════════════════
-    // RENDER
-    // ═══════════════════════════════════════════════════════════
+    function matchesSearch(item) {
+        if (!searchQuery) return true;
+        const statusLabel = item.status === 'cancelled' ? 'cancelled' : 'scheduled';
+        const haystack = [
+            item.blockDisplayId,
+            item.section,
+            item.operator,
+            item.notes,
+            statusLabel
+        ].join(' ').toLowerCase();
+        return haystack.indexOf(searchQuery) !== -1;
+    }
 
     function render() {
-        const missions = activeFilter === 'all'
-            ? allMissions
-            : allMissions.filter(m => m.status === activeFilter);
+        const list = document.getElementById('schedules-list');
+        if (!list) return;
 
-        const grid = document.getElementById('missions-grid');
-        if (!grid) return;
+        const visible = allSchedules.filter(matchesSearch);
 
-        if (missions.length === 0) {
-            grid.innerHTML = `
-                <div class="col-12 text-center py-5" style="color:var(--muted);">
-                    <div style="font-size:48px;margin-bottom:1.5rem;opacity:0.3;"></div>
-                    <h3 style="font-size:1.25rem;font-weight:600;color:var(--color-text-primary);margin-bottom:0.5rem;">
-                        No missions yet
-                    </h3>
-                    <p style="font-size:0.9375rem;margin-bottom:1.5rem;">
-                        Click "Add Mission" to schedule your first drone flight.
-                    </p>
+        const resultCount = document.getElementById('schedule-result-count');
+        if (resultCount) {
+            resultCount.textContent = allSchedules.length
+                ? `${visible.length} of ${allSchedules.length}`
+                : '';
+        }
+
+        if (allSchedules.length === 0) {
+            list.innerHTML = `
+                <div class="schedule-card-message">
+                    No flight schedules yet. Use "+ Add Schedule" above, or schedule a scan from an individual Fruit Block.
                 </div>`;
             return;
         }
 
-        grid.innerHTML = missions.map(m => buildCard(m)).join('');
-    }
-
-    function buildStatItem(label, value) {
-        return `
-        <div class="stat-item">
-            <span class="stat-label">${label}</span>
-            <span class="stat-value">${value}</span>
-        </div>`;
-    }
-
-    function buildCard(m) {
-        const statusLabels = {
-            scheduled: 'Scheduled',
-            'in-progress': 'In Progress',
-            completed: 'Completed',
-            cancelled: 'Cancelled'
-        };
-
-        const statusBadge = `
-        <span class="badge ${m.status}">
-            <span class="bdot"></span>${statusLabels[m.status] || m.status}
-        </span>`;
-
-        return `
-        <div class="col-12">
-            <div class="mission-card" onclick="openEditMissionModal('${m.id}')">
-                <div class="mission-card-main">
-                    <div class="mission-card-identity">
-                        <div class="mission-id">${m.missionNumber}</div>
-                        <div class="mission-date">${m.date}</div>
-                        <div class="mission-title">${m.time} &middot; ${m.drone}</div>
-                    </div>
-
-                    <div class="mission-stats-grid">
-                        ${buildStatItem('AREA', m.area)}
-                        ${buildStatItem('OPERATOR', m.operator)}
-                        ${buildStatItem('DURATION', m.duration)}
-                    </div>
-
-                    <div class="mission-card-status">
-                        ${statusBadge}
-                    </div>
-                </div>
-                
-                ${m.notes ? `
-                <div class="mission-card-notes">
-                    <span class="notes-label">NOTES</span>
-                    <span class="notes-value">${m.notes}</span>
-                </div>
-                ` : ''}
-            </div>
-        </div>`;
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    // ADD MISSION
-    // ═══════════════════════════════════════════════════════════
-
-    window.openAddMissionModal = function () {
-        utils.showModal('add-mission-modal');
-    };
-
-    window.closeAddMissionModal = function () {
-        utils.hideModal('add-mission-modal');
-        document.getElementById('add-mission-form').reset();
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        document.getElementById('mission-date').value = tomorrow.toISOString().split('T')[0];
-        document.getElementById('mission-time').value = '06:00';
-    };
-
-    window.handleAddMission = async function (event) {
-        event.preventDefault();
-        console.log('💾 Adding mission...');
-
-        const form = document.getElementById('add-mission-form');
-        const formData = new FormData(form);
-
-        const missionDate = formData.get('missionDate');
-        const missionTime = formData.get('missionTime');
-        const missionArea = formData.get('missionArea');
-        const operator = formData.get('operator');
-        const drone = formData.get('drone');
-        const notes = formData.get('notes');
-
-        if (!missionDate || !missionTime || !missionArea || !operator) {
-            utils.showToast('Please fill in all required fields', 'error');
+        if (visible.length === 0) {
+            list.innerHTML = `
+                <div class="schedule-card-message">
+                    No schedules match your search.
+                </div>`;
             return;
         }
 
-        try {
-            // OPTIMIZATION: use the in-memory allMissions array that loadMissions()
-            // already fetched, instead of a separate Firestore round-trip that
-            // downloaded every mission document just to count them.
-            const missionNumber = `MISSION #${allMissions.length + 1}`;
+        list.innerHTML = visible.map(buildCard).join('');
+    }
 
-            // Format date
-            const dateObj = new Date(missionDate);
-            const formattedDate = dateObj.toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'short',
-                day: '2-digit'
-            });
+    function renderLoadingRow() {
+        const list = document.getElementById('schedules-list');
+        if (!list) return;
+        list.innerHTML = `
+            <div class="schedule-card-message">
+                Loading flight schedules…
+            </div>`;
+    }
 
-            const missionData = {
-                userId: currentUserId,
-                missionNumber: missionNumber,
-                date: formattedDate,
-                time: missionTime,
-                drone: drone || 'DJI Mavic 3 Multispectral',
-                area: missionArea,
-                operator: operator,
-                duration: '~2h 20m',
-                notes: notes || '',
-                status: 'scheduled',
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            };
-
-            console.log('💾 Saving mission:', missionData);
-
-            await firebase.firestore()
-                .collection('missions')
-                .add(missionData);
-
-            console.log('✅ Mission created');
-
-            utils.showToast('Mission scheduled successfully!', 'success');
-            window.closeAddMissionModal();
-            await loadMissions();
-
-        } catch (error) {
-            console.error('❌ Error:', error);
-            utils.showToast('Failed to schedule mission', 'error');
+    function statusBadge(status) {
+        if (status === 'cancelled') {
+            return '<span class="badge crit"><span class="bdot"></span>Cancelled</span>';
         }
-    };
+        return '<span class="badge good"><span class="bdot"></span>Scheduled</span>';
+    }
+
+    /**
+     * Icon-based action buttons (replacing the old text buttons) so the
+     * actions stay compact and never push the card wider than its
+     * container. Functionality is unchanged — same handlers, same
+     * conditions — only the presentation is icons with a tooltip +
+     * aria-label instead of button text.
+     */
+    function actionIcons(item) {
+        if (item.status !== 'scheduled') {
+            return '<span class="schedule-card-no-actions">—</span>';
+        }
+        return `
+            <button
+                type="button"
+                class="icon-btn"
+                data-tooltip="Edit schedule"
+                aria-label="Edit schedule"
+                onclick="openEditScheduleModal('${item.id}')"
+            >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                </svg>
+            </button>
+            <button
+                type="button"
+                class="icon-btn icon-btn-danger"
+                data-tooltip="Cancel schedule"
+                aria-label="Cancel schedule"
+                onclick="openCancelScheduleModal('${item.id}')"
+            >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="15" y1="9" x2="9" y2="15" />
+                    <line x1="9" y1="9" x2="15" y2="15" />
+                </svg>
+            </button>`;
+    }
+
+    function buildCard(item) {
+        // Prefer the human-readable block name; fall back to the Block ID
+        // only when no name is on file — same existing-data logic as
+        // before. Unlike before, the raw block identifier is never
+        // rendered anywhere on the card.
+        const blockName = item.blockName && item.blockName !== item.blockDisplayId
+            ? item.blockName
+            : item.blockDisplayId;
+        const dateParts = formatScheduledDateParts(item.scheduledAt);
+
+        return `
+            <div class="schedule-card">
+                <div class="schedule-card-row">
+                    <div class="schedule-date-badge">
+                        <span class="schedule-date-day">${dateParts.day}</span>
+                        <span class="schedule-date-month">${dateParts.month}</span>
+                        <span class="schedule-date-year">${dateParts.year}</span>
+                        <span class="schedule-date-time">${dateParts.time}</span>
+                    </div>
+                    <div class="schedule-card-fields">
+                        <div class="schedule-field schedule-field-block">
+                            <span class="schedule-field-label">Block Name</span>
+                            <span class="schedule-field-value">${escapeHtml(blockName)}</span>
+                        </div>
+                        <div class="schedule-field schedule-field-section">
+                            <span class="schedule-field-label">Section</span>
+                            <span class="schedule-field-value">${escapeHtml(item.section)}</span>
+                        </div>
+                        <div class="schedule-field schedule-field-operator">
+                            <span class="schedule-field-label">Operator</span>
+                            <span class="schedule-field-value">${escapeHtml(item.operator || '—')}</span>
+                        </div>
+                    </div>
+                    <div class="schedule-card-side">
+                        <div class="schedule-field schedule-field-status">
+                            <span class="schedule-field-label">Status</span>
+                            ${statusBadge(item.status)}
+                        </div>
+                        <div class="schedule-card-actions">${actionIcons(item)}</div>
+                    </div>
+                </div>
+                <div class="schedule-card-notes">
+                    <span class="schedule-card-notes-label">Notes</span>
+                    <span class="schedule-card-notes-text">${escapeHtml(item.notes || '—')}</span>
+                </div>
+            </div>`;
+    }
 
     // ═══════════════════════════════════════════════════════════
-    // EDIT MISSION
+    // ADD SCHEDULE — writes to `scheduled_scans`, the exact same
+    // collection/shape blocks-view.html's "Schedule Scan" writes to, just
+    // with an explicit block picker since this page isn't scoped to one
+    // block already.
     // ═══════════════════════════════════════════════════════════
 
-    window.openEditMissionModal = async function (missionId) {
-        try {
-            const doc = await firebase.firestore()
-                .collection('missions')
-                .doc(missionId)
-                .get();
-
-            if (!doc.exists) {
-                utils.showToast('Mission not found', 'error');
-                return;
-            }
-
-            // Ownership check — prevent editing another user's mission by ID.
-            if (doc.data().userId !== currentUserId) {
-                utils.showToast('Access denied', 'error');
-                return;
-            }
-
-            const data = doc.data();
-
-            // Parse date from "May 09, 2026" to "2026-05-09"
-            const dateParts = data.date.split(' ');
-            const monthMap = {
-                'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04',
-                'May': '05', 'Jun': '06', 'Jul': '07', 'Aug': '08',
-                'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
-            };
-            const month = monthMap[dateParts[0]];
-            const day = dateParts[1].replace(',', '').padStart(2, '0');
-            const year = dateParts[2];
-            const formattedDate = `${year}-${month}-${day}`;
-
-            document.getElementById('edit-mission-id').value = missionId;
-            document.getElementById('edit-mission-date').value = formattedDate;
-            document.getElementById('edit-mission-time').value = data.time;
-            document.getElementById('edit-mission-area').value = data.area;
-            document.getElementById('edit-mission-operator').value = data.operator;
-            document.getElementById('edit-mission-status').value = data.status;
-            document.getElementById('edit-mission-notes').value = data.notes || '';
-
-            utils.showModal('edit-mission-modal');
-
-        } catch (error) {
-            console.error('❌ Error loading mission:', error);
-            utils.showToast('Failed to load mission', 'error');
+    window.openAddScheduleModal = function () {
+        if (userBlocks.length === 0) {
+            utils.showToast('Create a fruit block first — schedules are tied to a block.', 'error');
+            return;
         }
+
+        const form = document.getElementById('add-schedule-form');
+        if (form) form.reset();
+
+        populateBlockDropdown();
+
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        document.getElementById('schedule-date').value = tomorrow.toISOString().split('T')[0];
+        document.getElementById('schedule-time').value = '06:00';
+        document.getElementById('schedule-operator').value = currentUserName;
+        document.getElementById('schedule-notes').value = '';
+
+        utils.showModal('add-schedule-modal');
     };
 
-    window.closeEditMissionModal = function () {
-        utils.hideModal('edit-mission-modal');
-        document.getElementById('edit-mission-form').reset();
+    window.closeAddScheduleModal = function () {
+        utils.hideModal('add-schedule-modal');
     };
 
-    window.handleEditMission = async function (event) {
+    window.handleAddSchedule = async function (event) {
         event.preventDefault();
+        if (!currentUserId) {
+            utils.showToast('You must be signed in to add a schedule.', 'error');
+            return;
+        }
 
-        const form = document.getElementById('edit-mission-form');
-        const formData = new FormData(form);
+        const blockDocId = document.getElementById('schedule-block').value;
+        const dateStr = document.getElementById('schedule-date').value;
+        const timeStr = document.getElementById('schedule-time').value;
+        const operator = document.getElementById('schedule-operator').value.trim();
+        const notes = document.getElementById('schedule-notes').value.trim();
 
-        const missionId = formData.get('missionId');
-        const missionDate = formData.get('missionDate');
-        const missionTime = formData.get('missionTime');
-        const missionArea = formData.get('missionArea');
-        const operator = formData.get('operator');
-        const status = formData.get('status');
-        const notes = formData.get('notes');
+        if (!blockDocId || !dateStr || !timeStr || !operator) {
+            utils.showFormError('add-schedule-form', 'Please fill in all required fields.');
+            return;
+        }
+
+        const scheduledDate = parseScheduledDateTime(dateStr, timeStr);
+        if (!scheduledDate) {
+            utils.showFormError('add-schedule-form', 'Please enter a valid date and time.');
+            return;
+        }
+
+        const submitBtn = document.querySelector('#add-schedule-form button[type="submit"]');
+        if (submitBtn) submitBtn.disabled = true;
 
         try {
-            const dateObj = new Date(missionDate);
-            const formattedDate = dateObj.toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'short',
-                day: '2-digit'
+            await scheduledScanCollection().add({
+                blockId: blockDocId,
+                userId: currentUserId,
+                scheduledAt: firebase.firestore.Timestamp.fromDate(scheduledDate),
+                operator: operator,
+                notes: notes,
+                status: 'scheduled',
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             });
 
-            await firebase.firestore()
-                .collection('missions')
-                .doc(missionId)
-                .update({
-                    date: formattedDate,
-                    time: missionTime,
-                    area: missionArea,
-                    operator: operator,
-                    status: status,
-                    notes: notes || '',
-                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
-
-            utils.showToast('Mission updated successfully!', 'success');
-            window.closeEditMissionModal();
-            await loadMissions();
-
+            utils.showToast('Flight scheduled successfully!', 'success');
+            window.closeAddScheduleModal();
+            await loadSchedules();
+            combineAndRender();
         } catch (error) {
-            console.error('❌ Error updating mission:', error);
-            utils.showToast('Failed to update mission', 'error');
+            console.error('❌ Error scheduling flight:', error);
+            utils.showToast('Failed to schedule flight. Please try again.', 'error');
+        } finally {
+            if (submitBtn) submitBtn.disabled = false;
         }
     };
+
+    // ═══════════════════════════════════════════════════════════
+    // EDIT SCHEDULE
+    // ═══════════════════════════════════════════════════════════
+
+    window.openEditScheduleModal = function (scheduleId) {
+        const item = allSchedules.find(s => s.id === scheduleId);
+        if (!item) {
+            utils.showToast('Schedule not found. It may have changed — refreshing.', 'error');
+            refreshSchedules();
+            return;
+        }
+        if (item.status !== 'scheduled') {
+            utils.showToast("Cancelled schedules can't be edited.", 'error');
+            return;
+        }
+
+        const form = document.getElementById('edit-schedule-form');
+        if (form) form.reset();
+
+        document.getElementById('edit-schedule-id').value = item.id;
+        document.getElementById('edit-schedule-block-display').textContent =
+            item.blockName && item.blockName !== item.blockDisplayId
+                ? `${item.blockDisplayId} — ${item.blockName} (${item.section})`
+                : `${item.blockDisplayId} (${item.section})`;
+
+        const d = item.scheduledAt;
+        if (d instanceof Date && !isNaN(d.getTime())) {
+            const pad = n => String(n).padStart(2, '0');
+            document.getElementById('edit-schedule-date').value =
+                d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+            document.getElementById('edit-schedule-time').value =
+                pad(d.getHours()) + ':' + pad(d.getMinutes());
+        } else {
+            document.getElementById('edit-schedule-date').value = '';
+            document.getElementById('edit-schedule-time').value = '';
+        }
+
+        document.getElementById('edit-schedule-operator').value = item.operator || '';
+        document.getElementById('edit-schedule-notes').value = item.notes || '';
+
+        utils.showModal('edit-schedule-modal');
+    };
+
+    window.closeEditScheduleModal = function () {
+        utils.hideModal('edit-schedule-modal');
+    };
+
+    window.handleEditSchedule = async function (event) {
+        event.preventDefault();
+        if (!currentUserId) {
+            utils.showToast('You must be signed in to edit a schedule.', 'error');
+            return;
+        }
+
+        const scheduleId = document.getElementById('edit-schedule-id').value;
+        const dateStr = document.getElementById('edit-schedule-date').value;
+        const timeStr = document.getElementById('edit-schedule-time').value;
+        const operator = document.getElementById('edit-schedule-operator').value.trim();
+        const notes = document.getElementById('edit-schedule-notes').value.trim();
+
+        if (!scheduleId) {
+            utils.showToast('Missing schedule reference.', 'error');
+            return;
+        }
+
+        if (!dateStr || !timeStr || !operator) {
+            utils.showFormError('edit-schedule-form', 'Please fill in all required fields.');
+            return;
+        }
+
+        const scheduledDate = parseScheduledDateTime(dateStr, timeStr);
+        if (!scheduledDate) {
+            utils.showFormError('edit-schedule-form', 'Please enter a valid date and time.');
+            return;
+        }
+
+        const submitBtn = document.querySelector('#edit-schedule-form button[type="submit"]');
+        if (submitBtn) submitBtn.disabled = true;
+
+        try {
+            const item = allSchedules.find(s => s.id === scheduleId);
+            if (!item) {
+                utils.showToast('Schedule not found. Refreshing…', 'error');
+                await refreshSchedules();
+                return;
+            }
+
+            await scheduledScanCollection().doc(scheduleId).update({
+                scheduledAt: firebase.firestore.Timestamp.fromDate(scheduledDate),
+                operator: operator,
+                notes: notes,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+            utils.showToast('Schedule updated!', 'success');
+            window.closeEditScheduleModal();
+            await refreshSchedules();
+        } catch (error) {
+            console.error('❌ Error updating schedule:', error);
+            utils.showToast('Failed to update schedule. Please try again.', 'error');
+        } finally {
+            if (submitBtn) submitBtn.disabled = false;
+        }
+    };
+
+    // ═══════════════════════════════════════════════════════════
+    // CANCEL SCHEDULE — status update only, never a delete, so the
+    // schedule stays visible (and in the block's history) afterwards.
+    // ═══════════════════════════════════════════════════════════
+
+    let schedulePendingCancel = null;
+
+    window.openCancelScheduleModal = function (scheduleId) {
+        const item = allSchedules.find(s => s.id === scheduleId);
+        if (!item) {
+            utils.showToast('Schedule not found. It may have changed — refreshing.', 'error');
+            refreshSchedules();
+            return;
+        }
+        if (item.status !== 'scheduled') {
+            utils.showToast('This schedule is already cancelled.', 'error');
+            return;
+        }
+
+        schedulePendingCancel = scheduleId;
+        document.getElementById('cancel-schedule-datetime').textContent = formatScheduledDateTime(item.scheduledAt);
+        document.getElementById('cancel-schedule-block').textContent = item.blockDisplayId;
+        utils.showModal('cancel-schedule-modal');
+    };
+
+    window.closeCancelScheduleModal = function () {
+        schedulePendingCancel = null;
+        utils.hideModal('cancel-schedule-modal');
+    };
+
+    window.confirmCancelSchedule = async function () {
+        if (!schedulePendingCancel) {
+            window.closeCancelScheduleModal();
+            return;
+        }
+        const scheduleId = schedulePendingCancel;
+
+        try {
+            await scheduledScanCollection().doc(scheduleId).update({
+                status: 'cancelled',
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+            utils.showToast('Schedule cancelled.', 'success');
+            window.closeCancelScheduleModal();
+            await refreshSchedules();
+        } catch (error) {
+            console.error('❌ Error cancelling schedule:', error);
+            utils.showToast('Failed to cancel schedule. Please try again.', 'error');
+        }
+    };
+
+    // ═══════════════════════════════════════════════════════════
+    // HELPERS
+    // ═══════════════════════════════════════════════════════════
+
+    async function refreshSchedules() {
+        await loadSchedules();
+        combineAndRender();
+    }
+
+    /**
+     * Combine a date input value ("YYYY-MM-DD") and a time input value
+     * ("HH:MM") into a JS Date. Returns null if either part is missing or
+     * the result isn't a valid date.
+     */
+    function parseScheduledDateTime(dateStr, timeStr) {
+        if (!dateStr || !timeStr) return null;
+        const combined = new Date(dateStr + 'T' + timeStr);
+        if (isNaN(combined.getTime())) return null;
+        return combined;
+    }
+
+    /**
+     * Format a JS Date for display, e.g. "Sep 20, 2026 · 6:00 AM".
+     */
+    function formatScheduledDateTime(date) {
+        if (!(date instanceof Date) || isNaN(date.getTime())) {
+            return 'Unknown date';
+        }
+        const datePart = date.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: '2-digit'
+        });
+        const timePart = date.toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit'
+        });
+        return datePart + ' · ' + timePart;
+    }
+
+    /**
+     * Split a scheduled Date into the day/month/year/time parts used by
+     * the schedule card's Date & Time badge — same visual hierarchy as
+     * the Scan Log page's date badge (scans.html: large day, smaller
+     * month, smaller year), with the scheduled time kept visible below.
+     */
+    function formatScheduledDateParts(date) {
+        if (!(date instanceof Date) || isNaN(date.getTime())) {
+            return { day: '--', month: '—', year: '—', time: 'Unknown time' };
+        }
+        return {
+            day: String(date.getDate()).padStart(2, '0'),
+            month: date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase(),
+            year: String(date.getFullYear()),
+            time: date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+        };
+    }
+
+    function escapeHtml(str) {
+        return String(str == null ? '' : str).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
 
 })();

@@ -37,6 +37,11 @@
         margin-bottom: 1rem;
         transition: box-shadow 0.2s;
         align-items: center;
+        max-width: 100%;
+      }
+
+      .scan-entry:last-child {
+        margin-bottom: 0;
       }
 
       .scan-entry:hover {
@@ -76,6 +81,7 @@
 
       .sinfo {
         flex: 1;
+        min-width: 0;
         display: flex;
         flex-direction: column;
         gap: 0.75rem;
@@ -86,6 +92,7 @@
         font-weight: 600;
         color: #111827;
         margin: 0;
+        overflow-wrap: break-word;
       }
 
       .spills {
@@ -226,6 +233,88 @@
       .mc-yellow .mc-val {
         color: var(--yellow);
       }
+
+      /* ── Scan History: scrollable card + pagination ──────────── */
+      .scan-list-card {
+        background-color: var(--surf);
+        border: var(--border-width-base) solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: var(--space-lg);
+        box-shadow: var(--shadow-xs);
+        max-height: 660px;
+        overflow-y: auto;
+        overflow-x: hidden;
+      }
+
+      .scan-list-card .scan-entry {
+        max-width: 100%;
+      }
+
+      .scan-pagination {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--space-xs);
+        margin-top: var(--space-lg);
+      }
+
+      .page-nav-btn,
+      .page-num-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 32px;
+        height: 32px;
+        padding: 0 var(--space-sm);
+        font-size: var(--font-size-sm);
+        font-weight: var(--font-weight-medium);
+        font-family: var(--font-sans);
+        color: var(--color-text-secondary);
+        background-color: var(--surf);
+        border: var(--border-width-base) solid var(--border);
+        border-radius: var(--radius-pill);
+        cursor: pointer;
+        transition: all var(--transition-fast);
+      }
+
+      .page-nav-btn:hover:not(:disabled),
+      .page-num-btn:hover:not(.active) {
+        border-color: var(--green);
+        color: var(--green);
+      }
+
+      .page-nav-btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+
+      .page-num-btn.active {
+        background-color: var(--green-bg);
+        border-color: var(--green);
+        color: var(--green);
+        cursor: default;
+      }
+
+      .page-ellipsis {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 20px;
+        height: 32px;
+        color: var(--muted);
+        font-size: var(--font-size-sm);
+      }
+
+      @media (max-width: 580px) {
+        .scan-entry {
+          flex-wrap: wrap;
+        }
+        .sdate {
+          flex-direction: row;
+          gap: 0.375rem;
+          min-width: 0;
+        }
+      }
     </style>
   </head>
   <body>
@@ -344,7 +433,7 @@
                       width="20"
                     />
                   </span>
-                  <span class="nav-link-text">Flight Missions</span>
+                  <span class="nav-link-text">Flight Schedules</span>
                 </a>
               </li>
               <li>
@@ -455,8 +544,15 @@
             <!-- Populated by JavaScript -->
           </div>
 
-          <!-- Scan Entries List -->
-          <div id="scan-list" class="scan-list mb-5">
+          <!-- Scan Entries List (fixed-height, scrollable card) -->
+          <div class="scan-list-card">
+            <div id="scan-list" class="scan-list">
+              <!-- Populated by JavaScript -->
+            </div>
+          </div>
+
+          <!-- Pagination -->
+          <div id="scan-pagination" class="scan-pagination mb-5">
             <!-- Populated by JavaScript -->
           </div>
         </div>

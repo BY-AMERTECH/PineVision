@@ -46,6 +46,53 @@
           grid-template-columns: 1fr;
         }
       }
+
+      /* ── Live sync indicator (shared pattern with Flights & Scans) ── */
+      .fs-live-dot {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        font-weight: var(--font-weight-medium);
+        color: var(--muted);
+        font-family: var(--font-mono);
+      }
+      .fs-live-dot .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--green-500);
+        box-shadow: 0 0 0 3px var(--green-bg);
+        flex-shrink: 0;
+        animation: fs-pulse 2s ease-in-out infinite;
+      }
+      .fs-live-dot.offline .dot {
+        background: var(--red-mid);
+        box-shadow: 0 0 0 3px var(--red-bg);
+        animation: none;
+      }
+      @keyframes fs-pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.35; }
+      }
+
+      .rp-error-state {
+        text-align: center;
+        padding: var(--space-4xl) var(--space-2xl);
+        color: var(--muted);
+      }
+      .rp-error-state .empty-state-icon {
+        background: var(--red-bg);
+        color: var(--red-mid);
+      }
+
+      .rp-table col.c-date { width: 96px; }
+      .rp-table col.c-block { width: 20%; }
+      .rp-table col.c-operator { width: 18%; }
+      .rp-table col.c-duration { width: 100px; }
+      .rp-table col.c-status { width: 120px; }
+      .rp-table col.c-bearing { width: 110px; }
+      .rp-table col.c-actions { width: 110px; }
     </style>
   </head>
   <body>
@@ -319,27 +366,11 @@
               margin-bottom: var(--space-2xl);
             "
           >
-            <div>
-            </div>
-            <button
-              class="btn btn-primary btn-sm"
-              onclick="utils.showToast('Generating report…', 'success')"
-            >
-              <svg
-                width="13"
-                height="13"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.5"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-              Generate Report
-            </button>
+            <div></div>
+            <span class="fs-live-dot" id="rp-live-indicator">
+              <span class="dot"></span>
+              <span id="rp-live-label">Live</span>
+            </span>
           </div>
 
           <div class="rp-grid" id="rp-metrics"></div>
@@ -361,152 +392,360 @@
       if (!auth.requireSuperAdmin()) {
       }
 
+      // ══════════════════════════════════════════════════════════════
+      // Reports — live Firestore sync (all client accounts)
+      //
+      // Four collections are kept in sync with onSnapshot listeners:
+      //   scans  — one row per completed scan session (joined against
+      //            blocks/users below for a real block name + operator).
+      //   blocks — joined on blockId.
+      //   users  — joined on userId, and counted for "Client Coverage".
+      //   alerts — the admin account/security-alerts collection (same
+      //            one used on Alerts), counted where resolved === false
+      //            for the "Active Alerts" metric.
+      // ══════════════════════════════════════════════════════════════
+
+      const RP_LIMIT = 300;
+
+      let rpScansUnsub = null;
+      let rpBlocksUnsub = null;
+      let rpUsersUnsub = null;
+      let rpAlertsUnsub = null;
+
+      let rpScansLoaded = false;
+      let SCANS_RAW = [];
+      let BLOCKS_BY_ID = {};
+      let USERS_RAW = [];
+      let USERS_BY_ID = {};
+      let ACTIVE_ALERTS_COUNT = 0;
+
       window.initPage = function () {
-        loadMetrics();
-        loadReports();
+        attachListeners();
+        window.addEventListener("pagehide", detachListeners);
+        window.addEventListener("beforeunload", detachListeners);
       };
 
-      function loadMetrics() {
-        var scans = data.getScans ? data.getScans() : [];
-        var alerts = data.getAlerts ? data.getAlerts() : [];
-        var users = data.getUsers ? data.getUsers() : [];
+      // ── Live listeners ────────────────────────────────────────────
 
-        var colorMap = {
+      function attachListeners() {
+        detachListeners();
+        setLiveStatus(true);
+        utils.showLoading("rp-content");
+
+        rpBlocksUnsub = firebase
+          .firestore()
+          .collection("blocks")
+          .limit(RP_LIMIT)
+          .onSnapshot(
+            function (snap) {
+              BLOCKS_BY_ID = {};
+              snap.forEach(function (doc) {
+                const d = doc.data();
+                BLOCKS_BY_ID[doc.id] = {
+                  blockName: d.blockName || d.blockId || doc.id,
+                  section: d.section || "",
+                };
+              });
+              renderAll();
+            },
+            function (error) {
+              console.error("❌ blocks listener error:", error);
+              setLiveStatus(false);
+            },
+          );
+
+        rpUsersUnsub = firebase
+          .firestore()
+          .collection("users")
+          .limit(RP_LIMIT)
+          .onSnapshot(
+            function (snap) {
+              USERS_RAW = [];
+              USERS_BY_ID = {};
+              snap.forEach(function (doc) {
+                const d = doc.data();
+                USERS_RAW.push(Object.assign({ id: doc.id }, d));
+                USERS_BY_ID[doc.id] = d.fullName || d.username || d.email || doc.id;
+              });
+              renderAll();
+            },
+            function (error) {
+              console.error("❌ users listener error:", error);
+              setLiveStatus(false);
+            },
+          );
+
+        rpAlertsUnsub = firebase
+          .firestore()
+          .collection("alerts")
+          .where("resolved", "==", false)
+          .onSnapshot(
+            function (snap) {
+              ACTIVE_ALERTS_COUNT = snap.size;
+              renderAll();
+            },
+            function (error) {
+              console.error("❌ alerts listener error:", error);
+              // Non-fatal — the reports table doesn't depend on this.
+            },
+          );
+
+        rpScansUnsub = firebase
+          .firestore()
+          .collection("scans")
+          .orderBy("startTime", "desc")
+          .limit(RP_LIMIT)
+          .onSnapshot(
+            function (snap) {
+              rpScansLoaded = true;
+              setLiveStatus(true);
+              SCANS_RAW = [];
+              snap.forEach(function (doc) {
+                SCANS_RAW.push(Object.assign({ id: doc.id }, doc.data()));
+              });
+              renderAll();
+            },
+            function (error) {
+              console.error("❌ scans listener error:", error);
+              rpScansLoaded = true;
+              setLiveStatus(false);
+              renderError();
+            },
+          );
+      }
+
+      function detachListeners() {
+        [rpScansUnsub, rpBlocksUnsub, rpUsersUnsub, rpAlertsUnsub].forEach(function (unsub) {
+          if (typeof unsub === "function") {
+            try {
+              unsub();
+            } catch (e) {
+              /* no-op — already detached */
+            }
+          }
+        });
+        rpScansUnsub = null;
+        rpBlocksUnsub = null;
+        rpUsersUnsub = null;
+        rpAlertsUnsub = null;
+      }
+
+      function setLiveStatus(online) {
+        const el = document.getElementById("rp-live-indicator");
+        const label = document.getElementById("rp-live-label");
+        if (!el || !label) return;
+        el.classList.toggle("offline", !online);
+        label.textContent = online ? "Live" : "Connection issue";
+      }
+
+      // ── Join + render ────────────────────────────────────────────
+
+      function renderAll() {
+        if (!rpScansLoaded) return; // wait for the first scans snapshot
+
+        const rows = SCANS_RAW.map(buildScanRow);
+        renderMetrics(rows);
+        renderReports(rows);
+      }
+
+      function buildScanRow(s) {
+        const block = BLOCKS_BY_ID[s.blockId];
+        const blockLabel = block ? block.blockName : (s.blockId || "Unassigned");
+        const operatorName = USERS_BY_ID[s.userId] || s.userId || "Unknown";
+
+        const startTime = s.startTime && typeof s.startTime.toDate === "function" ? s.startTime.toDate() : null;
+        const endTime = s.endTime && typeof s.endTime.toDate === "function" ? s.endTime.toDate() : null;
+
+        let duration = "—";
+        if (startTime && endTime) {
+          const diffMs = endTime - startTime;
+          if (diffMs >= 0) {
+            const hours = Math.floor(diffMs / 3600000);
+            const minutes = Math.floor((diffMs % 3600000) / 60000);
+            duration = hours + "h " + minutes + "m";
+          }
+        }
+
+        const total = s.total || 0;
+        const bearingPercent = total > 0 ? ((s.bearing || 0) / total) * 100 : 0;
+
+        return {
+          id: s.id,
+          blockLabel: blockLabel,
+          operatorName: operatorName,
+          startTime: startTime,
+          duration: duration,
+          status: s.status || "completed",
+          bearingPercent: bearingPercent,
+          hasData: total > 0,
+        };
+      }
+
+      // ── Metrics ──────────────────────────────────────────────────
+
+      function renderMetrics(rows) {
+        const colorMap = {
           green: { fg: "var(--green)", bg: "var(--green-bg)" },
           amber: { fg: "var(--amber)", bg: "var(--amber-bg)" },
-          "": {
-            fg: "var(--color-text-secondary)",
-            bg: "var(--color-background-tertiary)",
-          },
+          "": { fg: "var(--color-text-secondary)", bg: "var(--color-background-tertiary)" },
         };
-        var cards = [
+        const clientCount = USERS_RAW.filter((u) => u.role === "client").length;
+        const cards = [
           {
             label: "Total Reports",
-            value: scans.length,
-            sub: "Scan reports generated",
+            value: rows.length,
+            sub: rows.length >= RP_LIMIT ? "Most recent " + RP_LIMIT : "Scan reports generated",
             color: "green",
             icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
           },
           {
             label: "Active Alerts",
-            value: alerts.filter(function (a) {
-              return !a.resolved;
-            }).length,
+            value: ACTIVE_ALERTS_COUNT,
             sub: "Requiring action",
             color: "amber",
             icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>',
           },
           {
             label: "Client Coverage",
-            value: users.filter(function (u) {
-              return u.role === "client";
-            }).length,
+            value: clientCount,
             sub: "Clients with data",
             color: "",
             icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
           },
         ];
 
-        var html = "";
+        let html = "";
         cards.forEach(function (c) {
-          var cm = colorMap[c.color] || colorMap[""];
+          const cm = colorMap[c.color] || colorMap[""];
           html +=
-            '<div class="mc ' +
-            c.color +
-            '">' +
-            '<div class="mc-icon"><div style="width:32px;height:32px;border-radius:var(--radius-sm);background:' +
-            cm.bg +
-            ";display:flex;align-items:center;justify-content:center;color:" +
-            cm.fg +
-            ';">' +
-            c.icon +
-            "</div></div>" +
-            '<div class="mc-label">' +
-            c.label +
-            "</div>" +
-            '<div class="mc-val">' +
-            c.value +
-            "</div>" +
-            '<div class="mc-sub">' +
-            c.sub +
-            "</div>" +
+            '<div class="mc ' + c.color + '">' +
+            '<div class="mc-icon"><div style="width:32px;height:32px;border-radius:var(--radius-sm);background:' + cm.bg +
+            ";display:flex;align-items:center;justify-content:center;color:" + cm.fg + ';">' + c.icon + "</div></div>" +
+            '<div class="mc-label">' + c.label + "</div>" +
+            '<div class="mc-val">' + c.value + "</div>" +
+            '<div class="mc-sub">' + c.sub + "</div>" +
             "</div>";
         });
         document.getElementById("rp-metrics").innerHTML = html;
       }
 
-      function loadReports() {
-        var scans = data.getScans ? data.getScans() : [];
-        if (!scans.length) {
+      // ── Table ────────────────────────────────────────────────────
+
+      function renderReports(rows) {
+        if (!rows.length) {
           document.getElementById("rp-content").innerHTML =
             '<div class="card"><div class="empty-state">' +
             '<div class="empty-state-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>' +
             '<div class="empty-state-title">No Reports Yet</div>' +
-            '<div class="empty-state-text">Reports will appear here after scans are completed</div>' +
+            '<div class="empty-state-text">Reports will appear here as soon as a client account completes a scan.</div>' +
             "</div></div>";
           return;
         }
 
-        var html =
+        let html =
           '<div class="tcard">' +
           '<div class="thead-row"><h3 class="thead-title">Scan Reports</h3>' +
-          '<span style="font-size:11px;color:var(--color-text-secondary);">' +
-          scans.length +
-          " reports</span></div>" +
-          '<div class="twrap"><table><thead><tr>' +
-          "<th>Date</th><th>Title</th><th>Operator</th><th>Blocks</th><th>Duration</th><th>Bearing Rate</th><th>Actions</th>" +
+          '<span style="font-size:11px;color:var(--color-text-secondary);font-family:var(--font-mono);">' +
+          rows.length + " report" + (rows.length !== 1 ? "s" : "") + "</span></div>" +
+          '<div class="twrap"><table class="rp-table">' +
+          "<colgroup>" +
+          '<col class="c-date"><col class="c-block"><col class="c-operator"><col class="c-duration"><col class="c-status"><col class="c-bearing"><col class="c-actions">' +
+          "</colgroup>" +
+          "<thead><tr>" +
+          "<th>Date</th><th>Block</th><th>Operator</th><th>Duration</th><th>Status</th><th>Bearing Rate</th><th>Actions</th>" +
           "</tr></thead><tbody>";
 
-        scans.forEach(function (s) {
-          var bearColor =
-            s.bearing >= 75
-              ? "var(--green)"
-              : s.bearing >= 60
-                ? "var(--amber)"
-                : "var(--red)";
-          var bearBadge =
-            s.bearing >= 75
-              ? '<span class="badge good"><span class="bdot"></span>' +
-                s.bearing.toFixed(1) +
-                "%</span>"
-              : s.bearing >= 60
-                ? '<span class="badge warn"><span class="bdot"></span>' +
-                  s.bearing.toFixed(1) +
-                  "%</span>"
-                : '<span class="badge crit"><span class="bdot"></span>' +
-                  s.bearing.toFixed(1) +
-                  "%</span>";
+        rows.forEach(function (r) {
+          const dateLabel = r.startTime
+            ? r.startTime.toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" })
+            : "—";
+          const bearBadge = !r.hasData
+            ? '<span class="badge" style="background-color:var(--surf2);color:var(--color-text-secondary);border-color:var(--border);"><span class="bdot" style="background-color:var(--color-text-tertiary);"></span>—</span>'
+            : r.bearingPercent >= 75
+              ? '<span class="badge good"><span class="bdot"></span>' + r.bearingPercent.toFixed(1) + "%</span>"
+              : r.bearingPercent >= 60
+                ? '<span class="badge warn"><span class="bdot"></span>' + r.bearingPercent.toFixed(1) + "%</span>"
+                : '<span class="badge crit"><span class="bdot"></span>' + r.bearingPercent.toFixed(1) + "%</span>";
+
           html +=
             "<tr>" +
-            '<td style="font-size:11px;font-family:var(--font-mono);color:var(--color-text-secondary);">' +
-            s.day +
-            " " +
-            s.month +
-            "</td>" +
-            '<td style="font-weight:var(--font-weight-medium);">' +
-            (s.title || "—") +
-            "</td>" +
-            '<td style="font-size:var(--font-size-sm);color:var(--color-text-secondary);">' +
-            (s.operator || "—") +
-            "</td>" +
-            '<td style="font-size:var(--font-size-sm);text-align:center;">' +
-            (s.blocks || "—") +
-            "</td>" +
-            '<td style="font-size:var(--font-size-sm);color:var(--color-text-secondary);">' +
-            (s.duration || "—") +
-            "</td>" +
-            "<td>" +
-            bearBadge +
-            "</td>" +
-            '<td><button class="btn btn-secondary btn-sm" style="font-size:11px;" onclick="utils.showToast(\'Downloading report…\', \'success\')">Download</button></td>' +
+            '<td style="font-size:11px;font-family:var(--font-mono);color:var(--color-text-secondary);white-space:nowrap;">' + dateLabel + "</td>" +
+            '<td style="font-weight:var(--font-weight-medium);">' + escapeHtml(r.blockLabel) + "</td>" +
+            '<td style="font-size:var(--font-size-sm);color:var(--color-text-secondary);">' + escapeHtml(r.operatorName) + "</td>" +
+            '<td style="font-size:var(--font-size-sm);color:var(--color-text-secondary);">' + r.duration + "</td>" +
+            "<td>" + scanStatusBadge(r.status) + "</td>" +
+            "<td>" + bearBadge + "</td>" +
+            '<td><button class="btn btn-secondary btn-sm" style="font-size:11px;" onclick="exportScanRowCSV(\'' + r.id + '\')" title="Download this report as CSV">Download</button></td>' +
             "</tr>";
         });
 
         html += "</tbody></table></div></div>";
         document.getElementById("rp-content").innerHTML = html;
+        LAST_RENDERED_ROWS = rows;
       }
 
+      /* ── Per-scan CSV download ──────────────────────────────────────
+       * Reuses the same Blob/createObjectURL pattern as
+       * admin/activity.html's exportCSV(), applied to the single row
+       * the user clicked "Download" on (rows are already fully computed
+       * by buildScanRow() — no extra Firestore read needed). */
+      let LAST_RENDERED_ROWS = [];
 
+      function exportScanRowCSV(scanId) {
+        const r = LAST_RENDERED_ROWS.find((row) => row.id === scanId);
+        if (!r) {
+          utils.showToast("Couldn't find that report row — try refreshing.", "error");
+          return;
+        }
+        const dateLabel = r.startTime
+          ? r.startTime.toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" })
+          : "—";
+        const rows = [
+          ["Date", "Block", "Operator", "Duration", "Status", "Bearing Rate %"],
+          [
+            dateLabel,
+            '"' + (r.blockLabel || "").replace(/"/g, '""') + '"',
+            '"' + (r.operatorName || "").replace(/"/g, '""') + '"',
+            r.duration,
+            r.status,
+            r.hasData ? r.bearingPercent.toFixed(1) : "",
+          ],
+        ];
+        const csv = rows.map((row) => row.join(",")).join("\n");
+        const blob = new Blob([csv], { type: "text/csv" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "pinevision-scan-report-" + scanId + ".csv";
+        a.click();
+        URL.revokeObjectURL(url);
+        utils.showToast("Report downloaded", "success");
+      }
+
+      function renderError() {
+        document.getElementById("rp-content").innerHTML =
+          '<div class="card"><div class="rp-error-state">' +
+          '<div class="empty-state-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>' +
+          '<div class="empty-state-title">Couldn\'t load report data</div>' +
+          '<div class="empty-state-text">Lost the live connection to Firestore. Check your network and try again.</div>' +
+          '<button class="btn btn-primary btn-sm" style="margin-top:var(--space-lg);" onclick="attachListeners()">Retry</button>' +
+          "</div></div>";
+        document.getElementById("rp-metrics").innerHTML = "";
+      }
+
+      function scanStatusBadge(status) {
+        const s = String(status || "completed").toLowerCase();
+        if (s === "completed") return '<span class="badge good"><span class="bdot"></span>Completed</span>';
+        if (s === "processing" || s === "in_progress") return '<span class="badge warn"><span class="bdot"></span>Processing</span>';
+        if (s === "failed" || s === "error") return '<span class="badge crit"><span class="bdot"></span>Failed</span>';
+        return '<span class="badge" style="background-color:var(--surf2);color:var(--color-text-secondary);border-color:var(--border);"><span class="bdot" style="background-color:var(--color-text-tertiary);"></span>' + escapeHtml(status) + "</span>";
+      }
+
+      function escapeHtml(str) {
+        return String(str == null ? "" : str).replace(/[&<>"']/g, function (c) {
+          return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+        });
+      }
     </script>
 
   </body>

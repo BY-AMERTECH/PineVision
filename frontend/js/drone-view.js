@@ -1206,7 +1206,7 @@ async function handleEndScan() {
 
     // For live drone: signals the backend to stop.
     // For video mode: signals backend to abort the analysis worker.
-    await stopDetection();
+    const scanFinalizedOk = await stopDetection();
 
     if (DRONE_STATE.videoMode) {
         if (DRONE_STATE.videoBlobUrl) {
@@ -1243,7 +1243,11 @@ async function handleEndScan() {
     setEndScanButtonLoading(false);
     closeBsModal('modal-end-scan');
     transitionTo('idle');
-    utils.showToast('Scan session ended', 'info');
+    if (scanFinalizedOk) {
+        utils.showToast('Scan session ended', 'info');
+    } else {
+        utils.showToast('Scan ended, but the final save may not have completed. Check Scans history to confirm.', 'error');
+    }
 
     if (DRONE_STATE.blockId) {
         setTimeout(() => {

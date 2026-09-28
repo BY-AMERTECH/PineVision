@@ -496,6 +496,22 @@
                   <span class="nav-link-text">Audit Logs</span>
                 </a>
               </li>
+              <li>
+                <a
+                  href="blocks.html"
+                  class="nav-link"
+                  data-tooltip="Fruit Blocks"
+                >
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-leaf.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Fruit Blocks</span>
+                </a>
+              </li>
             </ul>
           </div>
 
@@ -863,6 +879,7 @@
         // Firestore stores these exact strings from auth.js:
         "Failed Login": "Failed Login",
         "Multiple Failed Login Attempts": "Failed Login",
+        crop_health: "Crop Health Alert",
       };
 
       /* ── Filter State ────────────────────────────────────────────────────── */
@@ -893,6 +910,7 @@
 
         return {
           id: doc.id,
+          source: "security",
           severity: sev,
           type: type,
           title: d.title || d.type || "Alert",
@@ -905,39 +923,142 @@
         };
       }
 
+      /* ── Map a monitoring_alerts doc (crop-health threshold alerts,
+       * written by the backend's check_thresholds_and_create_alerts())
+       * into the same row shape as mapAlert() above, so the existing
+       * table/detail/filter code renders both kinds of alert without
+       * changes. This collection was previously never read here — the
+       * page only ever showed failed-login events under "Alerts". ── */
+      var BLOCKS_BY_ID = {}; // blockId -> blockName, for crop-alert labels
+
+      function mapMonitoringAlert(doc) {
+        var d = doc.data();
+        var ts = d.detectedDate
+          ? d.detectedDate.toDate
+            ? d.detectedDate.toDate().toISOString()
+            : new Date(d.detectedDate).toISOString()
+          : new Date().toISOString();
+
+        var sev = (d.severity || "warn").toLowerCase();
+        if (sev === "critical") sev = "crit";
+        if (sev === "warning") sev = "warn";
+
+        var blockLabel = BLOCKS_BY_ID[d.blockId] || d.blockId || "Unknown block";
+
+        return {
+          id: doc.id,
+          source: "monitoring",
+          severity: sev,
+          type: "crop_health",
+          title: d.title || "Crop Health Alert",
+          // No account-level actions (Suspend/Reset Password) make sense for
+          // a crop alert, so leave user as "unknown" — the existing template
+          // already hides those buttons for a.user === "unknown".
+          user: "unknown",
+          ip: "—",
+          device: blockLabel,
+          timestamp: ts,
+          status: d.resolved ? "resolved" : "active",
+          details: d.description || "",
+        };
+      }
+
+      function loadBlocksForAlerts() {
+        return db.collection("blocks").limit(500).get()
+          .then(function (snap) {
+            var map = {};
+            snap.forEach(function (doc) {
+              map[doc.id] = (doc.data() || {}).blockName || doc.id;
+            });
+            BLOCKS_BY_ID = map;
+          })
+          .catch(function (err) {
+            console.error("Failed to load blocks for alert labels:", err);
+          });
+      }
+
       /* ── Load Alerts from Firestore (real-time) ─────────────────────────── */
+      var alertsUnsub = null;
+      var monitoringAlertsUnsub = null;
+      var SECURITY_ALERTS = [];
+      var MONITORING_ALERTS = [];
+
+      function mergeAndRenderAlerts() {
+        ACCOUNT_ALERTS = SECURITY_ALERTS.concat(MONITORING_ALERTS).sort(
+          function (a, b) {
+            return new Date(b.timestamp) - new Date(a.timestamp);
+          },
+        );
+        renderMetrics();
+        renderSecondaryStats();
+        applyFilters();
+        updateNavBadge();
+        document.getElementById("last-updated").textContent =
+          "Updated " +
+          new Date().toLocaleTimeString("en-US", {
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+          });
+      }
+
       function loadAlerts() {
         showLoadingState();
 
-        db.collection("alerts")
-          .orderBy("timestamp", "desc")
-          .limit(200)
-          .onSnapshot(
-            function (snapshot) {
-              ACCOUNT_ALERTS = snapshot.docs.map(mapAlert);
-              renderMetrics();
-              renderSecondaryStats();
-              applyFilters();
-              updateNavBadge();
-              document.getElementById("last-updated").textContent =
-                "Updated " +
-                new Date().toLocaleTimeString("en-US", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  hour12: true,
-                });
-            },
-            function (error) {
-              console.error("Firestore error:", error);
-              document.getElementById("alerts-content").innerHTML =
-                '<div class="card"><div class="empty-state">' +
-                '<div class="empty-state-title">Failed to load alerts</div>' +
-                '<div class="empty-state-text">' +
-                error.message +
-                "</div>" +
-                "</div></div>";
-            },
-          );
+        if (typeof alertsUnsub === "function") {
+          try { alertsUnsub(); } catch (e) { /* no-op — already detached */ }
+        }
+        if (typeof monitoringAlertsUnsub === "function") {
+          try { monitoringAlertsUnsub(); } catch (e) { /* no-op — already detached */ }
+        }
+
+        loadBlocksForAlerts().then(function () {
+          alertsUnsub = db.collection("alerts")
+            .orderBy("timestamp", "desc")
+            .limit(200)
+            .onSnapshot(
+              function (snapshot) {
+                SECURITY_ALERTS = snapshot.docs.map(mapAlert);
+                mergeAndRenderAlerts();
+              },
+              function (error) {
+                console.error("Firestore error:", error);
+                document.getElementById("alerts-content").innerHTML =
+                  '<div class="card"><div class="empty-state">' +
+                  '<div class="empty-state-title">Failed to load alerts</div>' +
+                  '<div class="empty-state-text">' +
+                  error.message +
+                  "</div>" +
+                  "</div></div>";
+              },
+            );
+
+          monitoringAlertsUnsub = db.collection("monitoring_alerts")
+            .orderBy("detectedDate", "desc")
+            .limit(200)
+            .onSnapshot(
+              function (snapshot) {
+                MONITORING_ALERTS = snapshot.docs.map(mapMonitoringAlert);
+                mergeAndRenderAlerts();
+              },
+              function (error) {
+                // Don't blank the whole page if only this listener fails —
+                // security alerts (above) still render.
+                console.error("Failed to load monitoring_alerts:", error);
+              },
+            );
+        });
+      }
+
+      function detachAlertsListener() {
+        if (typeof alertsUnsub === "function") {
+          try { alertsUnsub(); } catch (e) { /* no-op — already detached */ }
+        }
+        alertsUnsub = null;
+        if (typeof monitoringAlertsUnsub === "function") {
+          try { monitoringAlertsUnsub(); } catch (e) { /* no-op — already detached */ }
+        }
+        monitoringAlertsUnsub = null;
       }
 
       function showLoadingState() {
@@ -951,6 +1072,8 @@
       /* ── Init ────────────────────────────────────────────────────────────── */
       window.initPage = function () {
         loadAlerts(); // replaces the old renderMetrics() / applyFilters() calls
+        window.addEventListener("pagehide", detachAlertsListener);
+        window.addEventListener("beforeunload", detachAlertsListener);
       };
 
       /* ── Nav Badge ───────────────────────────────────────────────────────── */
@@ -1378,16 +1501,20 @@
           '<div class="det-row"><span class="det-label">Detected</span><span class="det-value det-mono">' +
           ts +
           "</span></div>" +
-          '<div class="det-section">Access Information</div>' +
-          '<div class="det-row"><span class="det-label">User Account</span><span class="det-value">' +
-          a.user +
-          "</span></div>" +
-          '<div class="det-row"><span class="det-label">IP Address</span><span class="det-value det-mono">' +
-          a.ip +
-          "</span></div>" +
-          '<div class="det-row"><span class="det-label">Device</span><span class="det-value">' +
-          a.device +
-          "</span></div>" +
+          '<div class="det-section">' + (a.source === "monitoring" ? "Source" : "Access Information") + "</div>" +
+          (a.source === "monitoring"
+            ? '<div class="det-row"><span class="det-label">Block</span><span class="det-value">' +
+              a.device +
+              "</span></div>"
+            : '<div class="det-row"><span class="det-label">User Account</span><span class="det-value">' +
+              a.user +
+              "</span></div>" +
+              '<div class="det-row"><span class="det-label">IP Address</span><span class="det-value det-mono">' +
+              a.ip +
+              "</span></div>" +
+              '<div class="det-row"><span class="det-label">Device</span><span class="det-value">' +
+              a.device +
+              "</span></div>") +
           '<div class="det-section">Description</div>' +
           '<p style="font-size:var(--font-size-sm);color:var(--color-text-primary);line-height:1.6;margin:0;">' +
           a.details +
@@ -1404,8 +1531,13 @@
 
       /* ── Action Handlers ─────────────────────────────────────────────────── */
       function markResolved(id) {
-        // Update Firestore — the onSnapshot listener will re-render automatically
-        db.collection("alerts")
+        // Route to whichever collection this alert actually came from —
+        // "alerts" (login-security events) or "monitoring_alerts" (crop
+        // health threshold alerts). Update Firestore — the onSnapshot
+        // listener will re-render automatically.
+        var a = ACCOUNT_ALERTS.find(function (x) { return x.id === id; });
+        var collectionName = a && a.source === "monitoring" ? "monitoring_alerts" : "alerts";
+        db.collection(collectionName)
           .doc(id)
           .update({ resolved: true })
           .then(function () {
@@ -1423,28 +1555,72 @@
           });
       }
 
-      function suspendUser(username) {
-        if (typeof utils !== "undefined")
-          utils.showToast(
-            'User "' + username + '" has been suspended.',
-            "success",
-          );
-        var oc = bootstrap.Offcanvas.getInstance(
-          document.getElementById("detail-offcanvas"),
-        );
-        if (oc) oc.hide();
+      async function logUserAction(action, details) {
+        try {
+          var currentUser = firebase.auth().currentUser;
+          if (!currentUser) return;
+          var currentUserDoc = await db.collection("users").doc(currentUser.uid).get();
+          var currentUserData = currentUserDoc.exists ? currentUserDoc.data() : {};
+          await db.collection("activity_logs").add({
+            userId: currentUser.uid,
+            user: currentUserData.username || currentUser.email,
+            action: action,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            status: "success",
+            email: currentUserData.email,
+            role: currentUserData.role,
+            details: details,
+          });
+        } catch (logError) {
+          console.error("Failed to log action:", logError);
+        }
       }
 
-      function resetPassword(username) {
-        if (typeof utils !== "undefined")
-          utils.showToast(
-            'Password reset initiated for "' + username + '".',
-            "success",
+      async function suspendUser(username) {
+        try {
+          var snap = await db.collection("users").where("username", "==", username).limit(1).get();
+          if (snap.empty) {
+            utils.showToast('User "' + username + '" not found.', "error");
+            return;
+          }
+          await snap.docs[0].ref.update({ status: "disabled" });
+          await logUserAction("toggle_status", "Suspended user: " + username);
+
+          utils.showToast('User "' + username + '" has been suspended.', "success");
+          var oc = bootstrap.Offcanvas.getInstance(
+            document.getElementById("detail-offcanvas"),
           );
-        var oc = bootstrap.Offcanvas.getInstance(
-          document.getElementById("detail-offcanvas"),
-        );
-        if (oc) oc.hide();
+          if (oc) oc.hide();
+        } catch (err) {
+          console.error("Failed to suspend user:", err);
+          utils.showToast("Failed to suspend user. Please try again.", "error");
+        }
+      }
+
+      async function resetPassword(username) {
+        try {
+          var snap = await db.collection("users").where("username", "==", username).limit(1).get();
+          if (snap.empty) {
+            utils.showToast('User "' + username + '" not found.', "error");
+            return;
+          }
+          var userEmail = snap.docs[0].data().email;
+          if (!userEmail) {
+            utils.showToast("No email on file for this user.", "error");
+            return;
+          }
+          await firebase.auth().sendPasswordResetEmail(userEmail);
+          await logUserAction("reset_password", "Sent password reset email to: " + username);
+
+          utils.showToast('Password reset email sent to "' + username + '".', "success");
+          var oc = bootstrap.Offcanvas.getInstance(
+            document.getElementById("detail-offcanvas"),
+          );
+          if (oc) oc.hide();
+        } catch (err) {
+          console.error("Failed to send password reset:", err);
+          utils.showToast("Failed to send password reset email.", "error");
+        }
       }
 
       function refreshAlerts() {

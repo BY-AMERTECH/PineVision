@@ -22,7 +22,7 @@
     <style>
       .rp-grid {
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(4, 1fr);
         gap: var(--grid-gap);
         margin-bottom: var(--space-2xl);
       }
@@ -45,6 +45,161 @@
         .rp-grid {
           grid-template-columns: 1fr;
         }
+      }
+
+      /* ── Live sync indicator (shared pattern with Flights & Scans) ── */
+      .fs-live-dot {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        font-weight: var(--font-weight-medium);
+        color: var(--muted);
+        font-family: var(--font-mono);
+      }
+      .fs-live-dot .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--green-500);
+        box-shadow: 0 0 0 3px var(--green-bg);
+        flex-shrink: 0;
+        animation: fs-pulse 2s ease-in-out infinite;
+      }
+      .fs-live-dot.offline .dot {
+        background: var(--red-mid);
+        box-shadow: 0 0 0 3px var(--red-bg);
+        animation: none;
+      }
+      @keyframes fs-pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.35; }
+      }
+
+      /* ── Filter Panel ─────────────────────────────────────────── */
+      .filter-panel {
+        background-color: var(--surf);
+        border: var(--border-width-base) solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: var(--space-xl);
+        margin-bottom: var(--space-2xl);
+      }
+      .filter-panel-title {
+        font-size: var(--font-size-md);
+        font-weight: var(--font-weight-semibold);
+        color: var(--color-text-primary);
+        margin-bottom: var(--space-lg);
+      }
+      .filter-field {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-sm);
+      }
+      .filter-field-label {
+        font-size: var(--font-size-sm);
+        font-weight: var(--font-weight-medium);
+        color: var(--color-text-primary);
+      }
+      .filter-select,
+      .filter-date {
+        padding: var(--space-md);
+        font-size: var(--font-size-base);
+        border: var(--border-width-base) solid var(--border);
+        border-radius: var(--radius-md);
+        background-color: var(--surf);
+        color: var(--color-text-primary);
+        font-family: var(--font-sans);
+        transition: border-color var(--transition-fast);
+        width: 100%;
+      }
+      .filter-select:focus,
+      .filter-date:focus {
+        outline: none;
+        border-color: var(--green);
+        box-shadow: 0 0 0 3px var(--green-bg);
+      }
+      .filter-actions {
+        display: flex;
+        gap: var(--space-md);
+        align-items: center;
+        flex-wrap: wrap;
+        margin-top: var(--space-lg);
+      }
+
+      /* ── Report Results ───────────────────────────────────────── */
+      .report-results { display: none; }
+      .report-results.visible { display: block; }
+      .report-header-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: var(--space-lg);
+        flex-wrap: wrap;
+        gap: var(--space-md);
+      }
+      .report-title-group {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-xs);
+      }
+      .report-title {
+        font-size: var(--font-size-lg);
+        font-weight: var(--font-weight-semibold);
+        color: var(--color-text-primary);
+      }
+      .report-subtitle {
+        font-size: var(--font-size-sm);
+        color: var(--muted);
+      }
+      .export-actions { display: flex; gap: var(--space-sm); }
+      .btn-export {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-sm);
+        padding: var(--space-sm) var(--space-lg);
+        font-size: var(--font-size-sm);
+        font-weight: var(--font-weight-medium);
+        border: var(--border-width-base) solid var(--border);
+        border-radius: var(--radius-md);
+        background-color: var(--surf2);
+        color: var(--color-text-secondary);
+        cursor: not-allowed;
+        font-family: var(--font-sans);
+        opacity: 0.7;
+        position: relative;
+      }
+      .btn-export:not(:disabled) {
+        cursor: pointer;
+        opacity: 1;
+      }
+      .btn-export:not(:disabled):hover {
+        border-color: var(--color-text-tertiary, var(--border));
+      }
+      .btn-export-label {
+        position: absolute;
+        top: -8px;
+        right: -4px;
+        font-size: 9px;
+        font-weight: var(--font-weight-semibold);
+        background-color: var(--amber-bg);
+        color: var(--amber);
+        padding: 1px 5px;
+        border-radius: var(--radius-pill);
+        border: 1px solid var(--amber);
+        white-space: nowrap;
+      }
+
+      .rp-table col.c-block { width: 14%; }
+      .rp-table col.c-section { width: 12%; }
+      .rp-table col.c-operator { width: 16%; }
+      .rp-table col.c-daf { width: 80px; }
+      .rp-table col.c-area { width: 80px; }
+      .rp-table col.c-bearing { width: 15%; }
+      .rp-table col.c-nonviable { width: 15%; }
+      .rp-table col.c-status { width: 120px; }
+
+      @media (max-width: 580px) {
+        .filter-panel { padding: var(--space-lg); }
       }
     </style>
   </head>
@@ -138,6 +293,22 @@
                       height="18"
                   /></span>
                   <span class="nav-link-text">Audit Logs</span>
+                </a>
+              </li>
+              <li>
+                <a
+                  href="blocks.html"
+                  class="nav-link"
+                  data-tooltip="Fruit Blocks"
+                >
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-leaf.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Fruit Blocks</span>
                 </a>
               </li>
             </ul>
@@ -314,37 +485,102 @@
           <div
             style="
               display: flex;
-              justify-content: space-between;
-              align-items: flex-end;
-              margin-bottom: var(--space-2xl);
+              justify-content: flex-end;
+              align-items: center;
+              margin-bottom: var(--space-lg);
             "
           >
-            <div>
-            </div>
-            <button
-              class="btn btn-primary btn-sm"
-              onclick="utils.showToast('Generating report…', 'success')"
-            >
-              <svg
-                width="13"
-                height="13"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.5"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-              Generate Report
-            </button>
+            <span class="fs-live-dot" id="rp-live-indicator">
+              <span class="dot"></span>
+              <span id="rp-live-label">Live</span>
+            </span>
           </div>
 
-          <div class="rp-grid" id="rp-metrics"></div>
+          <!-- Filter Panel -->
+          <div class="filter-panel">
+            <div class="filter-panel-title">Report Filters</div>
+            <div class="row g-3">
+              <div class="col-sm-6 col-lg-3">
+                <div class="filter-field">
+                  <label class="filter-field-label" for="rp-date-from">Date From</label>
+                  <input type="date" id="rp-date-from" class="filter-date" />
+                </div>
+              </div>
+              <div class="col-sm-6 col-lg-3">
+                <div class="filter-field">
+                  <label class="filter-field-label" for="rp-date-to">Date To</label>
+                  <input type="date" id="rp-date-to" class="filter-date" />
+                </div>
+              </div>
+              <div class="col-sm-6 col-lg-3">
+                <div class="filter-field">
+                  <label class="filter-field-label" for="rp-filter-block">Block</label>
+                  <select id="rp-filter-block" class="filter-select">
+                    <option value="all">All Blocks</option>
+                  </select>
+                </div>
+              </div>
+              <div class="col-sm-6 col-lg-3">
+                <div class="filter-field">
+                  <label class="filter-field-label" for="rp-filter-operator">Flight Operator</label>
+                  <select id="rp-filter-operator" class="filter-select">
+                    <option value="all">All Operators</option>
+                  </select>
+                </div>
+              </div>
+              <div class="col-sm-6 col-lg-3">
+                <div class="filter-field">
+                  <label class="filter-field-label" for="rp-filter-status">Status</label>
+                  <select id="rp-filter-status" class="filter-select">
+                    <option value="all">All Statuses</option>
+                    <option value="good">Healthy</option>
+                    <option value="warn">Watch</option>
+                    <option value="crit">Critical</option>
+                    <option value="none">No Scan Data</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div class="filter-actions">
+              <button class="btn btn-primary" onclick="generateReport()">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                </svg>
+                <span>Generate Report</span>
+              </button>
+              <button class="btn btn-secondary" onclick="clearFilters()">
+                <span>&#8635;</span>
+                <span>Clear Filters</span>
+              </button>
+            </div>
+          </div>
 
-          <div id="rp-content"></div>
+          <!-- Loading / error placeholder (before any report has been generated) -->
+          <div id="rp-status-placeholder" style="color: var(--muted); font-size: var(--font-size-sm); padding: var(--space-lg) 0;">
+            Loading live farm data…
+          </div>
+
+          <!-- Report Results (shown after Generate is clicked) -->
+          <div class="report-results" id="report-results">
+            <div class="report-header-bar">
+              <div class="report-title-group">
+                <div class="report-title" id="report-title-text">Farm Performance Report</div>
+                <div class="report-subtitle" id="report-subtitle-text"></div>
+              </div>
+              <div class="export-actions">
+                <button class="btn-export" title="PDF export coming soon" disabled>
+                  <span>📄</span><span>Export PDF</span><span class="btn-export-label">Soon</span>
+                </button>
+                <button class="btn-export" title="Download this report as CSV" onclick="exportReportCSV()">
+                  <span>📊</span><span>Export CSV</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="rp-grid" id="rp-metrics"></div>
+
+            <div id="rp-content"></div>
+          </div>
         </div>
       </main>
     </div>
@@ -361,152 +597,414 @@
       if (!auth.requireFarmManager()) {
       }
 
+      // ══════════════════════════════════════════════════════════════
+      // Reports — live Firestore sync (farm-wide, all accounts)
+      //
+      // The report is generated from the live `blocks` collection (each
+      // block's bearingPercent/nonBearingPercent/nonViable reflect its
+      // most recent scan), joined against `users` for the flight
+      // operator's name. The `scans` collection is joined separately to
+      // count how many scan sessions fall inside the selected date
+      // range, for the "Scans in Range" metric — a real link between the
+      // report and the underlying scan history rather than a static
+      // count. All three collections are onSnapshot listeners; if the
+      // report panel is already open when new data arrives, it silently
+      // re-renders with the fresh data.
+      // ══════════════════════════════════════════════════════════════
+
+      const RP_LIMIT = 300;
+
+      let rpBlocksUnsub = null;
+      let rpUsersUnsub = null;
+      let rpScansUnsub = null;
+
+      let rpBlocksLoaded = false;
+      let rpUsersLoaded = false;
+      let rpScansLoaded = false;
+
+      let BLOCKS_RAW = [];   // [{id, blockName, section, userId, operatorName, ...}]
+      let USERS_BY_ID = {};  // userId -> fullName
+      let SCANS_RAW = [];    // [{id, blockId, startTime, ...}]
+      let CURRENT_REPORT_BLOCKS = [];  // last filtered set rendered by generateReport(), used by exportReportCSV()
+
       window.initPage = function () {
-        loadMetrics();
-        loadReports();
+        const today = new Date();
+        const monthAgo = new Date(today);
+        monthAgo.setDate(today.getDate() - 30);
+        document.getElementById("rp-date-to").value = today.toISOString().split("T")[0];
+        document.getElementById("rp-date-from").value = monthAgo.toISOString().split("T")[0];
+
+        attachListeners();
+        window.addEventListener("pagehide", detachListeners);
+        window.addEventListener("beforeunload", detachListeners);
       };
 
-      function loadMetrics() {
-        var scans = data.getScans ? data.getScans() : [];
-        var alerts = data.getAlerts ? data.getAlerts() : [];
-        var users = data.getUsers ? data.getUsers() : [];
+      // ── Live listeners ────────────────────────────────────────────
 
-        var colorMap = {
-          green: { fg: "var(--green)", bg: "var(--green-bg)" },
-          amber: { fg: "var(--amber)", bg: "var(--amber-bg)" },
-          "": {
-            fg: "var(--color-text-secondary)",
-            bg: "var(--color-background-tertiary)",
-          },
-        };
-        var cards = [
-          {
-            label: "Total Reports",
-            value: scans.length,
-            sub: "Scan reports generated",
-            color: "green",
-            icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
-          },
-          {
-            label: "Active Alerts",
-            value: alerts.filter(function (a) {
-              return !a.resolved;
-            }).length,
-            sub: "Requiring action",
-            color: "amber",
-            icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>',
-          },
-          {
-            label: "Client Coverage",
-            value: users.filter(function (u) {
-              return u.role === "client";
-            }).length,
-            sub: "Clients with data",
-            color: "",
-            icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
-          },
-        ];
+      function attachListeners() {
+        detachListeners();
+        setLiveStatus(true);
+        document.getElementById("rp-status-placeholder").style.display = "block";
+        document.getElementById("rp-status-placeholder").textContent = "Loading live farm data…";
 
-        var html = "";
-        cards.forEach(function (c) {
-          var cm = colorMap[c.color] || colorMap[""];
-          html +=
-            '<div class="mc ' +
-            c.color +
-            '">' +
-            '<div class="mc-icon"><div style="width:32px;height:32px;border-radius:var(--radius-sm);background:' +
-            cm.bg +
-            ";display:flex;align-items:center;justify-content:center;color:" +
-            cm.fg +
-            ';">' +
-            c.icon +
-            "</div></div>" +
-            '<div class="mc-label">' +
-            c.label +
-            "</div>" +
-            '<div class="mc-val">' +
-            c.value +
-            "</div>" +
-            '<div class="mc-sub">' +
-            c.sub +
-            "</div>" +
-            "</div>";
-        });
-        document.getElementById("rp-metrics").innerHTML = html;
+        rpUsersUnsub = firebase
+          .firestore()
+          .collection("users")
+          .limit(RP_LIMIT)
+          .onSnapshot(
+            function (snap) {
+              USERS_BY_ID = {};
+              snap.forEach(function (doc) {
+                const d = doc.data();
+                USERS_BY_ID[doc.id] = d.fullName || d.username || d.email || doc.id;
+              });
+              rpUsersLoaded = true;
+              onDataChanged();
+            },
+            function (error) {
+              console.error("❌ users listener error:", error);
+              setLiveStatus(false);
+            },
+          );
+
+        rpBlocksUnsub = firebase
+          .firestore()
+          .collection("blocks")
+          .limit(RP_LIMIT)
+          .onSnapshot(
+            function (snap) {
+              BLOCKS_RAW = [];
+              snap.forEach(function (doc) {
+                const d = doc.data();
+                BLOCKS_RAW.push({
+                  id: doc.id,
+                  blockName: d.blockName || d.blockId || doc.id,
+                  userId: d.userId || "",
+                  section: d.section || "—",
+                  area: typeof d.area === "number" ? d.area : parseFloat(d.area) || 0,
+                  daf: typeof d.daf === "number" ? d.daf : parseInt(d.daf, 10) || 0,
+                  bearing: d.bearingPercent || 0,
+                  nonbearing: d.nonBearingPercent || 0,
+                  nonViable: d.nonViable || 0,
+                  declaredPopulation: d.declaredPopulation || d.totalPineapples || 0,
+                  totalScans: d.totalScans || 0,
+                  plants: d.totalPineapples || 0,
+                });
+              });
+              rpBlocksLoaded = true;
+              setLiveStatus(true);
+              onDataChanged();
+            },
+            function (error) {
+              console.error("❌ blocks listener error:", error);
+              rpBlocksLoaded = true;
+              setLiveStatus(false);
+              renderLoadError();
+            },
+          );
+
+        rpScansUnsub = firebase
+          .firestore()
+          .collection("scans")
+          .orderBy("startTime", "desc")
+          .limit(RP_LIMIT)
+          .onSnapshot(
+            function (snap) {
+              SCANS_RAW = [];
+              snap.forEach(function (doc) {
+                const d = doc.data();
+                SCANS_RAW.push({
+                  id: doc.id,
+                  blockId: d.blockId || "",
+                  startTime: d.startTime && typeof d.startTime.toDate === "function" ? d.startTime.toDate() : null,
+                });
+              });
+              rpScansLoaded = true;
+              onDataChanged();
+            },
+            function (error) {
+              console.error("❌ scans listener error:", error);
+              rpScansLoaded = true;
+              onDataChanged();
+            },
+          );
       }
 
-      function loadReports() {
-        var scans = data.getScans ? data.getScans() : [];
-        if (!scans.length) {
-          document.getElementById("rp-content").innerHTML =
+      function detachListeners() {
+        [rpBlocksUnsub, rpUsersUnsub, rpScansUnsub].forEach(function (unsub) {
+          if (typeof unsub === "function") {
+            try {
+              unsub();
+            } catch (e) {
+              /* no-op — already detached */
+            }
+          }
+        });
+        rpBlocksUnsub = null;
+        rpUsersUnsub = null;
+        rpScansUnsub = null;
+      }
+
+      function setLiveStatus(online) {
+        const el = document.getElementById("rp-live-indicator");
+        const label = document.getElementById("rp-live-label");
+        if (!el || !label) return;
+        el.classList.toggle("offline", !online);
+        label.textContent = online ? "Live" : "Connection issue";
+      }
+
+      // Called whenever any of the three live collections resolve/update.
+      function onDataChanged() {
+        if (!rpBlocksLoaded || !rpUsersLoaded || !rpScansLoaded) return;
+
+        document.getElementById("rp-status-placeholder").style.display = "none";
+        populateFilterOptions();
+
+        // If a report is already open, keep it live by silently
+        // re-running the same filters against the fresh data.
+        const results = document.getElementById("report-results");
+        if (results.classList.contains("visible")) {
+          generateReport();
+        }
+      }
+
+      function renderLoadError() {
+        document.getElementById("rp-status-placeholder").style.display = "block";
+        document.getElementById("rp-status-placeholder").innerHTML =
+          'Couldn\'t reach Firestore to load report data. ' +
+          '<button class="btn btn-sm btn-secondary" onclick="attachListeners()">Retry</button>';
+      }
+
+      // ── Filter dropdown population ──────────────────────────────
+
+      function populateFilterOptions() {
+        const blockSelect = document.getElementById("rp-filter-block");
+        const operatorSelect = document.getElementById("rp-filter-operator");
+        const currentBlock = blockSelect.value;
+        const currentOperator = operatorSelect.value;
+
+        const operatorBlocks = BLOCKS_RAW.map(function (b) {
+          return Object.assign({}, b, { operatorName: USERS_BY_ID[b.userId] || b.userId || "Unassigned" });
+        });
+
+        blockSelect.innerHTML =
+          '<option value="all">All Blocks</option>' +
+          operatorBlocks
+            .slice()
+            .sort((a, b) => a.blockName.localeCompare(b.blockName))
+            .map((b) => `<option value="${escapeHtml(b.id)}">${escapeHtml(b.blockName)} — ${escapeHtml(b.section)}</option>`)
+            .join("");
+
+        const operators = Array.from(new Set(operatorBlocks.map((b) => b.operatorName).filter(Boolean))).sort();
+        operatorSelect.innerHTML =
+          '<option value="all">All Operators</option>' +
+          operators.map((o) => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join("");
+
+        blockSelect.value = currentBlock || "all";
+        operatorSelect.value = currentOperator || "all";
+      }
+
+      // ── Generate report ──────────────────────────────────────────
+
+      function generateReport() {
+        const blockFilter = document.getElementById("rp-filter-block").value;
+        const operatorFilter = document.getElementById("rp-filter-operator").value;
+        const statusFilter = document.getElementById("rp-filter-status").value;
+        const dateFrom = document.getElementById("rp-date-from").value;
+        const dateTo = document.getElementById("rp-date-to").value;
+
+        let blocks = BLOCKS_RAW.map(function (b) {
+          return Object.assign({}, b, { operatorName: USERS_BY_ID[b.userId] || b.userId || "Unassigned" });
+        });
+
+        if (blockFilter !== "all") blocks = blocks.filter((b) => b.id === blockFilter);
+        if (operatorFilter !== "all") blocks = blocks.filter((b) => b.operatorName === operatorFilter);
+        if (statusFilter !== "all") blocks = blocks.filter((b) => blockStatusClass(b) === statusFilter);
+
+        // Join against the live scans collection: how many scan sessions,
+        // for the blocks currently in this report, fall in the date range.
+        const blockIds = new Set(blocks.map((b) => b.id));
+        const fromTime = dateFrom ? new Date(dateFrom + "T00:00:00") : null;
+        const toTime = dateTo ? new Date(dateTo + "T23:59:59") : null;
+        const scansInRange = SCANS_RAW.filter(function (s) {
+          if (!blockIds.has(s.blockId)) return false;
+          if (!s.startTime) return false;
+          if (fromTime && s.startTime < fromTime) return false;
+          if (toTime && s.startTime > toTime) return false;
+          return true;
+        });
+
+        const parts = [];
+        if (dateFrom) parts.push("From " + dateFrom);
+        if (dateTo) parts.push("To " + dateTo);
+        if (blockFilter !== "all") {
+          const b = BLOCKS_RAW.find((x) => x.id === blockFilter);
+          parts.push("Block " + (b ? b.blockName : blockFilter));
+        }
+        if (operatorFilter !== "all") parts.push(operatorFilter);
+        if (statusFilter !== "all") parts.push(statusLabel(statusFilter) + " only");
+
+        document.getElementById("report-title-text").textContent = "Farm Performance Report";
+        document.getElementById("report-subtitle-text").textContent =
+          parts.length ? parts.join(" · ") : "All blocks · All operators · All statuses";
+
+        renderMetrics(blocks, scansInRange);
+        renderTable(blocks);
+        CURRENT_REPORT_BLOCKS = blocks;
+
+        const results = document.getElementById("report-results");
+        results.classList.add("visible");
+      }
+
+      /* ── Export CSV ────────────────────────────────────────────────
+       * Reuses the same Blob/createObjectURL pattern as
+       * admin/activity.html's exportCSV() — exports the report table
+       * exactly as currently filtered/generated. */
+      function exportReportCSV() {
+        if (!CURRENT_REPORT_BLOCKS.length) {
+          utils.showToast("Generate a report first.", "info");
+          return;
+        }
+        const rows = [
+          [
+            "Block",
+            "Section",
+            "Flight Operator",
+            "Days After Flowering",
+            "Area (ha)",
+            "Bearing %",
+            "Non-Viable %",
+            "Status",
+          ],
+        ];
+        CURRENT_REPORT_BLOCKS.forEach((block) => {
+          rows.push([
+            '"' + (block.blockName || "").replace(/"/g, '""') + '"',
+            '"' + (block.section || "").replace(/"/g, '""') + '"',
+            '"' + (block.operatorName || "").replace(/"/g, '""') + '"',
+            block.daf,
+            block.area,
+            block.bearing.toFixed(1),
+            block.nonViable.toFixed(1),
+            statusLabel(blockStatusClass(block)),
+          ]);
+        });
+        const csv = rows.map((r) => r.join(",")).join("\n");
+        const blob = new Blob([csv], { type: "text/csv" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "pinevision-report-" + new Date().toISOString().slice(0, 10) + ".csv";
+        a.click();
+        URL.revokeObjectURL(url);
+        utils.showToast("Exported " + CURRENT_REPORT_BLOCKS.length + " block" + (CURRENT_REPORT_BLOCKS.length !== 1 ? "s" : ""), "success");
+      }
+
+      function renderMetrics(blocks, scansInRange) {
+        if (blocks.length === 0) {
+          document.getElementById("rp-metrics").innerHTML =
+            '<div class="col-span-4" style="grid-column:1/-1;color:var(--muted);font-size:var(--font-size-sm);">No data for the selected filters.</div>';
+          return;
+        }
+
+        const totalPlants = blocks.reduce((s, b) => s + b.declaredPopulation, 0);
+        const avgBearing = blocks.reduce((s, b) => s + b.bearing, 0) / blocks.length;
+        const avgNonbearing = blocks.reduce((s, b) => s + b.nonbearing, 0) / blocks.length;
+        const avgNonViable = blocks.reduce((s, b) => s + b.nonViable, 0) / blocks.length;
+        const totalArea = blocks.reduce((s, b) => s + b.area, 0);
+
+        document.getElementById("rp-metrics").innerHTML =
+          utils.buildMetricCard("Blocks in Report", blocks.length, blocks.length + " of " + BLOCKS_RAW.length + " total", "") +
+          utils.buildMetricCard("Scans in Range", scansInRange.length, "Linked scan sessions", "green") +
+          utils.buildMetricCard("Total Declared Pop.", utils.formatNumber(totalPlants), "across selected blocks", "") +
+          utils.buildMetricCard("Avg Bearing Rate", utils.formatPercent(avgBearing), "of selected blocks", "green") +
+          utils.buildMetricCard("Avg Non-Bearing", utils.formatPercent(avgNonbearing), "of selected blocks", "amber") +
+          utils.buildMetricCard("Avg Non-Viable", utils.formatPercent(avgNonViable), "of selected blocks", "yellow") +
+          utils.buildMetricCard("Total Area", totalArea.toFixed(1) + " ha", "selected area coverage", "") +
+          utils.buildMetricCard("Unique Operators", new Set(blocks.map((b) => b.operatorName)).size, "flying selected blocks", "");
+      }
+
+      function renderTable(blocks) {
+        const content = document.getElementById("rp-content");
+
+        if (blocks.length === 0) {
+          content.innerHTML =
             '<div class="card"><div class="empty-state">' +
-            '<div class="empty-state-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>' +
-            '<div class="empty-state-title">No Reports Yet</div>' +
-            '<div class="empty-state-text">Reports will appear here after scans are completed</div>' +
+            '<div class="empty-state-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>' +
+            '<div class="empty-state-title">No blocks match the selected filters</div>' +
+            '<div class="empty-state-text">Try widening the date range or clearing a filter.</div>' +
             "</div></div>";
           return;
         }
 
-        var html =
+        let html =
           '<div class="tcard">' +
-          '<div class="thead-row"><h3 class="thead-title">Scan Reports</h3>' +
-          '<span style="font-size:11px;color:var(--color-text-secondary);">' +
-          scans.length +
-          " reports</span></div>" +
-          '<div class="twrap"><table><thead><tr>' +
-          "<th>Date</th><th>Title</th><th>Operator</th><th>Blocks</th><th>Duration</th><th>Bearing Rate</th><th>Actions</th>" +
+          '<div class="thead-row"><div class="thead-title">Block Results</div>' +
+          '<span style="font-size:var(--font-size-sm);color:var(--muted);">' +
+          blocks.length + " result" + (blocks.length !== 1 ? "s" : "") + "</span></div>" +
+          '<div class="twrap"><table class="rp-table">' +
+          "<colgroup>" +
+          '<col class="c-block"><col class="c-section"><col class="c-operator"><col class="c-daf"><col class="c-area"><col class="c-bearing"><col class="c-nonviable"><col class="c-status">' +
+          "</colgroup>" +
+          "<thead><tr>" +
+          "<th>Block</th><th>Section</th><th>Flight Operator</th><th>DAF</th><th>Area</th><th>Bearing</th><th>Non-Viable</th><th>Status</th>" +
           "</tr></thead><tbody>";
 
-        scans.forEach(function (s) {
-          var bearColor =
-            s.bearing >= 75
-              ? "var(--green)"
-              : s.bearing >= 60
-                ? "var(--amber)"
-                : "var(--red)";
-          var bearBadge =
-            s.bearing >= 75
-              ? '<span class="badge good"><span class="bdot"></span>' +
-                s.bearing.toFixed(1) +
-                "%</span>"
-              : s.bearing >= 60
-                ? '<span class="badge warn"><span class="bdot"></span>' +
-                  s.bearing.toFixed(1) +
-                  "%</span>"
-                : '<span class="badge crit"><span class="bdot"></span>' +
-                  s.bearing.toFixed(1) +
-                  "%</span>";
-          html +=
-            "<tr>" +
-            '<td style="font-size:11px;font-family:var(--font-mono);color:var(--color-text-secondary);">' +
-            s.day +
-            " " +
-            s.month +
-            "</td>" +
-            '<td style="font-weight:var(--font-weight-medium);">' +
-            (s.title || "—") +
-            "</td>" +
-            '<td style="font-size:var(--font-size-sm);color:var(--color-text-secondary);">' +
-            (s.operator || "—") +
-            "</td>" +
-            '<td style="font-size:var(--font-size-sm);text-align:center;">' +
-            (s.blocks || "—") +
-            "</td>" +
-            '<td style="font-size:var(--font-size-sm);color:var(--color-text-secondary);">' +
-            (s.duration || "—") +
-            "</td>" +
-            "<td>" +
-            bearBadge +
-            "</td>" +
-            '<td><button class="btn btn-secondary btn-sm" style="font-size:11px;" onclick="utils.showToast(\'Downloading report…\', \'success\')">Download</button></td>' +
-            "</tr>";
+        blocks.forEach(function (block) {
+          const statusClass = blockStatusClass(block);
+          html += `
+                    <tr>
+                        <td><strong>${escapeHtml(block.blockName)}</strong></td>
+                        <td>${escapeHtml(block.section)}</td>
+                        <td style="font-size:var(--font-size-sm);color:var(--color-text-secondary);">${escapeHtml(block.operatorName)}</td>
+                        <td style="font-family:var(--font-mono);">${block.daf}d</td>
+                        <td style="font-family:var(--font-mono);">${utils.formatArea(block.area)}</td>
+                        <td>${utils.buildInlineBar(block.bearing, utils.barColor(block.bearing))}</td>
+                        <td>${utils.buildInlineBar(block.nonViable, "var(--yellow-mid)")}</td>
+                        <td>${blockStatusBadge(statusClass)}</td>
+                    </tr>`;
         });
 
         html += "</tbody></table></div></div>";
-        document.getElementById("rp-content").innerHTML = html;
+        content.innerHTML = html;
       }
 
+      function clearFilters() {
+        document.getElementById("rp-filter-block").value = "all";
+        document.getElementById("rp-filter-operator").value = "all";
+        document.getElementById("rp-filter-status").value = "all";
+        const today = new Date();
+        const monthAgo = new Date(today);
+        monthAgo.setDate(today.getDate() - 30);
+        document.getElementById("rp-date-to").value = today.toISOString().split("T")[0];
+        document.getElementById("rp-date-from").value = monthAgo.toISOString().split("T")[0];
+        document.getElementById("report-results").classList.remove("visible");
+      }
 
+      // ── Status helpers ───────────────────────────────────────────
+
+      function blockStatusClass(block) {
+        if (!block.totalScans || block.plants <= 0) return "none";
+        return utils.getStatusClass(block.bearing);
+      }
+
+      function blockStatusBadge(status) {
+        if (status === "none") {
+          return '<span class="badge" style="background-color:var(--surf2);color:var(--color-text-secondary);border-color:var(--border);"><span class="bdot" style="background-color:var(--color-text-tertiary);"></span>No Scan Data</span>';
+        }
+        return utils.statusBadge(status);
+      }
+
+      function statusLabel(status) {
+        if (status === "none") return "No Scan Data";
+        return utils.getStatusText(status);
+      }
+
+      function escapeHtml(str) {
+        return String(str == null ? "" : str).replace(/[&<>"']/g, function (c) {
+          return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+        });
+      }
     </script>
 
   </body>

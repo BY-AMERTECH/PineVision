@@ -46,6 +46,53 @@
           grid-template-columns: 1fr 1fr;
         }
       }
+
+      /* ── Live sync affordances ─────────────────────────────── */
+      .fs-live-dot {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        font-weight: var(--font-weight-medium);
+        color: var(--muted);
+        font-family: var(--font-mono);
+      }
+      .fs-live-dot .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--green-500);
+        box-shadow: 0 0 0 3px var(--green-bg);
+        flex-shrink: 0;
+        animation: fs-pulse 2s ease-in-out infinite;
+      }
+      .fs-live-dot.offline .dot {
+        background: var(--red-mid);
+        box-shadow: 0 0 0 3px var(--red-bg);
+        animation: none;
+      }
+      @keyframes fs-pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.35; }
+      }
+
+      .fs-error-state {
+        text-align: center;
+        padding: var(--space-4xl) var(--space-2xl);
+        color: var(--muted);
+      }
+      .fs-error-state .empty-state-icon {
+        background: var(--red-bg);
+        color: var(--red-mid);
+      }
+
+      /* Balanced column widths for the 6-column scans table */
+      .fs-table col.c-date { width: 96px; }
+      .fs-table col.c-block { width: 20%; }
+      .fs-table col.c-operator { width: 18%; }
+      .fs-table col.c-duration { width: 100px; }
+      .fs-table col.c-status { width: 130px; }
+      .fs-table col.c-bearing { width: 110px; }
     </style>
   </head>
   <body>
@@ -138,6 +185,22 @@
                       height="18"
                   /></span>
                   <span class="nav-link-text">Audit Logs</span>
+                </a>
+              </li>
+              <li>
+                <a
+                  href="blocks.html"
+                  class="nav-link"
+                  data-tooltip="Fruit Blocks"
+                >
+                  <span class="nav-link-icon"
+                    ><img
+                      src="/frontend/assets/icons/nav-leaf.svg"
+                      alt=""
+                      width="18"
+                      height="18"
+                  /></span>
+                  <span class="nav-link-text">Fruit Blocks</span>
                 </a>
               </li>
             </ul>
@@ -315,8 +378,11 @@
               margin-bottom: var(--space-2xl);
             "
           >
-            <div>
-            </div>
+            <div></div>
+            <span class="fs-live-dot" id="fs-live-indicator">
+              <span class="dot"></span>
+              <span id="fs-live-label">Live</span>
+            </span>
           </div>
 
           <div class="fs-grid" id="fs-metrics"></div>
@@ -338,155 +404,287 @@
       if (!auth.requireFarmManager()) {
       }
 
+      // ══════════════════════════════════════════════════════════════
+      // Flights & Scans — live Firestore sync (farm-wide, all accounts)
+      //
+      // Three collections are kept in sync with onSnapshot listeners and
+      // joined client-side on every render:
+      //   scans  — one doc per drone scan session (blockId, userId,
+      //            startTime/endTime, bearing/nonBearing/nonViable/total
+      //            RAW plant counts, status). This collection has no
+      //            atmospheric-conditions field — the removed column here
+      //            was previously reading a mock-only value from data.js.
+      //   blocks — joined on blockId to resolve a real block name.
+      //   users  — joined on userId to resolve the flight operator name.
+      // ══════════════════════════════════════════════════════════════
+
+      const SCANS_LIMIT = 300;
+
+      let scansUnsub = null;
+      let blocksUnsub = null;
+      let usersUnsub = null;
+
+      let scansLoaded = false;
+      let SCANS_RAW = [];       // [{id, ...doc data}]
+      let BLOCKS_BY_ID = {};    // blockId -> { blockName, section }
+      let USERS_BY_ID = {};     // userId -> fullName
+
       window.initPage = function () {
-        loadMetrics();
-        loadScans();
+        attachListeners();
+        window.addEventListener("pagehide", detachListeners);
+        window.addEventListener("beforeunload", detachListeners);
       };
 
-      function loadMetrics() {
-        var scans = data.getScans ? data.getScans() : [];
-        var avgBearing = scans.length
-          ? (
-              scans.reduce(function (s, x) {
-                return s + x.bearing;
-              }, 0) / scans.length
-            ).toFixed(1)
+      // ── Live listeners ────────────────────────────────────────────
+
+      function attachListeners() {
+        detachListeners();
+        setLiveStatus(true);
+        utils.showLoading("fs-content");
+
+        blocksUnsub = firebase
+          .firestore()
+          .collection("blocks")
+          .limit(SCANS_LIMIT)
+          .onSnapshot(
+            function (snap) {
+              BLOCKS_BY_ID = {};
+              snap.forEach(function (doc) {
+                const d = doc.data();
+                BLOCKS_BY_ID[doc.id] = {
+                  blockName: d.blockName || d.blockId || doc.id,
+                  section: d.section || "",
+                };
+              });
+              renderAll();
+            },
+            function (error) {
+              console.error("❌ blocks listener error:", error);
+              setLiveStatus(false);
+            },
+          );
+
+        usersUnsub = firebase
+          .firestore()
+          .collection("users")
+          .limit(SCANS_LIMIT)
+          .onSnapshot(
+            function (snap) {
+              USERS_BY_ID = {};
+              snap.forEach(function (doc) {
+                const d = doc.data();
+                USERS_BY_ID[doc.id] = d.fullName || d.username || d.email || doc.id;
+              });
+              renderAll();
+            },
+            function (error) {
+              console.error("❌ users listener error:", error);
+              setLiveStatus(false);
+            },
+          );
+
+        scansUnsub = firebase
+          .firestore()
+          .collection("scans")
+          .orderBy("startTime", "desc")
+          .limit(SCANS_LIMIT)
+          .onSnapshot(
+            function (snap) {
+              scansLoaded = true;
+              setLiveStatus(true);
+              SCANS_RAW = [];
+              snap.forEach(function (doc) {
+                SCANS_RAW.push(Object.assign({ id: doc.id }, doc.data()));
+              });
+              renderAll();
+            },
+            function (error) {
+              console.error("❌ scans listener error:", error);
+              scansLoaded = true;
+              setLiveStatus(false);
+              renderError();
+            },
+          );
+      }
+
+      function detachListeners() {
+        [scansUnsub, blocksUnsub, usersUnsub].forEach(function (unsub) {
+          if (typeof unsub === "function") {
+            try {
+              unsub();
+            } catch (e) {
+              /* no-op — already detached */
+            }
+          }
+        });
+        scansUnsub = null;
+        blocksUnsub = null;
+        usersUnsub = null;
+      }
+
+      function setLiveStatus(online) {
+        const el = document.getElementById("fs-live-indicator");
+        const label = document.getElementById("fs-live-label");
+        if (!el || !label) return;
+        el.classList.toggle("offline", !online);
+        label.textContent = online ? "Live" : "Connection issue";
+      }
+
+      // ── Join + render ────────────────────────────────────────────
+
+      function renderAll() {
+        if (!scansLoaded) return; // wait for the first scans snapshot
+
+        const rows = SCANS_RAW.map(buildScanRow);
+        renderMetrics(rows);
+        renderScans(rows);
+      }
+
+      function buildScanRow(s) {
+        const block = BLOCKS_BY_ID[s.blockId];
+        const blockLabel = block ? block.blockName : (s.blockId || "Unassigned");
+        const operatorName = USERS_BY_ID[s.userId] || s.userId || "Unknown";
+
+        const startTime = s.startTime && typeof s.startTime.toDate === "function" ? s.startTime.toDate() : null;
+        const endTime = s.endTime && typeof s.endTime.toDate === "function" ? s.endTime.toDate() : null;
+
+        let duration = "—";
+        if (startTime && endTime) {
+          const diffMs = endTime - startTime;
+          if (diffMs >= 0) {
+            const hours = Math.floor(diffMs / 3600000);
+            const minutes = Math.floor((diffMs % 3600000) / 60000);
+            duration = hours + "h " + minutes + "m";
+          }
+        }
+
+        const total = s.total || 0;
+        const bearingCount = s.bearing || 0;
+        const bearingPercent = total > 0 ? (bearingCount / total) * 100 : 0;
+
+        return {
+          id: s.id,
+          blockId: s.blockId || "",
+          blockLabel: blockLabel,
+          operatorName: operatorName,
+          userId: s.userId || "",
+          startTime: startTime,
+          duration: duration,
+          status: s.status || "completed",
+          bearingPercent: bearingPercent,
+          hasData: total > 0,
+        };
+      }
+
+      // ── Metrics ──────────────────────────────────────────────────
+
+      function renderMetrics(rows) {
+        const withData = rows.filter((r) => r.hasData);
+        const avgBearing = withData.length
+          ? (withData.reduce((s, r) => s + r.bearingPercent, 0) / withData.length).toFixed(1)
           : "—";
 
-        var colorMap = {
+        const uniqueOperators = new Set(rows.map((r) => r.userId).filter(Boolean)).size;
+        const uniqueBlocks = new Set(rows.map((r) => r.blockId).filter(Boolean)).size;
+
+        const colorMap = {
           green: { fg: "var(--green)", bg: "var(--green-bg)" },
-          "": {
-            fg: "var(--color-text-secondary)",
-            bg: "var(--color-background-tertiary)",
-          },
+          "": { fg: "var(--color-text-secondary)", bg: "var(--color-background-tertiary)" },
         };
-        var cards = [
+        const cards = [
           {
             label: "Total Flights",
-            value: scans.length,
-            sub: "All sessions",
+            value: rows.length,
+            sub: rows.length >= SCANS_LIMIT ? "Most recent " + SCANS_LIMIT : "All sessions",
             color: "green",
             icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>',
           },
           {
             label: "Avg Bearing Rate",
-            value: avgBearing + "%",
-            sub: "Across all scans",
+            value: avgBearing === "—" ? "—" : avgBearing + "%",
+            sub: "Across scanned sessions",
             color: "",
             icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
           },
           {
             label: "Unique Operators",
-            value: [
-              ...new Set(
-                scans.map(function (s) {
-                  return s.operator;
-                }),
-              ),
-            ].length,
+            value: uniqueOperators,
             sub: "Active pilots",
             color: "",
             icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
           },
           {
             label: "Blocks Covered",
-            value: [
-              ...new Set(
-                scans.map(function (s) {
-                  return s.blocks;
-                }),
-              ),
-            ].length,
+            value: uniqueBlocks,
             sub: "Distinct blocks",
             color: "",
             icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>',
           },
         ];
 
-        var html = "";
+        let html = "";
         cards.forEach(function (c) {
-          var cm = colorMap[c.color] || colorMap[""];
+          const cm = colorMap[c.color] || colorMap[""];
           html +=
-            '<div class="mc ' +
-            c.color +
-            '">' +
-            '<div class="mc-icon"><div style="width:32px;height:32px;border-radius:var(--radius-sm);background:' +
-            cm.bg +
-            ";display:flex;align-items:center;justify-content:center;color:" +
-            cm.fg +
-            ';">' +
-            c.icon +
-            "</div></div>" +
-            '<div class="mc-label">' +
-            c.label +
-            "</div>" +
-            '<div class="mc-val">' +
-            c.value +
-            "</div>" +
-            '<div class="mc-sub">' +
-            c.sub +
-            "</div>" +
+            '<div class="mc ' + c.color + '">' +
+            '<div class="mc-icon"><div style="width:32px;height:32px;border-radius:var(--radius-sm);background:' + cm.bg +
+            ";display:flex;align-items:center;justify-content:center;color:" + cm.fg + ';">' + c.icon + "</div></div>" +
+            '<div class="mc-label">' + c.label + "</div>" +
+            '<div class="mc-val">' + c.value + "</div>" +
+            '<div class="mc-sub">' + c.sub + "</div>" +
             "</div>";
         });
         document.getElementById("fs-metrics").innerHTML = html;
       }
 
-      function loadScans() {
-        var scans = data.getScans ? data.getScans() : [];
-        if (!scans.length) {
+      // ── Table ────────────────────────────────────────────────────
+
+      function renderScans(rows) {
+        if (!rows.length) {
           document.getElementById("fs-content").innerHTML =
             '<div class="card"><div class="empty-state">' +
             '<div class="empty-state-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg></div>' +
             '<div class="empty-state-title">No Flights Recorded</div>' +
-            '<div class="empty-state-text">Flight sessions will appear here once logged</div>' +
+            '<div class="empty-state-text">Flight sessions will appear here as soon as a client account logs a scan.</div>' +
             "</div></div>";
           return;
         }
 
-        var html =
+        let html =
           '<div class="tcard">' +
           '<div class="thead-row"><h3 class="thead-title">All Flights</h3>' +
-          '<span style="font-size:11px;color:var(--color-text-secondary);">' +
-          scans.length +
-          " sessions</span></div>" +
-          '<div class="twrap"><table><thead><tr>' +
-          "<th>Date</th><th>Title</th><th>Operator</th><th>Blocks</th><th>Duration</th><th>Weather</th><th>Bearing</th>" +
+          '<span style="font-size:11px;color:var(--color-text-secondary);font-family:var(--font-mono);">' +
+          rows.length + " session" + (rows.length !== 1 ? "s" : "") + "</span></div>" +
+          '<div class="twrap"><table class="fs-table">' +
+          "<colgroup>" +
+          '<col class="c-date"><col class="c-block"><col class="c-operator"><col class="c-duration"><col class="c-status"><col class="c-bearing">' +
+          "</colgroup>" +
+          "<thead><tr>" +
+          "<th>Date</th><th>Block</th><th>Operator</th><th>Duration</th><th>Status</th><th>Bearing</th>" +
           "</tr></thead><tbody>";
 
-        scans.forEach(function (s) {
-          var bearColor =
-            s.bearing >= 75
+        rows.forEach(function (r) {
+          const bearColor = !r.hasData
+            ? "var(--color-text-tertiary)"
+            : r.bearingPercent >= 75
               ? "var(--green)"
-              : s.bearing >= 60
+              : r.bearingPercent >= 60
                 ? "var(--amber)"
                 : "var(--red)";
+
+          const dateLabel = r.startTime
+            ? r.startTime.toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" })
+            : "—";
+
           html +=
             "<tr>" +
-            '<td style="font-size:11px;font-family:var(--font-mono);color:var(--color-text-secondary);">' +
-            s.day +
-            " " +
-            s.month +
-            "</td>" +
-            '<td style="font-weight:var(--font-weight-medium);">' +
-            (s.title || "—") +
-            "</td>" +
-            '<td style="font-size:var(--font-size-sm);color:var(--color-text-secondary);">' +
-            (s.operator || "—") +
-            "</td>" +
-            '<td style="font-size:var(--font-size-sm);text-align:center;">' +
-            (s.blocks || "—") +
-            "</td>" +
-            '<td style="font-size:var(--font-size-sm);color:var(--color-text-secondary);">' +
-            (s.duration || "—") +
-            "</td>" +
-            '<td style="font-size:var(--font-size-sm);color:var(--color-text-secondary);">' +
-            (s.weather || "—") +
-            "</td>" +
-            '<td style="font-family:var(--font-mono);font-size:var(--font-size-sm);color:' +
-            bearColor +
-            ';font-weight:var(--font-weight-medium);">' +
-            s.bearing.toFixed(1) +
-            "%</td>" +
+            '<td style="font-size:11px;font-family:var(--font-mono);color:var(--color-text-secondary);white-space:nowrap;">' + dateLabel + "</td>" +
+            '<td style="font-weight:var(--font-weight-medium);">' + escapeHtml(r.blockLabel) + "</td>" +
+            '<td style="font-size:var(--font-size-sm);color:var(--color-text-secondary);">' + escapeHtml(r.operatorName) + "</td>" +
+            '<td style="font-size:var(--font-size-sm);color:var(--color-text-secondary);">' + r.duration + "</td>" +
+            "<td>" + scanStatusBadge(r.status) + "</td>" +
+            '<td style="font-family:var(--font-mono);font-size:var(--font-size-sm);color:' + bearColor + ';font-weight:var(--font-weight-medium);">' +
+            (r.hasData ? r.bearingPercent.toFixed(1) + "%" : "—") + "</td>" +
             "</tr>";
         });
 
@@ -494,7 +692,30 @@
         document.getElementById("fs-content").innerHTML = html;
       }
 
+      function renderError() {
+        document.getElementById("fs-content").innerHTML =
+          '<div class="card"><div class="fs-error-state">' +
+          '<div class="empty-state-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>' +
+          '<div class="empty-state-title">Couldn\'t load flight data</div>' +
+          '<div class="empty-state-text">Lost the live connection to Firestore. Check your network and try again.</div>' +
+          '<button class="btn btn-primary btn-sm" style="margin-top:var(--space-lg);" onclick="attachListeners()">Retry</button>' +
+          "</div></div>";
+        document.getElementById("fs-metrics").innerHTML = "";
+      }
 
+      function scanStatusBadge(status) {
+        const s = String(status || "completed").toLowerCase();
+        if (s === "completed") return '<span class="badge good"><span class="bdot"></span>Completed</span>';
+        if (s === "processing" || s === "in_progress") return '<span class="badge warn"><span class="bdot"></span>Processing</span>';
+        if (s === "failed" || s === "error") return '<span class="badge crit"><span class="bdot"></span>Failed</span>';
+        return '<span class="badge" style="background-color:var(--surf2);color:var(--color-text-secondary);border-color:var(--border);"><span class="bdot" style="background-color:var(--color-text-tertiary);"></span>' + escapeHtml(status) + "</span>";
+      }
+
+      function escapeHtml(str) {
+        return String(str == null ? "" : str).replace(/[&<>"']/g, function (c) {
+          return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+        });
+      }
     </script>
 
   </body>

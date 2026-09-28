@@ -499,11 +499,11 @@
                   <span class="nav-link-icon">
                     <img
                       src="/frontend/assets/icons/flight.svg"
-                      alt="Flight Missions"
+                      alt="Flight Schedules"
                       width="20"
                     />
                   </span>
-                  <span class="nav-link-text">Flight Missions</span>
+                  <span class="nav-link-text">Flight Schedules</span>
                 </a>
               </li>
               <li>
@@ -1116,7 +1116,6 @@
 
     <!-- Application JavaScript -->
     <script src="../../js/auth.js"></script>
-    <script src="../../js/data.js"></script>
     <script src="../../js/utils.js"></script>
     <script src="../../js/app.js"></script>
 
@@ -1192,6 +1191,14 @@
 
           const blockData = blockDoc.data();
 
+          // A client may only view/edit their own blocks — the block id in
+          // the URL is not itself proof of ownership, so verify it here
+          // rather than trusting the query string.
+          if (blockData.userId !== currentUserId) {
+            console.error("❌ Block does not belong to the current user");
+            return;
+          }
+
           // Transform Firestore data to display format
           currentBlock = {
             id: blockDoc.id,
@@ -1220,9 +1227,10 @@
             lastScanned: blockData.lastScanned,
           };
 
-          // Load harvest status from localStorage (frontend state only)
-          const statuses = getBlockStatuses();
-          currentBlock.harvestStatus = statuses[currentBlock.id] || "Still Growing";
+          // Harvest cycle status now lives on the block document itself
+          // (harvestStatus field) so it syncs across devices/browsers,
+          // instead of the localStorage-only value used previously.
+          currentBlock.harvestStatus = blockData.harvestStatus || "Still Growing";
 
           console.log("✅ Block loaded:", currentBlock);
 
@@ -1467,81 +1475,70 @@
         return area + " ha";
       }
 
-      // ── Trend Modal (Mock data for now) ─────────────────────────
+      // ── Trend Modal — live bearing-rate history from this block's scans ──
 
-      function openTrendModal() {
+      async function openTrendModal() {
         if (!currentBlock) return;
-        renderTrendModal();
         utils.showModal("trend-modal");
+        document.getElementById("trend-modal-content").innerHTML =
+          '<div style="padding:var(--space-xl);text-align:center;color:var(--color-text-secondary);">Loading scan history…</div>';
+        await renderTrendModal();
       }
 
       function closeTrendModal() {
         utils.hideModal("trend-modal");
       }
 
-      function renderTrendModal() {
-        // Mock historical data for now
-        const mockHistory = [
-          { date: "Mar 28", pct: 85.2 },
-          { date: "Apr 04", pct: 86.1 },
-          { date: "Apr 11", pct: 86.8 },
-          { date: "Apr 18", pct: 87.0 },
-          { date: "Apr 25", pct: 87.3 },
-          { date: "May 02", pct: 87.5 },
-        ];
+      async function renderTrendModal() {
+        try {
+          const snap = await firebase
+            .firestore()
+            .collection("scans")
+            .where("blockId", "==", currentBlock.id)
+            .where("userId", "==", currentUserId)
+            .get();
 
-        document.getElementById("trend-modal-content").innerHTML = mockHistory
-          .map((entry) => {
-            const color =
-              entry.pct >= 80
-                ? "var(--green)"
-                : entry.pct >= 60
-                  ? "var(--amber)"
-                  : "var(--red)";
-            return `
+          const history = [];
+          snap.forEach(function (doc) {
+            const d = doc.data();
+            const startTime = d.startTime && typeof d.startTime.toDate === "function" ? d.startTime.toDate() : null;
+            const total = d.total || 0;
+            if (!startTime || total <= 0) return;
+            history.push({ date: startTime, pct: ((d.bearing || 0) / total) * 100 });
+          });
+          history.sort((a, b) => a.date - b.date);
+
+          if (!history.length) {
+            document.getElementById("trend-modal-content").innerHTML =
+              '<div style="padding:var(--space-xl);text-align:center;color:var(--color-text-secondary);">No completed scans yet for this block — trends will appear here once a scan finishes.</div>';
+            return;
+          }
+
+          document.getElementById("trend-modal-content").innerHTML = history
+            .map((entry) => {
+              const dateLabel = entry.date.toLocaleDateString("en-US", { month: "short", day: "2-digit" });
+              const color =
+                entry.pct >= 80
+                  ? "var(--green)"
+                  : entry.pct >= 60
+                    ? "var(--amber)"
+                    : "var(--red)";
+              return `
                 <div class="trend-row">
-                    <div class="trend-date">${entry.date}</div>
+                    <div class="trend-date">${dateLabel}</div>
                     <div class="trend-bar-wrap">
                         <div class="bar-wrap">
                             <div class="bar-fill" style="width:${entry.pct}%; background-color:${color};"></div>
                         </div>
                     </div>
                     <div class="trend-val">${entry.pct.toFixed(1)}%</div>
-                    <button class="pdf-icon-btn" title="Download PDF details">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                            <polyline points="14 2 14 8 20 8"/>
-                            <line x1="16" y1="13" x2="8" y2="13"/>
-                            <line x1="16" y1="17" x2="8" y2="17"/>
-                            <polyline points="10 9 9 9 8 9"/>
-                        </svg>
-                    </button>
                 </div>`;
-          })
-          .join("");
-      }
-
-      // ── localStorage helpers (frontend state only) ───────────────
-
-      function getBlockStatuses() {
-        try {
-          return JSON.parse(localStorage.getItem("pinevision_block_statuses") || "{}");
-        } catch (e) {
-          return {};
-        }
-      }
-
-      function saveBlockStatus(blockId, status) {
-        const statuses = getBlockStatuses();
-        statuses[blockId] = status;
-        localStorage.setItem("pinevision_block_statuses", JSON.stringify(statuses));
-      }
-
-      function getDeletedBlocks() {
-        try {
-          return JSON.parse(localStorage.getItem("pinevision_deleted_blocks") || "[]");
-        } catch (e) {
-          return [];
+            })
+            .join("");
+        } catch (error) {
+          console.error("❌ Error loading scan history:", error);
+          document.getElementById("trend-modal-content").innerHTML =
+            '<div style="padding:var(--space-xl);text-align:center;color:var(--color-text-secondary);">Couldn\'t load scan history. Please try again.</div>';
         }
       }
 
@@ -1660,8 +1657,6 @@
         currentBlock.declaredPopulation = declaredPopulation;
         currentBlock.harvestStatus = harvestStatus;
 
-        saveBlockStatus(currentBlock.id, harvestStatus);
-
         firebase
           .firestore()
           .collection("blocks")
@@ -1674,6 +1669,7 @@
             forcingDate: forcingDate,
             daf: daf,
             declaredPopulation: declaredPopulation,
+            harvestStatus: harvestStatus,
           })
           .then(function () {
             logBlockUpdateActivity(previousValues, newValues, currentBlock.id);
@@ -1703,14 +1699,23 @@
 
       function handleDeleteBlock() {
         if (!currentBlock) return;
-        const deleted = getDeletedBlocks();
-        deleted.push(currentBlock.id);
-        localStorage.setItem("pinevision_deleted_blocks", JSON.stringify(deleted));
-        closeDeleteModal();
-        utils.showToast("Block deleted.", "success");
-        setTimeout(function () {
-          window.location.href = "blocks.html";
-        }, 800);
+        firebase
+          .firestore()
+          .collection("blocks")
+          .doc(currentBlock.id)
+          .delete()
+          .then(function () {
+            closeDeleteModal();
+            utils.showToast("Block deleted.", "success");
+            setTimeout(function () {
+              window.location.href = "blocks.html";
+            }, 800);
+          })
+          .catch(function (err) {
+            console.error("❌ Failed to delete block:", err);
+            closeDeleteModal();
+            utils.showToast("Failed to delete block. Please try again.", "error");
+          });
       }
 
       // ── Scheduled Scans ─────────────────────────────────────────────
