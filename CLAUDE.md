@@ -5,6 +5,7 @@
 - The shared rules are in `AGENTS.md` (imported above). Don't duplicate them here.
 - Don't `@`-import `llm-context/knowledge.md`; an import loads it into every
   session. Read it on demand.
-- This repo defines no project skills. Claude Code loads skills from
-  `.claude/skills/`, not `.agents/skills/`; add one there only if a task-specific
-  procedure earns it.
+- Project skills live once under `.agents/skills/`. The matching entries in
+  `.claude/skills/` link to those same files for Claude Code. Keep skills
+  task-specific; do not duplicate shared rules from `AGENTS.md` or facts from
+  `llm-context/knowledge.md`.
