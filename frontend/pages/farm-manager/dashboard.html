@@ -154,6 +154,66 @@
         overflow: visible;
       }
 
+      /* ── Fruit detections chart (farm-wide, scan-based) ── */
+      .fs-controls {
+        display: flex;
+        align-items: center;
+        gap: var(--space-md);
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+      .period-toggle {
+        display: inline-flex;
+        padding: 2px;
+        gap: 2px;
+        background: var(--surf2);
+        border: 1px solid var(--color-border-secondary);
+        border-radius: var(--radius-pill);
+      }
+      .period-btn {
+        border: 0;
+        background: transparent;
+        color: var(--color-text-secondary);
+        font-size: var(--font-size-xs);
+        font-weight: var(--font-weight-medium);
+        padding: 5px 14px;
+        border-radius: var(--radius-pill);
+        cursor: pointer;
+        transition:
+          background var(--transition-fast),
+          color var(--transition-fast);
+      }
+      .period-btn:hover {
+        color: var(--color-text-primary);
+      }
+      .period-btn:focus-visible {
+        outline: none;
+        box-shadow: var(--shadow-focus);
+      }
+      .period-btn.active {
+        background: var(--green);
+        color: #fff;
+      }
+      .fruit-stats-body {
+        padding: var(--space-lg) var(--card-padding-x) var(--space-xl);
+      }
+      .fruit-stats-note {
+        margin: 0 0 var(--space-xs);
+        font-size: var(--font-size-xs);
+        color: var(--color-text-secondary);
+        line-height: var(--line-height-normal);
+      }
+      .fruit-stats-summary {
+        margin: 0 0 var(--space-md);
+        font-size: var(--font-size-xs);
+        font-family: var(--font-mono);
+        color: var(--color-text-tertiary);
+      }
+      .fruit-stats-canvas-wrap {
+        position: relative;
+        height: 320px;
+      }
+
       /* ── Activity feed ── */
       .act-feed {
         display: flex;
@@ -704,6 +764,90 @@
             ></div>
           </div>
 
+          <!-- Farm-wide confirmed plant detections per scan period -->
+          <div class="tcard" style="margin-bottom: var(--space-2xl)">
+            <div class="thead-row">
+              <h3 class="thead-title d-flex align-items-center gap-2">
+                <span class="card-hdr-icon">
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <line x1="18" y1="20" x2="18" y2="10" />
+                    <line x1="12" y1="20" x2="12" y2="4" />
+                    <line x1="6" y1="20" x2="6" y2="14" />
+                  </svg>
+                </span>
+                Confirmed Plant Detections per Scan Period
+              </h3>
+              <div class="fs-controls">
+                <div
+                  class="period-toggle"
+                  role="group"
+                  aria-label="Group chart by period: Weekly, Monthly or Yearly"
+                >
+                  <button
+                    type="button"
+                    class="period-btn active"
+                    data-period="weekly"
+                    aria-pressed="true"
+                    onclick="setFruitStatsPeriod('weekly')"
+                  >
+                    Weekly
+                  </button>
+                  <button
+                    type="button"
+                    class="period-btn"
+                    data-period="monthly"
+                    aria-pressed="false"
+                    onclick="setFruitStatsPeriod('monthly')"
+                  >
+                    Monthly
+                  </button>
+                  <button
+                    type="button"
+                    class="period-btn"
+                    data-period="yearly"
+                    aria-pressed="false"
+                    onclick="setFruitStatsPeriod('yearly')"
+                  >
+                    Yearly
+                  </button>
+                </div>
+                <a href="blocks.html" class="btn btn-secondary btn-sm"
+                  >Browse Fruit Blocks →</a
+                >
+              </div>
+            </div>
+            <div class="fruit-stats-body">
+              <p class="fruit-stats-note">
+                Sum of confirmed detections (bearing, non-bearing, non-viable)
+                from completed scans, grouped by scan start date. Repeated
+                scans can detect the same plants again, so these are not unique
+                plants and not historical block totals.
+              </p>
+              <p class="fruit-stats-summary" id="fruit-stats-summary"></p>
+              <div class="fruit-stats-canvas-wrap" id="fruit-stats-wrap">
+                <canvas
+                  id="fruit-stats-chart"
+                  role="img"
+                  aria-label="Stacked bar chart of confirmed plant detections per scan period, split into bearing, non-bearing and non-viable"
+                ></canvas>
+              </div>
+              <div class="empty-state" id="fruit-stats-empty" style="display: none">
+                <div class="empty-state-title" id="fruit-stats-empty-title"></div>
+                <div class="empty-state-text" id="fruit-stats-empty-text"></div>
+              </div>
+            </div>
+          </div>
+
           <!-- Bottom: Alerts + Users -->
           <div class="bottom-grid">
             <div class="tcard" style="margin-bottom: 0">
@@ -784,6 +928,8 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 
     <script src="../../bootstrap/js/bootstrap.bundle.min.js"></script>
+    <!-- Chart.js (same version as the client dashboard) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="../../js/auth.js"></script>
     <script src="../../js/data.js"></script>
     <script src="../../js/utils.js"></script>
@@ -953,10 +1099,27 @@
           var bearingTotalSum = 0;
           var bearingTotalCount = 0;
 
+          // Rows for the farm-wide detections chart: completed scans only
+          // (active scans hold partial live counts; failed ones stop mid-way).
+          // Legacy docs with no status are treated as completed, matching
+          // flights-scans.html.
+          var fruitRows = [];
+          var oldestLoadedScan = null;
+
           scansSnap.forEach(function (doc) {
             var d = doc.data();
             var startTime = d.startTime && typeof d.startTime.toDate === "function" ? d.startTime.toDate() : null;
             if (!startTime) return;
+
+            if (!oldestLoadedScan || startTime < oldestLoadedScan) oldestLoadedScan = startTime;
+            if (d.status === undefined || d.status === null || d.status === "completed") {
+              fruitRows.push({
+                startTime: startTime,
+                bearing: Number(d.bearing) || 0,
+                nonBearing: Number(d.nonBearing) || 0,
+                nonViable: Number(d.nonViable) || 0,
+              });
+            }
 
             if (startTime >= todayStart) flightsToday++;
 
@@ -1000,6 +1163,10 @@
           loadSystemStats(pendingAlerts, flightsToday, totalScans, avgBearingRate);
           loadRecentActivity();
           loadAnalytics(alertBuckets, pendingAlerts, scanVolData, bearingData, sessionData);
+          fruitStatsState.rows = fruitRows;
+          fruitStatsState.oldestLoaded = oldestLoadedScan;
+          fruitStatsState.truncated = scansSnap.size >= SCANS_LIMIT;
+          renderFruitStats();
           loadRecentAlerts(recentAlertsSnap);
           loadUserStats();
           updateTimestamp();
@@ -1011,6 +1178,236 @@
 
       // loadFirebaseData() removed — data loading merged into initPage()
       // using Promise.all for parallel execution.
+
+      // ── Farm-wide confirmed plant detections per scan period ─────────────
+      // Source: the `scans` documents already fetched in initPage() (latest
+      // SCANS_LIMIT by startTime). Each completed scan stores the raw counts of
+      // confirmed tracks (bearing / nonBearing / nonViable). The chart sums
+      // those counts per period. Repeated scans of a block can count the same
+      // plants again, so the values are detections, NOT unique plants and NOT
+      // historical block totals. Nothing here is derived from block documents.
+      var fruitStatsState = {
+        rows: [],
+        oldestLoaded: null,
+        truncated: false,
+        period: "weekly",
+      };
+      var fruitStatsChart = null;
+      var FRUIT_PERIODS = {
+        weekly: { buckets: 12, unit: "weeks" },
+        monthly: { buckets: 12, unit: "months" },
+        yearly: { buckets: null, unit: "years" },
+      };
+
+      function setFruitStatsPeriod(period) {
+        if (!FRUIT_PERIODS[period]) return;
+        fruitStatsState.period = period;
+        document.querySelectorAll(".period-btn").forEach(function (btn) {
+          var on = btn.getAttribute("data-period") === period;
+          btn.classList.toggle("active", on);
+          btn.setAttribute("aria-pressed", on ? "true" : "false");
+        });
+        renderFruitStats();
+      }
+
+      // Local-time start of the bucket (weeks start on Monday) containing date.
+      function fruitBucketStart(date, period) {
+        var d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        if (period === "weekly") {
+          d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+        } else if (period === "monthly") {
+          d.setDate(1);
+        } else {
+          d.setMonth(0, 1);
+        }
+        return d;
+      }
+
+      function fruitBucketShift(start, period, n) {
+        var d = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+        if (period === "weekly") d.setDate(d.getDate() + 7 * n);
+        else if (period === "monthly") d.setMonth(d.getMonth() + n);
+        else d.setFullYear(d.getFullYear() + n);
+        return d;
+      }
+
+      function fruitBucketKey(d) {
+        return d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate();
+      }
+
+      function fruitBucketLabel(d, period, full) {
+        if (period === "yearly") return String(d.getFullYear());
+        if (period === "monthly")
+          return d.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+        var s = d.toLocaleDateString("en-US", full ? { month: "short", day: "numeric", year: "numeric" } : { month: "short", day: "numeric" });
+        return full ? "Week of " + s : s;
+      }
+
+      function fruitStatsShowEmpty(title, text) {
+        document.getElementById("fruit-stats-wrap").style.display = "none";
+        document.getElementById("fruit-stats-empty").style.display = "block";
+        document.getElementById("fruit-stats-empty-title").textContent = title;
+        document.getElementById("fruit-stats-empty-text").textContent = text;
+      }
+
+      function renderFruitStats() {
+        var canvas = document.getElementById("fruit-stats-chart");
+        if (!canvas) return;
+
+        if (fruitStatsChart) {
+          fruitStatsChart.destroy();
+          fruitStatsChart = null;
+        }
+        document.getElementById("fruit-stats-wrap").style.display = "";
+        document.getElementById("fruit-stats-empty").style.display = "none";
+        var summaryEl = document.getElementById("fruit-stats-summary");
+
+        if (typeof Chart === "undefined") {
+          summaryEl.textContent = "";
+          fruitStatsShowEmpty("Chart unavailable", "The chart library could not be loaded. Check your connection and refresh.");
+          return;
+        }
+
+        var period = fruitStatsState.period;
+        var rows = fruitStatsState.rows;
+        if (rows.length === 0) {
+          summaryEl.textContent = "";
+          fruitStatsShowEmpty("No completed scans yet", "Detection counts will appear here once scans have been completed.");
+          return;
+        }
+
+        // Window of buckets: last 12 weeks / 12 months, or every year with data.
+        var endBucket = fruitBucketStart(new Date(), period);
+        var startBucket;
+        if (FRUIT_PERIODS[period].buckets) {
+          startBucket = fruitBucketShift(endBucket, period, -(FRUIT_PERIODS[period].buckets - 1));
+        } else {
+          var earliest = rows.reduce(function (min, r) {
+            return r.startTime < min ? r.startTime : min;
+          }, rows[0].startTime);
+          startBucket = fruitBucketStart(earliest, period);
+        }
+        // If the scan query hit its limit, older scans were never loaded:
+        // don't draw empty bars for that history as if nothing happened.
+        var clampedNote = "";
+        if (fruitStatsState.truncated && fruitStatsState.oldestLoaded) {
+          var oldestBucket = fruitBucketStart(fruitStatsState.oldestLoaded, period);
+          if (oldestBucket > startBucket) startBucket = oldestBucket;
+          clampedNote =
+            " · Limited to the latest " + SCANS_LIMIT + " scans (from " +
+            fruitStatsState.oldestLoaded.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) +
+            "); earlier scans are not included.";
+        }
+
+        var buckets = [];
+        var index = {};
+        for (var b = startBucket; b <= endBucket; b = fruitBucketShift(b, period, 1)) {
+          index[fruitBucketKey(b)] = buckets.length;
+          buckets.push({
+            label: fruitBucketLabel(b, period, false),
+            fullLabel: fruitBucketLabel(b, period, true),
+            bearing: 0,
+            nonBearing: 0,
+            nonViable: 0,
+            scans: 0,
+          });
+        }
+
+        var scansInWindow = 0;
+        rows.forEach(function (r) {
+          var i = index[fruitBucketKey(fruitBucketStart(r.startTime, period))];
+          if (i === undefined) return;
+          buckets[i].bearing += r.bearing;
+          buckets[i].nonBearing += r.nonBearing;
+          buckets[i].nonViable += r.nonViable;
+          buckets[i].scans++;
+          scansInWindow++;
+        });
+
+        if (scansInWindow === 0) {
+          summaryEl.textContent = "";
+          fruitStatsShowEmpty(
+            "No completed scans in this period",
+            "Try a longer period to see earlier scans."
+          );
+          return;
+        }
+
+        var grand = buckets.reduce(function (s, x) {
+          return s + x.bearing + x.nonBearing + x.nonViable;
+        }, 0);
+        summaryEl.textContent =
+          scansInWindow + " completed scan" + (scansInWindow === 1 ? "" : "s") +
+          " · " + grand.toLocaleString() + " detections shown" + clampedNote;
+
+        var isDark = document.documentElement.classList.contains("dark-mode");
+        var textClr = isDark ? "#a0a0a0" : "#666666";
+        var gridClr = isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.06)";
+        var axisTitle = { yearly: "Year", monthly: "Month", weekly: "Week starting (Monday)" }[period];
+
+        fruitStatsChart = new Chart(canvas.getContext("2d"), {
+          type: "bar",
+          data: {
+            labels: buckets.map(function (x) { return x.label; }),
+            datasets: [
+              { label: "Bearing", data: buckets.map(function (x) { return x.bearing; }), backgroundColor: "#4caf78", borderRadius: 3 },
+              { label: "Non-Bearing", data: buckets.map(function (x) { return x.nonBearing; }), backgroundColor: "#e6a817", borderRadius: 3 },
+              { label: "Non-Viable", data: buckets.map(function (x) { return x.nonViable; }), backgroundColor: "#f0c430", borderRadius: 3 },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: "index", intersect: false },
+            plugins: {
+              legend: {
+                position: "bottom",
+                labels: {
+                  color: textClr,
+                  boxWidth: 12,
+                  boxHeight: 12,
+                  padding: 18,
+                  font: { family: "Inter, sans-serif", size: 13 },
+                },
+              },
+              tooltip: {
+                callbacks: {
+                  title: function (items) {
+                    return buckets[items[0].dataIndex].fullLabel;
+                  },
+                  label: function (ctx) {
+                    return " " + ctx.dataset.label + ": " + ctx.parsed.y.toLocaleString();
+                  },
+                  footer: function (items) {
+                    var bk = buckets[items[0].dataIndex];
+                    var total = bk.bearing + bk.nonBearing + bk.nonViable;
+                    return "Total: " + total.toLocaleString() + " detections · " + bk.scans + " scan" + (bk.scans === 1 ? "" : "s");
+                  },
+                },
+              },
+            },
+            scales: {
+              x: {
+                stacked: true,
+                grid: { display: false },
+                title: { display: true, text: axisTitle, color: textClr, font: { family: "Inter, sans-serif", size: 12 } },
+                ticks: { color: textClr, font: { family: "Inter, sans-serif", size: 12 } },
+              },
+              y: {
+                stacked: true,
+                beginAtZero: true,
+                grid: { color: gridClr },
+                title: { display: true, text: "Confirmed detections (sum across scans)", color: textClr, font: { family: "Inter, sans-serif", size: 12 } },
+                ticks: {
+                  color: textClr,
+                  callback: function (v) { return Number(v).toLocaleString(); },
+                  font: { family: "Inter, sans-serif", size: 12 },
+                },
+              },
+            },
+          },
+        });
+      }
 
       function updateTimestamp() {
         var el = document.getElementById("last-updated");
