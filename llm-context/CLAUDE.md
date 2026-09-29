@@ -12,7 +12,7 @@ coding agent (structure, commands, conventions, verification steps).
 - **`knowledge.md`** — the project reference (what it does, data flow,
   dependencies, config, known gaps). Read this before forming an opinion
   about how something works.
-- **`SKILL.md`** — step-by-step workflows for the common task shapes
+- **`.agents/skills/pinevision-common-tasks/SKILL.md`** — step-by-step workflows for the common task shapes
   (add/change a feature, fix a bug, touch the UI) with the specific files
   each one usually touches.
 - **This file** — how to use the three files above, and constraints
@@ -26,7 +26,7 @@ coding agent (structure, commands, conventions, verification steps).
    contradicted by its own docs (YOLO version, whether `FIXES_NEEDED.md` is
    current, role count). Don't resolve those ambiguities by guessing —
    either check the current source yourself or say the ambiguity remains.
-2. For a concrete task, check `SKILL.md` for a matching workflow first —
+2. For a concrete task, check `.agents/skills/pinevision-common-tasks/SKILL.md` for a matching workflow first —
    it lists the actual files a given task type touches, derived from how
    the codebase is organized, not a generic checklist.
 3. `AGENTS.md`'s structure listing and conventions section are the fastest
@@ -63,7 +63,7 @@ pattern means:
 - **No CI, no linter, no automated test suite exists.** Don't invent a
   command that "should" exist (`npm test`, `pytest`, a GitHub Action) —
   say plainly that verification here is manual (see `AGENTS.md` §
-  "Making and checking changes" and `SKILL.md`'s verification steps per
+  "Making and checking changes" and `.agents/skills/pinevision-common-tasks/SKILL.md`'s verification steps per
   workflow).
 - **Credentials and model weights are not in git.**
   `backend/serviceAccountKey.json` and `backend/best.pt` must already exist

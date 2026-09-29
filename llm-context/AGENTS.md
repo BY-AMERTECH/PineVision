@@ -172,5 +172,5 @@ Because of that, agents must verify changes manually and explicitly:
   config/env, and known gaps.
 - [`CLAUDE.md`](./CLAUDE.md) — Claude-specific workflow notes for this
   folder.
-- [`SKILL.md`](./SKILL.md) — step-by-step workflows for common PineVision
+- [`SKILL.md`](../.agents/skills/pinevision-common-tasks/SKILL.md) — step-by-step workflows for common PineVision
   tasks (add a feature, fix a bug, change the UI).

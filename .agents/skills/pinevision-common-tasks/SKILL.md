@@ -5,9 +5,9 @@ description: Use when adding or changing a feature, fixing a bug, or updating th
 
 # PineVision — Common Task Workflows
 
-Background: [`knowledge.md`](./knowledge.md). Structure/commands/conventions:
-[`AGENTS.md`](./AGENTS.md). When to use this file vs. those:
-[`CLAUDE.md`](./CLAUDE.md).
+Background: [`knowledge.md`](../../../llm-context/knowledge.md). Structure/commands/conventions:
+[`AGENTS.md`](../../../llm-context/AGENTS.md). When to use this file vs. those:
+[`CLAUDE.md`](../../../llm-context/CLAUDE.md).
 
 ## When to use this skill
 
