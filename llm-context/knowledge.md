@@ -1,201 +1,147 @@
 # PineVision — Knowledge Reference
 
-A concise, verified reference to how PineVision actually works, built by
-reading the repository on 2026-09-28. For file-by-file structure and dev
-commands see [`AGENTS.md`](./AGENTS.md).
+Verified reference facts about how PineVision works. Rules and conventions are
+in [`../AGENTS.md`](../AGENTS.md); this file holds facts. Last checked against
+source on 2026-09-29. Items marked **(unverified)** were not checked against code.
 
-## What the application does
+## What it does
 
-PineVision is a smart farm monitoring platform for pineapple plantations. A
-DJI drone flies over a "block" (a section of the plantation) streaming RTMP
-video; the system converts that to a browser-playable stream, runs an
-object-detection model over it in real time, classifies every pineapple
-plant it sees into **bearing / non-bearing / non-viable**, tracks unique
-plants across frames so the same plant isn't double-counted, and streams the
-running totals to the frontend and into Firestore. When a scan ends, final
-stats are saved and threshold-based alerts are created or auto-resolved.
+A DJI drone streams RTMP video over a plantation "block". MediaMTX converts it
+to HLS/RTSP, the Flask backend runs YOLO + DeepSORT on the frames, classifies
+each plant as **bearing / non-bearing / non-viable**, counts each tracked plant
+once, and writes running totals to Firestore. When a scan ends, final stats are
+saved and threshold alerts are created or auto-resolved. An MP4 can be scanned
+instead of a live stream.
 
-Three user roles exist in the live code (confirmed in `backend/app.py` and
-`frontend/js/auth.js`): **admin** ("Super Admin"), **farm_manager**, and
-**client**, each with its own page tree
-(`frontend/pages/{admin,client,farm-manager}/`) and, for admin/farm_manager,
-server-side token+role verification in `app.py`
-(`_verify_admin_token`, `_verify_farm_manager_token`). Farm Managers get a
-subset of admin-style user-management endpoints (`/api/fm/users*`) but are
-explicitly blocked from ever creating, editing, or reading Super Admin
-accounts.
+Three roles exist in code (`admin` = Super Admin, `farm_manager`, `client`),
+each with a page tree under `frontend/pages/`. `app.py` verifies token + role
+server-side for admin (`/api/users*`) and farm manager (`/api/fm/users*`). Farm
+managers can't create, edit, or read Super Admin accounts.
 
-> **Note on stale docs:** `project-documentation/system-summary.md` and
-> `features-summary.md` describe only two roles (Admin, Client) and predate
-> the `farm_manager` role and its page tree — treat those two files as
-> historical background, not current truth, for anything role-related.
+## Where things live
 
-## Main components and data flow
+| Area | Location |
+|---|---|
+| Flask entry, user-management API, serves the frontend | `backend/app.py` |
+| `/api/drone/*` endpoints (`drone_bp`) | `backend/drone_conn/routes.py` |
+| YOLO + DeepSORT, scan loops, alert thresholds | `backend/drone_conn/detection.py` (`PineappleDetector`) |
+| Firestore scan/block writes | `backend/drone_conn/firebase_client.py` |
+| Frame capture / reconnect | `backend/drone_conn/stream_capture.py` |
+| RTMP validation, stream health | `backend/drone_conn/service.py` |
+| MediaMTX API client / process | `backend/drone_conn/mediamtx.py`, `process_manager.py` |
+| Live detection UI | `frontend/js/drone-view.js` + `frontend/pages/*/drone-view.html` |
+| Auth + role routing / SPA nav | `frontend/js/auth.js` / `frontend/js/app.js` |
+| Security rules | `firestore.rules` |
+| Setup / run steps | `SETUP_INSTRUCTIONS.md` |
+
+## Detection pipeline
 
 ```
-DJI Drone (RTMP) ──▶ MediaMTX (mediamtx/mediamtx.exe)
-                         │  converts RTMP → HLS + RTSP
-                         │  auto-started by backend/drone_conn/process_manager.py
-                         ▼
-        backend/drone_conn/stream_capture.py
-        (opens the stream with OpenCV; prefers RTSP over HLS
-         when talking to MediaMTX — avoids HLS segment-boundary gaps)
-                         │  frames, sampled at N FPS
-                         ▼
-        backend/drone_conn/detection.py
-        - loads YOLO weights from backend/best.pt via ultralytics.YOLO
-          (falls back to torch.hub('ultralytics/yolov5', 'custom', ...) if
-          ultralytics import/load fails — so the model is effectively
-          YOLOv8-trained-and-loaded-via-ultralytics with a YOLOv5-repo
-          fallback path; the two docs in this repo disagree on which
-          version is authoritative, see "Open questions" below)
-        - DeepSORT (deep-sort-realtime) assigns a persistent ID per
-          detected plant so it's counted once even across many frames
-                         │  running per-class unique counts
-                         ▼
-        backend/drone_conn/firebase_client.py
-        - batches writes to Firestore: block stats + scan progress every
-          ~2 seconds while a scan is active; final write + threshold/alert
-          check (`check_thresholds_and_create_alerts`) on scan completion
-                         ▼
-        Firestore ("blocks", "scans", "monitoring_alerts", "users",
-                    "activity_logs", "alerts", "scheduled_scans", "missions")
-                         │  Firebase real-time listeners
-                         ▼
-        frontend/js/drone-view.js (+ dashboard.js, scans.js, alerts.js, ...)
-        - renders live stats, drives the Connect Drone / Upload MP4 /
-          End Scan UI on frontend/pages/*/drone-view.html
+Drone --RTMP :1935--> MediaMTX (HLS :8888, RTSP :8554, control API :9997)
+   process_manager.ensure_running() launches mediamtx.exe with mediamtx/mediamtx.yml
+POST /api/drone/prepare -> /connect (service.connect validates the RTMP URL,
+   checks the path via mediamtx.get_path(), returns the HLS URL)
+POST /api/drone/start-detection -> get_detector().start_detection()
+   singleton, _scan_lock-guarded; a second scan raises ScanInProgressError -> 409
+HLSStreamCapture: prefers RTSP-over-TCP derived from the HLS URL, falls back to HLS;
+   frames go to Queue(maxsize=10) at `fps` (route default 1); reconnects after
+   30 consecutive read failures, at most 5 reconnects
+PineappleDetector.detect_frame(): resize to 640 -> YOLO -> DeepSort
+   (max_age=30, n_init=3, max_iou_distance=0.7) -> count only is_confirmed() tracks;
+   track_categories locks a track's class at first confirmation;
+   unique_ids = per-class sets (bearing / non_bearing / non_viable)
+every update_interval (2.0 s), daemon thread: update_detection_batch()
+   ONE batch = blocks doc (percents, totals) + scans doc (counts, progress)
+POST /api/drone/stop-detection -> stop_detection(): get_scan_status() first;
+   never overwrites completed/failed/cancelled; then _compute_population_estimates()
+   -> complete_scan_session() (one batch: scan doc final + block stats + totalScans
+   Increment) -> check_thresholds_and_create_alerts()
 ```
 
-Entry point for all of this on the server side is `backend/app.py`, a single
-Flask app that:
-- initializes Firebase Admin from `backend/serviceAccountKey.json`,
-- registers the `drone_bp` blueprint (`backend/drone_conn/routes.py`,
-  everything under `/api/drone/*`),
-- exposes direct `/api/users/*` (admin) and `/api/fm/users/*`
-  (farm_manager) REST endpoints for account management, and
-- serves every frontend file itself (`/`, `/client/<page>`,
-  `/admin/<page>`, `/farm-manager/<page>`, and a catch-all for other static
-  assets) — there is no separate static file server or CDN.
+**Video variant.** `POST /api/drone/upload-video` accepts `.mp4` only, stores it in
+`%TEMP%/pinevision_uploads` (`_UPLOADS_DIR`), then `start_video_scan()` runs
+`_video_scan_loop_sequential()` (every Nth frame, route default N=5). The manifest
+`<scan_id>_manifest.json` is written *before* `manifestReady=True`; the frontend
+reads `GET /api/drone/scan/<scan_id>/manifest` (scan_id validated in `routes.py`).
 
-### Detection entry points (from `routes.py` / `SETUP_INSTRUCTIONS.md`)
+**Scan status.** `create_scan_session()` writes `active`. `complete_scan_session()`
+writes `completed`. `failed` (+ `endTime`) is written by stream-start failure,
+loop error/cancel, interrupted video, and manifest-write failure. `cancelled` is
+checked in `stop_detection()` but nothing in the inspected code writes it.
+
+**Alerts.** `check_thresholds_and_create_alerts()` (in `detection.py`) does one
+`monitoring_alerts` query (`blockId` + `resolved == False`; needs a composite
+index blockId ASC / resolved ASC) and commits creates and auto-resolves in one
+batch. Thresholds (watch / critical): bearing 75 / 60 %, non-bearing 18 / 25 %,
+non-viable 10 / 15 %.
+
+**Dead code (edits have no effect):** `_video_scan_loop()` ("NOT CURRENTLY USED";
+`start_video_scan()` always spawns the sequential loop) and `push_video_time()`
+(no-op; `/api/drone/video-time` exists but is ignored).
+
+**Model loading.** Primary path is `ultralytics.YOLO(model_path)`
+(`use_ultralytics=True`, device `cuda` if available else `cpu`); `torch.hub`
+`ultralytics/yolov5` is only the fallback when the ultralytics load raises.
+`detect_frame()` branches on `use_ultralytics`. The docstring says "YOLOv5" and a
+comment says "YOLOv8"; describe the load path instead of asserting a version.
+Weights: `backend/best.pt` (classes `bearing`, `non-bearing`, `non-viable`).
+
+### API surface
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /api/test` | Health check, reports Firebase connection status |
-| `POST /api/drone/prepare` | Auto-starts MediaMTX, detects local IPv4, returns a prefilled RTMP URL |
-| `POST /api/drone/connect` | Validates an RTMP URL, returns the HLS URL to play |
-| `GET /api/drone/status?path=NAME` | Checks stream health via MediaMTX's control API |
-| `POST /api/drone/start-detection` | Starts the YOLO+DeepSORT loop against a live HLS/RTSP stream |
-| `POST /api/drone/stop-detection` | Stops detection, finalizes the scan |
-| `POST /api/drone/upload-video` | Accepts an uploaded MP4, runs an async background scan, streams results to Firestore every 2s |
+| `GET /api/test` | Health check, Firebase status |
+| `POST /api/drone/prepare` | Starts MediaMTX, returns prefilled RTMP URL |
+| `POST /api/drone/connect` | Validates RTMP URL, returns HLS URL |
+| `GET /api/drone/status?path=NAME` | Stream health via MediaMTX API |
+| `POST /api/drone/start-detection` / `stop-detection` | Start/finish a live scan |
+| `POST /api/drone/upload-video` | MP4 background scan |
+| `GET /api/drone/scan/<id>/manifest` | Per-frame detections for an uploaded-video scan |
 
-Detection can also be run standalone from the CLI without the web UI:
-`python -m drone_conn.detection --video <path> --block_id <id> --user_id <id> [--frame_skip N]`
-(see `SETUP_INSTRUCTIONS.md`, "Testing Without Drone → Option B").
+### Testing without a drone
 
-## Important dependencies
+No automated tests exist. Options (the first two **write to live Firestore**):
 
-From `backend/requirements.txt`:
-- **Flask** 2.3.0 + **flask-cors** 4.0.0 — web server / API
-- **firebase-admin** ≥6.2.0 — Firestore + Firebase Auth from the backend
-- **torch** / **torchvision** ≥2.0 (CPU build per setup docs) + **ultralytics** ≥8.0.0 — YOLO inference
-- **opencv-python** ≥4.8.0 — video frame decode
-- **deep-sort-realtime** ≥1.3.2 — multi-object tracking
-- **av**, **ffmpeg-python** — video/stream handling (FFmpeg must also be
-  separately installed and on PATH; the repo does not vendor it)
-- **python-dotenv**, **requests**, **pillow** — utility/support
-- Note: `setuptools>=70,<80` is deliberately pinned — a comment in
-  `requirements.txt` says `deep-sort-realtime` needs `pkg_resources`, which
-  setuptools ≥80 removed.
+```bash
+cd backend
+./venv/Scripts/python.exe -m drone_conn.detection --video clip.mp4 --block_id test_block --user_id test_user [--frame_skip 2]
+python -m drone_conn.stream_capture      # 10 s MediaMTX capture smoke test
+```
 
-Frontend has no package manager dependency — Bootstrap 5 is vendored
-directly under `frontend/bootstrap/`.
+Standalone mode initializes Firebase from `backend/serviceAccountKey.json`. On
+Windows consoles that fail on emoji (`UnicodeEncodeError ... charmap`), set
+`PYTHONUTF8=1`. Fake publisher:
+`ffmpeg -re -f lavfi -i testsrc=size=640x480:rate=25 -f lavfi -i sine -c:v libx264 -preset ultrafast -c:a aac -f flv rtmp://localhost:1935/pinevision_scan`
 
-`scripts/migrate-user-ids.js` is a separate Node.js tool (own
-`node_modules/`, uses `firebase-admin` for Node) for a one-time Firestore
-data migration (backfilling `userId` on `blocks`/`monitoring_alerts` docs).
-It is not part of the running application.
+## Dependencies and configuration
 
-## Configuration / environment
+- `backend/requirements.txt`: Flask, flask-cors, firebase-admin, torch/torchvision,
+  ultralytics, opencv-python, deep-sort-realtime, av, ffmpeg-python, requests,
+  python-dotenv, pillow. `setuptools>=70,<80` is pinned because
+  `deep-sort-realtime` needs `pkg_resources`. FFmpeg must be installed separately.
+- Frontend has no package manager; Bootstrap 5 is vendored. `scripts/` is a
+  standalone Node utility (`migrate-user-ids.js`, backfills `userId`); not part
+  of the app.
+- Config is file-based. `python-dotenv` is listed but no `load_dotenv` call exists
+  in `backend/*.py` or `backend/drone_conn/*.py`, so no `.env` is needed.
+  Firebase project: `pinevision-632aa` (per `SETUP_INSTRUCTIONS.md`).
+- Flask runs `debug=True` on `0.0.0.0:5000`, hardcoded.
+- `firestore.rules`: any authenticated user can read/write `blocks`, `scans`,
+  `monitoring_alerts`, `missions`, and `users` (except `users` read is public, for
+  username lookup); `activity_logs` and `alerts` allow unauthenticated `create`;
+  `scheduled_scans` is owner-only.
 
-There is no `.env.example` or documented environment-variable list in the
-repo as inspected — configuration is mostly via files, not env vars:
+## Known gaps and stale docs
 
-- `backend/serviceAccountKey.json` — Firebase Admin service account (required,
-  gitignored, must be obtained from the Firebase console for project
-  `pinevision-632aa` per `SETUP_INSTRUCTIONS.md`)
-- `backend/best.pt` — YOLO model weights (required, gitignored, ~22MB;
-  classes `bearing` / `non-bearing` / `non-viable`)
-- `mediamtx/mediamtx.yml` — MediaMTX server configuration (RTMP/HLS/RTSP
-  ports etc.)
-- `firestore.rules` (repo root) — Firestore security rules; currently quite
-  permissive (any authenticated user can read/write most collections, and a
-  few collections like `users` and `activity_logs` allow unauthenticated
-  `create` for login/lookup flows)
-- Flask itself runs with `debug=True` on `0.0.0.0:5000` (hardcoded in
-  `app.py`'s `__main__` block, not env-driven)
-- `python-dotenv` is a dependency but no `.env` file or `load_dotenv()` call
-  was found in the files inspected — if one exists it wasn't located, flag
-  this if you need to confirm before relying on it
-
-## Known limitations / open questions (from repo inspection, not invented)
-
-- **YOLO version is ambiguous in the repo's own comments.** `detection.py`'s
-  docstring says "Uses YOLOv5 for detection", a later comment says "YOLOv8
-  is trained at 640×640", and the primary load path is
-  `ultralytics.YOLO(model_path)` with a fallback to
-  `torch.hub.load('ultralytics/yolov5', ...)`. Don't assert a specific YOLO
-  version without checking which load path is actually active for the
-  current `best.pt`.
-- **`FIXES_NEEDED.md` appears stale.** All 7 numbered fixes it lists were
-  checked against the current source during this inspection and each
-  appears already present (e.g. `scans.js` already redirects to
-  `/index.html`, `app.js` already reads `link.getAttribute('href')` at
-  click time, `firebase_client.py`'s `complete_scan_session()` already
-  writes final `bearingPercent`/`nonBearingPercent`/`nonViable` to the
-  block). Treat this file as a historical changelog, not a current TODO
-  list, unless you re-verify a specific item against the current file.
-- **`project-documentation/*-summary.md` predate the Farm Manager role.**
-  They describe a two-role system (Admin/Client); the code has three
-  (`admin`/`farm_manager`/`client`) with a dedicated `farm-manager` page
-  tree and `/api/fm/*` endpoints. Cross-check anything role-related against
-  `app.py` / `auth.js` rather than these summaries.
-- **No automated test suite.** `test_imports.py` only checks that key
-  packages import; `test_video_firebase.py` is a manual script that runs
-  detection against a real video file and writes to live Firestore. Neither
-  is wired into CI (none exists) or a test runner like pytest.
-- **PDF report export status is unclear.** `features-summary.md` flags it as
-  "may be partially implemented" — this was not independently verified
-  against `reports.html`/`reports.js` logic during this pass; confirm before
-  claiming PDF export works or doesn't.
-- **No `.env` / environment-variable documentation found**, despite
-  `python-dotenv` being a listed dependency — confirm whether any code path
-  actually loads a `.env` file before assuming one is required or unused.
-- **`output/` at the repo root contains large `.ts`/`.m3u8` files** (HLS
-  segments from a prior test run, tens of MB) that are not `.gitignore`d
-  individually by name (only the `output` folder created by the HLS test
-  steps in `SETUP_INSTRUCTIONS.md`) — worth confirming these aren't
-  accidentally tracked in git before committing.
-- **`project-documentation/best.pt`** — there is a second copy of the YOLO
-  weights file inside `project-documentation/`. Unclear whether this is
-  intentional (e.g. a reference copy for that folder's own analysis
-  scripts) or a stray duplicate; not investigated further here.
-
-## Repository paths worth knowing
-
-- Flask entry / routing: `backend/app.py`
-- Detection engine: `backend/drone_conn/detection.py`
-- Firestore writes: `backend/drone_conn/firebase_client.py`
-- Stream capture: `backend/drone_conn/stream_capture.py`
-- Drone API routes: `backend/drone_conn/routes.py`
-- MediaMTX lifecycle: `backend/drone_conn/process_manager.py`,
-  `backend/drone_conn/mediamtx.py`
-- Live detection UI: `frontend/js/drone-view.js`,
-  `frontend/pages/{admin,client,farm-manager}/drone-view.html` (or
-  equivalent — confirm exact filename per role tree before editing)
-- Auth + role routing: `frontend/js/auth.js`
-- SPA page transitions: `frontend/js/app.js`
-- Security rules: `firestore.rules`
-- Setup/run instructions: `SETUP_INSTRUCTIONS.md`
-- Architecture notes (partly superseded by this file): `INTEGRATION_GUIDE.md`
+- **`FIXES_NEEDED.md` appears stale** (a 2026-09-28 pass found its items already
+  applied; not re-checked in full on 2026-09-29). Treat it as history.
+- **`project-documentation/*-summary.md` describe two roles** and predate
+  `farm_manager`.
+- `routes.py`'s `upload_video` docstring says `frame_skip` default 2; the code
+  default is 5.
+- **No automated tests, linter, or CI.**
+- **`.gitignore` problems:** `*.json` ignores every JSON file, and the last lines
+  are fused (`*.swo/project-documentation/`), so `project-documentation/` is not
+  actually ignored. Its 9 `.md` files are tracked; `best.pt` copies are not.
+- `output/` has four tracked files (`index.m3u8`, `index0-2.ts`, HLS test output).
+- **PDF report export status is unverified.**
