@@ -42,8 +42,8 @@ body {
 /* ── 1. TOPBAR ──────────────────────────────────────────────── */
 
 .pv-logo {
-    width: 32px;
-    height: 32px;
+    width: 40px;
+    height: 40px;
     object-fit: contain;
     border-radius: var(--radius-sm);
     flex-shrink: 0;
@@ -150,10 +150,10 @@ body {
 /* Topbar action buttons */
 .dv-btn-connect {
     font-size: var(--font-size-sm);
-    font-weight: 500;
-    background: rgba(34, 197, 94, 0.06);
-    border: 1px solid rgba(34, 197, 94, 0.35);
-    color: #22c55e;
+    font-weight: var(--font-weight-semibold);
+    background: var(--surf);
+    border: 1px solid var(--green);
+    color: var(--green);
     border-radius: var(--radius-md);
     padding: 6px 14px;
     font-family: var(--font-sans);
@@ -161,9 +161,9 @@ body {
     cursor: pointer;
 }
 .dv-btn-connect:hover {
-    background: rgba(34, 197, 94, 0.12);
-    border-color: #22c55e;
-    box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.12);
+    background: var(--green-bg);
+    border-color: var(--green);
+    color: var(--green);
 }
 
 .dv-btn-upload {
@@ -179,9 +179,9 @@ body {
     cursor: pointer;
 }
 .dv-btn-upload:hover {
-    border-color: #3b82f6;
-    color: #3b82f6;
-    background: rgba(59, 130, 246, 0.06);
+    border-color: var(--green);
+    color: var(--green);
+    background: var(--green-bg);
 }
 
 .dv-btn-end-scan {
@@ -203,10 +203,10 @@ body {
 
 .dv-btn-start-counting {
     font-size: var(--font-size-sm);
-    font-weight: 500;
-    background: rgba(34, 197, 94, 0.10);
-    border: 1px solid rgba(34, 197, 94, 0.45);
-    color: #22c55e;
+    font-weight: var(--font-weight-semibold);
+    background: var(--surf);
+    border: 1px solid var(--green);
+    color: var(--green);
     border-radius: var(--radius-md);
     padding: 6px 14px;
     font-family: var(--font-sans);
@@ -214,8 +214,9 @@ body {
     cursor: pointer;
 }
 .dv-btn-start-counting:hover {
-    border-color: #22c55e;
-    background: rgba(34, 197, 94, 0.18);
+    background: var(--green-bg);
+    border-color: var(--green);
+    color: var(--green);
 }
 
 
@@ -527,24 +528,24 @@ body {
 
 /* Modal action buttons */
 .dv-btn-primary {
-    background: rgba(34, 197, 94, 0.08);
-    border: 1px solid rgba(34, 197, 94, 0.45);
-    color: #22c55e;
+    background: var(--surf);
+    border: 1px solid var(--green);
+    color: var(--green);
     border-radius: var(--radius-md);
     font-size: var(--font-size-sm);
-    font-weight: 500;
+    font-weight: var(--font-weight-semibold);
     padding: 8px 20px;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-sm);
     font-family: var(--font-sans);
     transition: all 0.2s ease;
     cursor: pointer;
 }
 .dv-btn-primary:hover {
-    background: rgba(34, 197, 94, 0.14);
-    border-color: #22c55e;
-    box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.12);
+    background: var(--green-bg);
+    border-color: var(--green);
+    color: var(--green);
 }
 .dv-btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
 
@@ -665,4 +666,10 @@ body {
     #dv-stats-panel .col       { flex: 0 0 50%; max-width: 50%; }
     #dv-stats-panel .col-3     { flex: 0 0 100%; max-width: 100%; }
     #dv-stats-panel .mc-val    { font-size: var(--font-size-lg); }
+}
+
+.dv-topbar-actions { flex-wrap: wrap; }
+@media (max-width: 767px) {
+    #dv-topbar { flex-wrap: wrap; gap: var(--space-sm); }
+    .dv-topbar-actions { width: 100%; }
 }

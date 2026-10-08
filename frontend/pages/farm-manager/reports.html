@@ -154,30 +154,8 @@
         font-size: var(--font-size-sm);
         color: var(--muted);
       }
-      .export-actions { display: flex; gap: var(--space-sm); }
-      .btn-export {
-        display: inline-flex;
-        align-items: center;
-        gap: var(--space-sm);
-        padding: var(--space-sm) var(--space-lg);
-        font-size: var(--font-size-sm);
-        font-weight: var(--font-weight-medium);
-        border: var(--border-width-base) solid var(--border);
-        border-radius: var(--radius-md);
-        background-color: var(--surf2);
-        color: var(--color-text-secondary);
-        cursor: not-allowed;
-        font-family: var(--font-sans);
-        opacity: 0.7;
-        position: relative;
-      }
-      .btn-export:not(:disabled) {
-        cursor: pointer;
-        opacity: 1;
-      }
-      .btn-export:not(:disabled):hover {
-        border-color: var(--color-text-tertiary, var(--border));
-      }
+      .export-actions { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
+      .btn-export { position: relative; }
       .btn-export-label {
         position: absolute;
         top: -8px;
@@ -546,15 +524,12 @@
             </div>
             <div class="filter-actions">
               <button class="btn btn-primary" onclick="generateReport()">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
                   <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
                 </svg>
                 <span>Generate Report</span>
               </button>
-              <button class="btn btn-secondary" onclick="clearFilters()">
-                <span>&#8635;</span>
-                <span>Clear Filters</span>
-              </button>
+              <button class="btn btn-secondary" onclick="clearFilters()"><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m18 6-12 12M6 6l12 12"/></svg> <span>Clear Filters</span></button>
             </div>
           </div>
 
@@ -571,12 +546,8 @@
                 <div class="report-subtitle" id="report-subtitle-text"></div>
               </div>
               <div class="export-actions">
-                <button class="btn-export" title="PDF export coming soon" disabled>
-                  <span>📄</span><span>Export PDF</span><span class="btn-export-label">Soon</span>
-                </button>
-                <button class="btn-export" title="Download this report as CSV" onclick="exportReportCSV()">
-                  <span>📊</span><span>Export CSV</span>
-                </button>
+                <button class="btn-export btn btn-secondary" title="PDF export coming soon" disabled><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg> <span>Export PDF</span><span class="btn-export-label">Soon</span></button>
+                <button class="btn-export btn btn-primary" title="Download this report as CSV" onclick="exportReportCSV()"><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg> <span>Export CSV</span></button>
               </div>
             </div>
 
@@ -775,7 +746,7 @@
         document.getElementById("rp-status-placeholder").style.display = "block";
         document.getElementById("rp-status-placeholder").innerHTML =
           'Couldn\'t reach Firestore to load report data. ' +
-          '<button class="btn btn-sm btn-secondary" onclick="attachListeners()">Retry</button>';
+          '<button class="btn btn-sm btn-secondary" onclick="attachListeners()"><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Retry</button>';
       }
 
       // ── Filter dropdown population ──────────────────────────────

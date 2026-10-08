@@ -691,7 +691,7 @@
                 "
               ></span>
               <button
-                class="btn btn-secondary btn-sm"
+                class="btn btn-navigation btn-sm"
                 onclick="refreshDashboard()"
                 id="refresh-btn"
               >
@@ -705,7 +705,7 @@
                   stroke-width="2.5"
                   stroke-linecap="round"
                   stroke-linejoin="round"
-                >
+                 aria-hidden="true" focusable="false">
                   <polyline points="23 4 23 10 17 10" />
                   <polyline points="1 20 1 14 7 14" />
                   <path
@@ -747,9 +747,8 @@
                   </span>
                   Live Activity Feed
                 </h3>
-                <a href="auditlogs.html" class="btn btn-secondary btn-sm"
-                  >View All →</a
-                >
+                <a href="auditlogs.html" class="btn btn-navigation btn-sm"
+                  ><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg> View All <svg class="btn-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a>
               </div>
               <div id="activity-feed"></div>
             </div>
@@ -776,7 +775,7 @@
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 11v6"/><path d="M12 7h.01"/></svg>
                 </button>
               </h3>
-              <a href="blocks.html" class="btn btn-secondary btn-sm">Browse Fruit Blocks →</a>
+              <a href="blocks.html" class="btn btn-navigation btn-sm"><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg> Browse Fruit Blocks <svg class="btn-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a>
             </div>
             <div class="fruit-stats-grid">
               <div class="tcard fruit-stats-card fruit-stats-weekly">
@@ -861,9 +860,8 @@
                   </span>
                   Recent Alerts
                 </h3>
-                <a href="alerts.html" class="btn btn-secondary btn-sm"
-                  >View All →</a
-                >
+                <a href="alerts.html" class="btn btn-navigation btn-sm"
+                  ><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg> View All <svg class="btn-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a>
               </div>
               <div class="al-rows-wrap" id="alerts-container"></div>
             </div>
@@ -890,9 +888,8 @@
                   </span>
                   User Statistics
                 </h3>
-                <a href="users.html" class="btn btn-secondary btn-sm"
-                  >Manage →</a
-                >
+                <a href="users.html" class="btn btn-navigation btn-sm"
+                  ><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg> Manage <svg class="btn-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a>
               </div>
               <div class="twrap">
                 <table>
@@ -924,7 +921,7 @@
           <p style="margin-bottom: 0">Repeated scans can detect the same plants again, so these are not unique plants and not historical block totals.</p>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" onclick="utils.hideModal('fruit-stats-details-modal')">Close</button>
+          <button type="button" class="btn btn-secondary" onclick="utils.hideModal('fruit-stats-details-modal')"><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m18 6-12 12M6 6l12 12"/></svg> Close</button>
         </div>
       </div>
     </div>

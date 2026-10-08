@@ -99,6 +99,37 @@ var utils = (function() {
         return `${day} ${month} ${year}`;
     }
 
+    /** Build secondary scan metadata from the block's last completed scan. */
+    function recentScanBadge(timestamp) {
+        let date = null;
+        if (timestamp != null && timestamp !== '') {
+            if (typeof timestamp.toDate === 'function') {
+                date = timestamp.toDate();
+            } else if (typeof timestamp.seconds === 'number') {
+                date = new Date(timestamp.seconds * 1000);
+            } else {
+                date = new Date(timestamp);
+            }
+        }
+
+        let value = 'No scans yet';
+        if (date && !isNaN(date.getTime())) {
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = date.toLocaleString('en-GB', { month: 'short' });
+            const time = date.toLocaleString('en-US', {
+                hour: '2-digit', minute: '2-digit', hour12: true
+            });
+            value = `<time datetime="${date.toISOString()}">${day} ${month} ${date.getFullYear()}, ${time}</time>`;
+        } else if (timestamp != null && timestamp !== '') {
+            value = 'Date unavailable';
+        }
+
+        return `<span class="recent-scan-badge">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            <span>Recent Scan &middot; ${value}</span>
+        </span>`;
+    }
+
     /**
      * Format date for input fields - "YYYY-MM-DD"
      */
@@ -525,6 +556,7 @@ var utils = (function() {
         formatNumber,
         formatPercent,
         formatDate,
+        recentScanBadge,
         formatDateInput,
         formatArea,
         

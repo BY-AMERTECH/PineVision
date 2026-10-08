@@ -775,8 +775,8 @@
             </select>
             <div class="fb-toolbar-right">
               <span class="fb-result-count" id="fb-result-count"></span>
-              <button class="btn btn-secondary btn-sm" onclick="loadBlocks()" id="fb-refresh-btn">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <button class="btn btn-navigation btn-sm" onclick="loadBlocks()" id="fb-refresh-btn">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
                   <polyline points="23 4 23 10 17 10" />
                   <polyline points="1 20 1 14 7 14" />
                   <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
@@ -850,8 +850,8 @@
             </p>
           </div>
           <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
-            <button type="submit" class="btn btn-primary">Save Changes</button>
+            <button type="button" class="btn btn-secondary" onclick="closeEditModal()"><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m18 6-12 12M6 6l12 12"/></svg> Cancel</button>
+            <button type="submit" class="btn btn-primary"><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12l4 4v12a2 2 0 0 1-2 2zM17 21v-8H7v8M7 3v5h8"/></svg> Save Changes</button>
           </div>
         </form>
       </div>
@@ -866,7 +866,7 @@
         </div>
         <div class="modal-body" id="trend-modal-content"></div>
         <div class="modal-footer" style="justify-content: flex-end">
-          <button type="button" class="btn btn-secondary" onclick="closeTrendModal()">Close</button>
+          <button type="button" class="btn btn-secondary" onclick="closeTrendModal()"><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m18 6-12 12M6 6l12 12"/></svg> Close</button>
         </div>
       </div>
     </div>
@@ -880,7 +880,7 @@
         </div>
         <div class="modal-body" id="scheduled-scans-modal-content" style="padding: 0"></div>
         <div class="modal-footer" style="justify-content: flex-end">
-          <button type="button" class="btn btn-secondary" onclick="closeScheduledScansModal()">Close</button>
+          <button type="button" class="btn btn-secondary" onclick="closeScheduledScansModal()"><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m18 6-12 12M6 6l12 12"/></svg> Close</button>
         </div>
       </div>
     </div>
@@ -1087,7 +1087,7 @@
             </div>
             <div class="fb-empty-title">Couldn't load Fruit Blocks</div>
             <div class="fb-empty-text">Something went wrong while fetching block data. Please try again.</div>
-            <button class="btn btn-primary btn-sm" onclick="loadBlocks()">Retry</button>
+            <button class="btn btn-primary btn-sm" onclick="loadBlocks()"><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Retry</button>
           </div>`;
         document.getElementById("fb-result-count").textContent = "";
       }
@@ -1122,7 +1122,7 @@
               </div>
               <div class="fb-empty-title">No blocks match your filters</div>
               <div class="fb-empty-text">Try adjusting or clearing your search and filters.</div>
-              <button class="btn btn-secondary btn-sm" onclick="clearFilters()">Clear Filters</button>
+              <button class="btn btn-secondary btn-sm" onclick="clearFilters()"><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m18 6-12 12M6 6l12 12"/></svg> Clear Filters</button>
             </div>`;
           return;
         }
@@ -1226,6 +1226,8 @@
                 Forced <strong>${escapeHtml(formatDateValue(block.forcingDate))}</strong>
               </span>
             </div>
+
+            ${utils.recentScanBadge(block.lastScanned)}
 
             <div class="fb-footer">
               <span class="fb-population">
@@ -1485,7 +1487,7 @@
           content.innerHTML = `
             <div style="padding:var(--space-xl);color:var(--muted);font-size:var(--font-size-sm);">
               Failed to load scheduled scans.
-              <button type="button" class="btn btn-sm btn-secondary" style="margin-left:var(--space-md);" onclick="loadScheduledScansForModal(findBlock('${block.id}'))">Retry</button>
+              <button type="button" class="btn btn-sm btn-secondary" style="margin-left:var(--space-md);" onclick="loadScheduledScansForModal(findBlock('${block.id}'))"><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Retry</button>
             </div>`;
         }
       }

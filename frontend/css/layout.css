@@ -35,7 +35,7 @@
     width: 54px;
     height: 54px;
     flex-shrink: 0;
-    background: #fffec5;
+    background: #214a2d;
     border-radius: 12px;
     box-sizing: border-box;
 }
@@ -346,6 +346,8 @@ html.sidebar-collapsed .nav-link[data-tooltip]:hover::after {
 
 .main-content {
     flex: 1;
+    /* Let action rows wrap within the viewport even beside wide tables. */
+    min-width: 0;
     margin-left: var(--sidebar-width);
     min-height: 100vh;
     background-color: var(--color-background-tertiary);

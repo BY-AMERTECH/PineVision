@@ -501,7 +501,7 @@
         </div>
         <div class="modal-body" id="trend-modal-content"></div>
         <div class="modal-footer" style="justify-content: flex-end">
-          <button type="button" class="btn btn-secondary" onclick="closeTrendModal()">Close</button>
+          <button type="button" class="btn btn-secondary" onclick="closeTrendModal()"><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m18 6-12 12M6 6l12 12"/></svg> Close</button>
         </div>
       </div>
     </div>
@@ -599,7 +599,7 @@
         document.getElementById("block-detail-root").innerHTML = `
           <div class="fb-empty" style="padding: var(--space-4xl) 0; text-align:center;">
             <p style="color: var(--muted); margin-bottom: var(--space-lg);">This Fruit Block could not be found.</p>
-            <a href="blocks.html" class="btn btn-secondary">&#8592; Back to Fruit Blocks</a>
+            <a href="blocks.html" class="btn btn-secondary"><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M19 12H5m6-6-6 6 6 6"/></svg> Back to Fruit Blocks</a>
           </div>`;
       }
 
@@ -617,7 +617,7 @@
         document.getElementById("block-detail-root").innerHTML = `
           <div class="block-page-header">
             <div class="block-header-left">
-              <a href="blocks.html" class="btn-back">&#8592; All Fruit Blocks</a>
+              <a href="blocks.html" class="btn-back"><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M19 12H5m6-6-6 6 6 6"/></svg> All Fruit Blocks</a>
               <div>
                 <div class="block-title-row">
                   <h1 class="block-page-title">${escapeHtml(block.blockName)}</h1>
@@ -632,6 +632,7 @@
                 <div class="block-page-subtitle">
                   ${escapeHtml(block.operatorName)} &middot; ${escapeHtml(block.section)} &middot; ${formatArea(block.area)} &middot; ${escapeHtml(growthStageLabel(block))}
                 </div>
+                ${utils.recentScanBadge(block.lastScanned)}
               </div>
             </div>
           </div>
@@ -720,7 +721,7 @@
               </div>
               <div class="d-flex align-items-center gap-2 trend-actions">
                 <button type="button" class="btn btn-sm btn-secondary" onclick="downloadTrendDetails(this)" title="Download scan details" aria-label="Download scan details"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg></button>
-                <button type="button" class="btn btn-sm btn-secondary" onclick="openTrendModal()">View</button>
+                <button type="button" class="btn btn-sm btn-navigation" onclick="openTrendModal()"><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg> View <svg class="btn-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>
               </div>
             </div>
           </div>
@@ -860,7 +861,7 @@
             <div class="thead-row"><span class="thead-title">Scheduled Scans</span></div>
             <div style="padding:var(--space-xl);color:var(--muted);font-size:var(--font-size-sm);">
               Failed to load scheduled scans.
-              <button type="button" class="btn btn-sm btn-secondary" style="margin-left:var(--space-md);" onclick="loadScheduledScans(currentBlock)">Retry</button>
+              <button type="button" class="btn btn-sm btn-secondary" style="margin-left:var(--space-md);" onclick="loadScheduledScans(currentBlock)"><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Retry</button>
             </div>`;
         }
       }

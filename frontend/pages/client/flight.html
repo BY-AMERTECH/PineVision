@@ -524,38 +524,7 @@
       }
 
       /* Button Styles */
-      .btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
-        padding: 0.625rem 1.125rem;
-        font-size: 0.9375rem;
-        font-weight: 500;
-        border-radius: 6px;
-        border: none;
-        cursor: pointer;
-        transition: all 0.2s;
-      }
-
-      .btn-primary {
-        background-color: var(--green);
-        color: white;
-      }
-
-      .btn-primary:hover {
-        background-color: #3d9970;
-        box-shadow: 0 4px 6px rgba(76, 175, 120, 0.2);
-      }
-
-      .btn-secondary {
-        background-color: white;
-        color: #374151;
-        border: 1px solid #d1d5db;
-      }
-
-      .btn-secondary:hover {
-        background-color: #f9fafb;
-      }
+      /* Action buttons use the shared PineVision button styles. */
 
       @media (max-width: 580px) {
         .form-row {
@@ -827,7 +796,7 @@
                     stroke-width="2.5"
                     stroke-linecap="round"
                     stroke-linejoin="round"
-                  >
+                   aria-hidden="true" focusable="false">
                     <line x1="12" y1="5" x2="12" y2="19" />
                     <line x1="5" y1="12" x2="19" y2="12" />
                   </svg>
@@ -926,12 +895,8 @@
               type="button"
               class="btn btn-secondary"
               onclick="closeAddScheduleModal()"
-            >
-              Cancel
-            </button>
-            <button type="submit" class="btn btn-primary">
-              Schedule Flight
-            </button>
+            ><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m18 6-12 12M6 6l12 12"/></svg> Cancel</button>
+            <button type="submit" class="btn btn-primary"><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18M9 16h2"/></svg> Schedule Flight</button>
           </div>
         </form>
       </div>
@@ -1022,10 +987,8 @@
               type="button"
               class="btn btn-secondary"
               onclick="closeEditScheduleModal()"
-            >
-              Cancel
-            </button>
-            <button type="submit" class="btn btn-primary">Save Changes</button>
+            ><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m18 6-12 12M6 6l12 12"/></svg> Cancel</button>
+            <button type="submit" class="btn btn-primary"><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12l4 4v12a2 2 0 0 1-2 2zM17 21v-8H7v8M7 3v5h8"/></svg> Save Changes</button>
           </div>
         </form>
       </div>
@@ -1053,17 +1016,13 @@
             type="button"
             class="btn btn-secondary"
             onclick="closeCancelScheduleModal()"
-          >
-            Keep Schedule
-          </button>
+          ><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m20 6-11 11-5-5"/></svg> Keep Schedule</button>
           <button
             type="button"
-            class="btn btn-primary"
+            class="btn btn-danger"
             onclick="confirmCancelSchedule()"
             style="background-color: var(--red); border-color: var(--red)"
-          >
-            Cancel Schedule
-          </button>
+          ><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m18 6-12 12M6 6l12 12"/></svg> Cancel Schedule</button>
         </div>
       </div>
     </div>

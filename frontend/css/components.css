@@ -62,30 +62,37 @@ table tr,
     padding: 9px var(--space-xl);
     font-family: var(--font-sans);
     font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-medium);
+    font-weight: var(--font-weight-semibold);
     border-radius: var(--radius-md);
     border: 1px solid transparent;
     cursor: pointer;
-    transition: all var(--transition-fast);
+    transition: background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
     text-decoration: none;
-    white-space: nowrap;
+    white-space: normal;
+    max-width: 100%;
+    min-height: 38px;
     letter-spacing: 0.01em;
     line-height: 1.4;
 }
 
 .btn-primary {
-    background-color: var(--green);
-    color: #ffffff;
-    border-color: var(--green);
+    --bs-btn-active-bg: var(--green-700);
+    --bs-btn-active-border-color: var(--green-700);
+    --bs-btn-active-color: #fff;
+    --bs-btn-hover-bg: var(--green-700);
+    --bs-btn-hover-border-color: var(--green-700);
+    --bs-btn-hover-color: #fff;
+    background-color: var(--color-accent);
+    color: #fff;
+    border-color: var(--color-accent);
     box-shadow: 0 1px 3px rgba(45, 106, 63, 0.25);
 }
 
 .btn-primary:hover {
     background-color: var(--green-700);
     border-color: var(--green-700);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(45, 106, 63, 0.30);
-    color: #ffffff;
+    box-shadow: 0 2px 6px rgba(45, 106, 63, 0.25);
+    color: #fff;
 }
 
 .btn-primary:active {
@@ -93,7 +100,45 @@ table tr,
     box-shadow: 0 1px 3px rgba(45, 106, 63, 0.20);
 }
 
+/* Compatibility for actions already using the explicit filled class. */
+.btn-primary.btn-filled {
+    --bs-btn-active-bg: var(--green-700);
+    --bs-btn-active-border-color: var(--green-700);
+    --bs-btn-active-color: #fff;
+    --bs-btn-hover-bg: var(--green-700);
+    --bs-btn-hover-border-color: var(--green-700);
+    --bs-btn-hover-color: #fff;
+    background-color: var(--color-accent);
+    border-color: var(--color-accent);
+    color: #fff;
+}
+
+.btn-primary.btn-filled:hover,
+.btn-primary.btn-filled:active {
+    background-color: var(--green-700);
+    border-color: var(--green-700);
+    color: #fff;
+}
+
+.dark-mode .btn-primary,
+.dark-mode .btn-primary.btn-filled {
+    background-color: var(--green-700);
+    border-color: var(--green-700);
+}
+
+.dark-mode .btn-primary:hover,
+.dark-mode .btn-primary.btn-filled:hover {
+    background-color: var(--green-800);
+    border-color: var(--green-800);
+}
+
 .btn-secondary {
+    --bs-btn-active-bg: var(--surf2);
+    --bs-btn-active-border-color: var(--color-border-primary);
+    --bs-btn-active-color: var(--color-text-primary);
+    --bs-btn-hover-bg: var(--surf2);
+    --bs-btn-hover-border-color: var(--color-border-primary);
+    --bs-btn-hover-color: var(--color-text-primary);
     background-color: var(--surf);
     color: var(--color-text-primary);
     border-color: var(--color-border-secondary);
@@ -108,12 +153,14 @@ table tr,
 }
 
 .btn-sm {
+    min-height: 32px;
     padding: 6px var(--space-md);
     font-size: var(--font-size-xs);
     border-radius: var(--radius-sm);
 }
 
 .btn-lg {
+    min-height: 44px;
     padding: var(--space-md) var(--space-2xl);
     font-size: var(--font-size-md);
     border-radius: var(--radius-md);
@@ -121,6 +168,12 @@ table tr,
 
 /* Danger / destructive button */
 .btn-danger {
+    --bs-btn-active-bg: var(--red);
+    --bs-btn-active-border-color: var(--red);
+    --bs-btn-active-color: #fff;
+    --bs-btn-hover-bg: var(--red);
+    --bs-btn-hover-border-color: var(--red);
+    --bs-btn-hover-color: #fff;
     background-color: var(--red-bg);
     color: var(--red);
     border-color: rgba(139, 32, 32, 0.25);
@@ -130,6 +183,73 @@ table tr,
     background-color: var(--red);
     color: #ffffff;
     border-color: var(--red);
+}
+
+/* Navigation has its own treatment; Cancel, Back and filters stay neutral. */
+.btn-navigation {
+    --bs-btn-active-bg: var(--green-bg);
+    --bs-btn-active-border-color: var(--green);
+    --bs-btn-active-color: var(--green);
+    --bs-btn-hover-bg: var(--green-bg);
+    --bs-btn-hover-border-color: var(--green);
+    --bs-btn-hover-color: var(--green);
+    background-color: var(--surf);
+    color: var(--green);
+    border-color: var(--green);
+    box-shadow: none;
+}
+
+.btn-navigation:hover,
+.btn-navigation:active {
+    background-color: var(--green-bg);
+    color: var(--green);
+    border-color: var(--green);
+}
+
+.btn > svg,
+.btn > .ti,
+.btn-back > svg {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 16px;
+    vertical-align: middle;
+    pointer-events: none;
+}
+
+.btn > .ti {
+    font-size: 16px;
+    line-height: 1;
+    margin: 0 !important;
+}
+
+.btn > .btn-arrow {
+    margin-left: var(--space-xs);
+}
+
+.btn:focus-visible,
+.btn-back:focus-visible {
+    outline: 2px solid var(--green);
+    outline-offset: 3px;
+    box-shadow: var(--shadow-focus);
+}
+
+.btn:disabled,
+.btn[aria-disabled="true"] {
+    opacity: 0.55;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .btn { transition: none; }
+}
+
+@media (max-width: 580px) {
+    .btn {
+        padding-left: var(--space-md);
+        padding-right: var(--space-md);
+    }
 }
 
 /* ========================================
@@ -303,6 +423,33 @@ table tr,
     font-size: var(--font-size-sm);
     color: var(--muted);
     margin-bottom: var(--space-md);
+}
+
+/* Secondary block metadata, shared by block listings and details. */
+.recent-scan-badge {
+    display: inline-flex;
+    align-self: flex-start;
+    align-items: center;
+    gap: var(--space-xs);
+    max-width: 100%;
+    margin-top: var(--space-sm);
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: var(--radius-md);
+    background-color: var(--surf2);
+    color: var(--muted);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-normal);
+    line-height: 1.5;
+    vertical-align: middle;
+}
+
+.recent-scan-badge svg {
+    flex-shrink: 0;
+}
+
+.recent-scan-badge > span {
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .bcard-stats {

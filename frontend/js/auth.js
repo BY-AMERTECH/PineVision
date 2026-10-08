@@ -384,8 +384,8 @@ var auth = (function () {
                     '<h3 style="font-size:var(--font-size-lg);font-weight:var(--font-weight-semibold);color:var(--color-text-primary);margin-bottom:var(--space-sm);">Confirm Logout</h3>' +
                     '<p style="font-size:var(--font-size-sm);color:var(--color-text-secondary);margin-bottom:var(--space-xl);">Are you sure you want to log out of your session?</p>' +
                     '<div style="display:flex;gap:var(--space-md);justify-content:center;">' +
-                        '<button onclick="auth.closeLogoutModal()" class="btn btn-secondary" style="flex:1;">Cancel</button>' +
-                        '<button onclick="auth.logout()" class="btn btn-danger" style="flex:1;background:var(--red-mid);color:#fff;border-color:var(--red-mid);">Yes, Logout</button>' +
+                        '<button onclick="auth.closeLogoutModal()" class="btn btn-secondary" style="flex:1;"><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m18 6-12 12M6 6l12 12"/></svg> Cancel</button>' +
+                        '<button onclick="auth.logout()" class="btn btn-danger" style="flex:1;background:var(--red-mid);color:#fff;border-color:var(--red-mid);"><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m20 6-11 11-5-5"/></svg> Yes, Logout</button>' +
                     '</div>' +
                 '</div>';
             document.body.appendChild(modal);

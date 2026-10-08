@@ -501,7 +501,7 @@
                 </button>
               </div>
               <div class="filter-bar-actions">
-                <button class="btn btn-primary" onclick="openAddBlockModal()">
+                <button class="btn btn-primary btn-filled" onclick="openAddBlockModal()">
                   <svg
                     width="16"
                     height="16"
@@ -511,7 +511,7 @@
                     stroke-width="2.5"
                     stroke-linecap="round"
                     stroke-linejoin="round"
-                  >
+                   aria-hidden="true" focusable="false">
                     <line x1="12" y1="5" x2="12" y2="19" />
                     <line x1="5" y1="12" x2="19" y2="12" />
                   </svg>
@@ -639,10 +639,8 @@
               type="button"
               class="btn btn-secondary"
               onclick="closeAddBlockModal()"
-            >
-              Cancel
-            </button>
-            <button type="submit" class="btn btn-primary">Add Block</button>
+            ><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m18 6-12 12M6 6l12 12"/></svg> Cancel</button>
+            <button type="submit" class="btn btn-primary"><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg> Add Block</button>
           </div>
         </form>
       </div>
@@ -787,7 +785,10 @@
                                   <div>
                                       <div class="bcard-number">${block.blockName || "BLOCK " + block.blockId}</div>
                                       <div class="bcard-stage">${block.stage}</div>
-                                      <div class="bcard-meta">${block.section} &middot; ${formatArea(block.area)}</div>
+                                      <div class="bcard-meta">
+                                          ${block.section} &middot; ${formatArea(block.area)}
+                                          <div>${utils.recentScanBadge(block.lastScanned)}</div>
+                                      </div>
                                   </div>
                                   <div style="display:flex;flex-direction:column;align-items:flex-end;gap:var(--space-xs);">
                                       ${statusBadge(statusClass)}
