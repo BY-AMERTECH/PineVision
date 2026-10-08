@@ -133,55 +133,37 @@
     // RENDER SCAN METADATA
     // ═══════════════════════════════════════════════════════════
 
-    async function renderScanMeta() {
+    function renderScanMeta() {
         const now = new Date();
         const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 
-        // Get current user
-        const currentUser = auth.getCurrentUser();
-        let userName = 'User';
-
-        // Fetch full name from Firestore users collection
-        if (currentUser && currentUser.uid) {
-            try {
-                const userDoc = await firebase.firestore()
-                    .collection('users')
-                    .doc(currentUser.uid)
-                    .get();
-
-                if (userDoc.exists) {
-                    const userData = userDoc.data();
-                    userName = userData.fullName || userData.displayName || currentUser.displayName || 'User';
-                } else {
-                    // Fallback to Firebase Auth display name
-                    userName = currentUser.displayName || 'User';
-                }
-            } catch (error) {
-                console.warn('Could not fetch user name:', error);
-                userName = currentUser.displayName || 'User';
-            }
-        }
-
         const metaHTML = `
-        <div class="scan-meta-item">
-            <span class="scan-meta-label">Date:</span>
-            <span class="scan-meta-value">${now.getDate().toString().padStart(2, '0')} ${months[now.getMonth()]} ${now.getFullYear()}</span>
+        <div class="monitoring-summary-item">
+            <span class="monitoring-summary-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>
+            </span>
+            <div class="monitoring-summary-details">
+                <span class="monitoring-summary-label">Today</span>
+                <time class="monitoring-summary-value" datetime="${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}">${String(now.getDate()).padStart(2, '0')} ${months[now.getMonth()]} ${now.getFullYear()}</time>
+            </div>
         </div>
-        <div class="scan-meta-item">
-            <span class="scan-meta-label">Drone:</span>
-            <span class="scan-meta-value">DJI Mavic 3 Multispectral</span>
+        <div class="monitoring-summary-item">
+            <span class="monitoring-summary-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            </span>
+            <div class="monitoring-summary-details">
+                <span class="monitoring-summary-label">Assigned to you</span>
+                <span class="monitoring-summary-value">${blocksData.length} Farm ${blocksData.length === 1 ? 'Block' : 'Blocks'}</span>
+            </div>
         </div>
-        <div class="scan-meta-item">
-            <span class="scan-meta-label">Operator:</span>
-            <span class="scan-meta-value">${userName}</span>
-        </div>
-        <div class="scan-meta-item">
-            <span class="scan-meta-label">Blocks:</span>
-            <span class="scan-meta-value">${blocksData.length} blocks</span>
-        </div>
-        <div class="scan-meta-item">
-            <span class="scan-meta-label">Status:</span>
-            <span class="scan-meta-value">Real-time</span>
+        <div class="monitoring-summary-item">
+            <span class="monitoring-summary-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            </span>
+            <div class="monitoring-summary-details">
+                <span class="monitoring-summary-label">Monitoring</span>
+                <span class="badge good"><span class="bdot" aria-hidden="true"></span>Real-time</span>
+            </div>
         </div>
     `;
 

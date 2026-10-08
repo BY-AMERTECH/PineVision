@@ -18,6 +18,9 @@
       })();
     </script>
     <title>User Management - PineVision</title>
+    <link rel="icon" type="image/x-icon" href="/frontend/assets/images/pinevision-favicon.ico" />
+    <link rel="icon" type="image/webp" sizes="64x64" href="/frontend/assets/images/pinevision-favicon.webp" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/frontend/assets/images/pinevision-touch-icon.png" />
     <link rel="stylesheet" href="../../bootstrap/css/bootstrap.min.css" />
     <link rel="stylesheet" href="../../css/tokens.css" />
     <link rel="stylesheet" href="../../css/layout.css" />
@@ -97,7 +100,7 @@
       .users-main .twrap {
         flex: 1;
         overflow-y: auto;
-        min-height: 424px;
+        min-height: 0;
       }
 
       .toolbar {
@@ -716,14 +719,14 @@
         <div class="sidebar-brand">
           <div class="sidebar-logo">
             <img
-              src="/frontend/assets/images/pinevision-logo.svg"
+              src="/frontend/assets/images/pinevision-transparent-logo.svg"
               alt="PineVision"
-              class="sidebar-logo-img"
+              class="sidebar-logo-img" width="56" height="56"
             />
           </div>
           <div class="sidebar-brand-text">
             <div class="sidebar-brand-name">PineVision</div>
-            <div class="sidebar-brand-tagline">Farm Manager Panel</div>
+            <div class="sidebar-brand-tagline">Farm Monitoring</div>
           </div>
         </div>
 
@@ -1220,7 +1223,7 @@
                 </div>
 
                 <!-- Table -->
-                <div class="twrap">
+                <div class="twrap card-scroll-region" tabindex="0" role="region" aria-label="User accounts">
                   <table class="users-table">
                     <thead>
                       <tr>
@@ -1304,7 +1307,7 @@
                     min-height: 0;
                   "
                 >
-                  <div class="timeline" id="activity-timeline"></div>
+                  <div class="timeline card-scroll-region" id="activity-timeline" tabindex="0" role="region" aria-label="Activity timeline"></div>
                 </div>
               </div>
             </div>

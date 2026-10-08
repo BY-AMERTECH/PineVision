@@ -18,6 +18,9 @@
       })();
     </script>
     <title>Block Detail - PineVision</title>
+    <link rel="icon" type="image/x-icon" href="/frontend/assets/images/pinevision-favicon.ico" />
+    <link rel="icon" type="image/webp" sizes="64x64" href="/frontend/assets/images/pinevision-favicon.webp" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/frontend/assets/images/pinevision-touch-icon.png" />
     <link rel="stylesheet" href="../../bootstrap/css/bootstrap.min.css" />
     <link rel="stylesheet" href="../../css/tokens.css" />
     <link rel="stylesheet" href="../../css/layout.css" />
@@ -161,6 +164,9 @@
         text-align: right;
       }
       .trend-compact-card .thead-row { border-bottom: none; }
+      .trend-compact-card .thead-row { flex-wrap: wrap; gap: var(--space-md); }
+      .trend-compact-card .thead-row > .d-flex { flex-wrap: wrap; min-width: 0; }
+      .trend-compact-card .trend-actions { margin-left: auto; flex-shrink: 0; }
       .trend-view-hint { font-size: var(--font-size-xs); color: var(--muted); }
 
       .bar-wrap {
@@ -207,14 +213,14 @@
         <div class="sidebar-brand">
           <div class="sidebar-logo">
             <img
-              src="/frontend/assets/images/pinevision-logo.svg"
+              src="/frontend/assets/images/pinevision-transparent-logo.svg"
               alt="PineVision"
-              class="sidebar-logo-img"
+              class="sidebar-logo-img" width="56" height="56"
             />
           </div>
           <div class="sidebar-brand-text">
             <div class="sidebar-brand-name">PineVision</div>
-            <div class="sidebar-brand-tagline">Farm Manager Panel</div>
+            <div class="sidebar-brand-tagline">Farm Monitoring</div>
           </div>
         </div>
 
@@ -488,7 +494,10 @@
       <div class="modal-content" style="max-width: 540px">
         <div class="modal-header">
           <h2 class="modal-title">Bearing Rate Trend</h2>
-          <button class="modal-close" onclick="closeTrendModal()">&times;</button>
+          <div class="d-flex align-items-center gap-2">
+            <button type="button" class="btn btn-sm btn-secondary" onclick="downloadTrendDetails(this)" title="Download scan details" aria-label="Download scan details"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg></button>
+            <button type="button" class="modal-close" aria-label="Close bearing rate trends" onclick="closeTrendModal()">&times;</button>
+          </div>
         </div>
         <div class="modal-body" id="trend-modal-content"></div>
         <div class="modal-footer" style="justify-content: flex-end">
@@ -509,6 +518,7 @@
     <script src="../../js/auth.js"></script>
     <script src="../../js/data.js"></script>
     <script src="../../js/utils.js"></script>
+    <script src="../../js/block-scan-history.js"></script>
     <script src="../../js/app.js"></script>
 
     <script>
@@ -708,7 +718,10 @@
                 <span class="thead-title">Bearing Rate Trend</span>
                 <span class="trend-view-hint">View Bearing Rate Trend</span>
               </div>
-              <button class="btn btn-sm btn-secondary" onclick="openTrendModal()">View</button>
+              <div class="d-flex align-items-center gap-2 trend-actions">
+                <button type="button" class="btn btn-sm btn-secondary" onclick="downloadTrendDetails(this)" title="Download scan details" aria-label="Download scan details"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg></button>
+                <button type="button" class="btn btn-sm btn-secondary" onclick="openTrendModal()">View</button>
+              </div>
             </div>
           </div>
 
@@ -854,33 +867,33 @@
 
       // ── Bearing Rate Trend modal ─────────────────────────────────────
 
-      function openTrendModal() {
+      async function openTrendModal() {
         if (!currentBlock) return;
-        renderTrendModal(currentBlock);
         utils.showModal("trend-modal");
+        document.getElementById("trend-modal-content").innerHTML =
+          '<div style="padding:var(--space-xl);text-align:center;color:var(--muted);">Loading scan history…</div>';
+        await renderTrendModal();
+      }
+
+      function downloadTrendDetails(button) {
+        if (!currentBlock) return;
+        return blockScanHistory.download(currentBlock, currentBlock.userId, button);
       }
 
       function closeTrendModal() {
         utils.hideModal("trend-modal");
       }
 
-      function renderTrendModal(block) {
-        const labels = ["Mar 28", "Apr 04", "Apr 11", "Apr 18", "Apr 25", "May 02"];
-        const current = block.bearing || 0;
-        const offsets = [-6.5, -5.2, -3.8, -2.5, -1.1, 0];
-        const points = labels.map((date, i) => ({ date, pct: Math.max(0, Math.min(100, current + offsets[i])) }));
+      async function renderTrendModal() {
+        try {
+          const history = await blockScanHistory.load(currentBlock.id, currentBlock.userId, true);
 
-        document.getElementById("trend-modal-content").innerHTML = points
-          .map(function (entry) {
-            const color = entry.pct >= 80 ? "var(--green)" : entry.pct >= 60 ? "var(--amber)" : "var(--red)";
-            return `
-                <div class="trend-row">
-                    <div class="trend-date">${entry.date}</div>
-                    <div class="trend-bar-wrap"><div class="bar-wrap"><div class="bar-fill" style="width:${entry.pct}%; background-color:${color};"></div></div></div>
-                    <div class="trend-val">${entry.pct.toFixed(1)}%</div>
-                </div>`;
-          })
-          .join("");
+          blockScanHistory.render(history, document.getElementById("trend-modal-content"));
+        } catch (error) {
+          console.error("❌ Error loading scan history:", error);
+          document.getElementById("trend-modal-content").innerHTML =
+            '<div style="padding:var(--space-xl);text-align:center;color:var(--color-text-secondary);">Couldn\'t load scan history. Please try again.</div>';
+        }
       }
 
       // ── Helpers ───────────────────────────────────────────────────

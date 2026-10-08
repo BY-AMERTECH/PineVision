@@ -18,6 +18,9 @@
       })();
     </script>
     <title>Farm Manager Dashboard - PineVision</title>
+    <link rel="icon" type="image/x-icon" href="/frontend/assets/images/pinevision-favicon.ico" />
+    <link rel="icon" type="image/webp" sizes="64x64" href="/frontend/assets/images/pinevision-favicon.webp" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/frontend/assets/images/pinevision-touch-icon.png" />
     <link rel="stylesheet" href="../../bootstrap/css/bootstrap.min.css" />
     <link rel="stylesheet" href="../../css/tokens.css" />
     <link rel="stylesheet" href="../../css/layout.css" />
@@ -155,53 +158,33 @@
       }
 
       /* ── Fruit detections chart (farm-wide, scan-based) ── */
-      .fs-controls {
+      .fruit-stats-header {
         display: flex;
         align-items: center;
         gap: var(--space-md);
         flex-wrap: wrap;
-        justify-content: flex-end;
+        justify-content: space-between;
+        margin-bottom: var(--space-lg);
       }
-      .period-toggle {
-        display: inline-flex;
-        padding: 2px;
-        gap: 2px;
-        background: var(--surf2);
-        border: 1px solid var(--color-border-secondary);
-        border-radius: var(--radius-pill);
+      .fruit-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--grid-gap);
       }
-      .period-btn {
-        border: 0;
-        background: transparent;
-        color: var(--color-text-secondary);
-        font-size: var(--font-size-xs);
-        font-weight: var(--font-weight-medium);
-        padding: 5px 14px;
-        border-radius: var(--radius-pill);
-        cursor: pointer;
-        transition:
-          background var(--transition-fast),
-          color var(--transition-fast);
+      .fruit-stats-card {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
       }
-      .period-btn:hover {
-        color: var(--color-text-primary);
-      }
-      .period-btn:focus-visible {
-        outline: none;
-        box-shadow: var(--shadow-focus);
-      }
-      .period-btn.active {
-        background: var(--green);
-        color: #fff;
+      .fruit-stats-weekly {
+        grid-row: span 2;
       }
       .fruit-stats-body {
         padding: var(--space-lg) var(--card-padding-x) var(--space-xl);
-      }
-      .fruit-stats-note {
-        margin: 0 0 var(--space-xs);
-        font-size: var(--font-size-xs);
-        color: var(--color-text-secondary);
-        line-height: var(--line-height-normal);
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-height: 0;
       }
       .fruit-stats-summary {
         margin: 0 0 var(--space-md);
@@ -211,7 +194,22 @@
       }
       .fruit-stats-canvas-wrap {
         position: relative;
-        height: 320px;
+        height: 240px;
+        min-height: 240px;
+        flex: 1;
+      }
+      @media (max-width: 960px) {
+        .fruit-stats-grid {
+          grid-template-columns: minmax(0, 1fr);
+        }
+        .fruit-stats-weekly {
+          grid-row: auto;
+        }
+        .fruit-stats-canvas-wrap {
+          height: 280px;
+          min-height: 280px;
+          flex: none;
+        }
       }
 
       /* ── Activity feed ── */
@@ -408,14 +406,14 @@
         <div class="sidebar-brand">
           <div class="sidebar-logo">
             <img
-              src="/frontend/assets/images/pinevision-logo.svg"
+              src="/frontend/assets/images/pinevision-transparent-logo.svg"
               alt="PineVision"
-              class="sidebar-logo-img"
+              class="sidebar-logo-img" width="56" height="56"
             />
           </div>
           <div class="sidebar-brand-text">
             <div class="sidebar-brand-name">PineVision</div>
-            <div class="sidebar-brand-tagline">Farm Manager Panel</div>
+            <div class="sidebar-brand-tagline">Farm Monitoring</div>
           </div>
         </div>
 
@@ -765,88 +763,81 @@
           </div>
 
           <!-- Farm-wide confirmed plant detections per scan period -->
-          <div class="tcard" style="margin-bottom: var(--space-2xl)">
-            <div class="thead-row">
-              <h3 class="thead-title d-flex align-items-center gap-2">
+          <section aria-labelledby="fruit-stats-title" style="margin-bottom: var(--space-2xl)">
+            <div class="fruit-stats-header">
+              <h3 class="thead-title d-flex align-items-center gap-2" id="fruit-stats-title">
                 <span class="card-hdr-icon">
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    aria-hidden="true"
-                  >
-                    <line x1="18" y1="20" x2="18" y2="10" />
-                    <line x1="12" y1="20" x2="12" y2="4" />
-                    <line x1="6" y1="20" x2="6" y2="14" />
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <polyline points="3 17 9 11 14 14 21 5" />
                   </svg>
                 </span>
                 Confirmed Plant Detections per Scan Period
+                <button type="button" class="btn btn-secondary btn-sm" onclick="utils.showModal('fruit-stats-details-modal')" title="View details" aria-label="View confirmed plant detection details" aria-haspopup="dialog" aria-controls="fruit-stats-details-modal">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 11v6"/><path d="M12 7h.01"/></svg>
+                </button>
               </h3>
-              <div class="fs-controls">
-                <div
-                  class="period-toggle"
-                  role="group"
-                  aria-label="Group chart by period: Weekly, Monthly or Yearly"
-                >
-                  <button
-                    type="button"
-                    class="period-btn active"
-                    data-period="weekly"
-                    aria-pressed="true"
-                    onclick="setFruitStatsPeriod('weekly')"
-                  >
-                    Weekly
-                  </button>
-                  <button
-                    type="button"
-                    class="period-btn"
-                    data-period="monthly"
-                    aria-pressed="false"
-                    onclick="setFruitStatsPeriod('monthly')"
-                  >
-                    Monthly
-                  </button>
-                  <button
-                    type="button"
-                    class="period-btn"
-                    data-period="yearly"
-                    aria-pressed="false"
-                    onclick="setFruitStatsPeriod('yearly')"
-                  >
-                    Yearly
-                  </button>
+              <a href="blocks.html" class="btn btn-secondary btn-sm">Browse Fruit Blocks →</a>
+            </div>
+            <div class="fruit-stats-grid">
+              <div class="tcard fruit-stats-card fruit-stats-weekly">
+                <div class="thead-row">
+                  <h4 class="thead-title">Weekly</h4>
                 </div>
-                <a href="blocks.html" class="btn btn-secondary btn-sm"
-                  >Browse Fruit Blocks →</a
-                >
+                <div class="fruit-stats-body">
+                  <p class="fruit-stats-summary" id="fruit-stats-summary-weekly"></p>
+                  <div class="fruit-stats-canvas-wrap" id="fruit-stats-wrap-weekly">
+                    <canvas
+                      id="fruit-stats-chart-weekly"
+                      role="img"
+                      aria-label="Weekly line chart of confirmed plant detections per scan period, split into bearing, non-bearing and non-viable"
+                    ></canvas>
+                  </div>
+                  <div class="empty-state" id="fruit-stats-empty-weekly" style="display: none">
+                    <div class="empty-state-title" id="fruit-stats-empty-title-weekly"></div>
+                    <div class="empty-state-text" id="fruit-stats-empty-text-weekly"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="tcard fruit-stats-card">
+                <div class="thead-row">
+                  <h4 class="thead-title">Monthly</h4>
+                </div>
+                <div class="fruit-stats-body">
+                  <p class="fruit-stats-summary" id="fruit-stats-summary-monthly"></p>
+                  <div class="fruit-stats-canvas-wrap" id="fruit-stats-wrap-monthly">
+                    <canvas
+                      id="fruit-stats-chart-monthly"
+                      role="img"
+                      aria-label="Monthly line chart of confirmed plant detections per scan period, split into bearing, non-bearing and non-viable"
+                    ></canvas>
+                  </div>
+                  <div class="empty-state" id="fruit-stats-empty-monthly" style="display: none">
+                    <div class="empty-state-title" id="fruit-stats-empty-title-monthly"></div>
+                    <div class="empty-state-text" id="fruit-stats-empty-text-monthly"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="tcard fruit-stats-card">
+                <div class="thead-row">
+                  <h4 class="thead-title">Yearly</h4>
+                </div>
+                <div class="fruit-stats-body">
+                  <p class="fruit-stats-summary" id="fruit-stats-summary-yearly"></p>
+                  <div class="fruit-stats-canvas-wrap" id="fruit-stats-wrap-yearly">
+                    <canvas
+                      id="fruit-stats-chart-yearly"
+                      role="img"
+                      aria-label="Yearly line chart of confirmed plant detections per scan period, split into bearing, non-bearing and non-viable"
+                    ></canvas>
+                  </div>
+                  <div class="empty-state" id="fruit-stats-empty-yearly" style="display: none">
+                    <div class="empty-state-title" id="fruit-stats-empty-title-yearly"></div>
+                    <div class="empty-state-text" id="fruit-stats-empty-text-yearly"></div>
+                  </div>
+                </div>
               </div>
             </div>
-            <div class="fruit-stats-body">
-              <p class="fruit-stats-note">
-                Sum of confirmed detections (bearing, non-bearing, non-viable)
-                from completed scans, grouped by scan start date. Repeated
-                scans can detect the same plants again, so these are not unique
-                plants and not historical block totals.
-              </p>
-              <p class="fruit-stats-summary" id="fruit-stats-summary"></p>
-              <div class="fruit-stats-canvas-wrap" id="fruit-stats-wrap">
-                <canvas
-                  id="fruit-stats-chart"
-                  role="img"
-                  aria-label="Stacked bar chart of confirmed plant detections per scan period, split into bearing, non-bearing and non-viable"
-                ></canvas>
-              </div>
-              <div class="empty-state" id="fruit-stats-empty" style="display: none">
-                <div class="empty-state-title" id="fruit-stats-empty-title"></div>
-                <div class="empty-state-text" id="fruit-stats-empty-text"></div>
-              </div>
-            </div>
-          </div>
+          </section>
 
           <!-- Bottom: Alerts + Users -->
           <div class="bottom-grid">
@@ -922,6 +913,22 @@
       </main>
     </div>
 
+    <div id="fruit-stats-details-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="fruit-stats-details-title" aria-describedby="fruit-stats-details-description">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title" id="fruit-stats-details-title">Confirmed Plant Detections per Scan Period</h2>
+          <button type="button" class="modal-close" aria-label="Close details" onclick="utils.hideModal('fruit-stats-details-modal')">&times;</button>
+        </div>
+        <div class="modal-body" id="fruit-stats-details-description">
+          <p>Sum of confirmed detections (bearing, non-bearing, non-viable) from completed scans, grouped by scan start date.</p>
+          <p style="margin-bottom: 0">Repeated scans can detect the same plants again, so these are not unique plants and not historical block totals.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="utils.hideModal('fruit-stats-details-modal')">Close</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
@@ -938,6 +945,8 @@
       if (!auth.requireFarmManager()) {
         /* redirects */
       }
+
+      utils.setupModalClose("fruit-stats-details-modal");
 
       // Global data storage
       var dashboardUsers = [];
@@ -1190,25 +1199,13 @@
         rows: [],
         oldestLoaded: null,
         truncated: false,
-        period: "weekly",
       };
-      var fruitStatsChart = null;
+      var fruitStatsCharts = {};
       var FRUIT_PERIODS = {
         weekly: { buckets: 12, unit: "weeks" },
         monthly: { buckets: 12, unit: "months" },
         yearly: { buckets: null, unit: "years" },
       };
-
-      function setFruitStatsPeriod(period) {
-        if (!FRUIT_PERIODS[period]) return;
-        fruitStatsState.period = period;
-        document.querySelectorAll(".period-btn").forEach(function (btn) {
-          var on = btn.getAttribute("data-period") === period;
-          btn.classList.toggle("active", on);
-          btn.setAttribute("aria-pressed", on ? "true" : "false");
-        });
-        renderFruitStats();
-      }
 
       // Local-time start of the bucket (weeks start on Monday) containing date.
       function fruitBucketStart(date, period) {
@@ -1243,36 +1240,39 @@
         return full ? "Week of " + s : s;
       }
 
-      function fruitStatsShowEmpty(title, text) {
-        document.getElementById("fruit-stats-wrap").style.display = "none";
-        document.getElementById("fruit-stats-empty").style.display = "block";
-        document.getElementById("fruit-stats-empty-title").textContent = title;
-        document.getElementById("fruit-stats-empty-text").textContent = text;
+      function fruitStatsShowEmpty(period, title, text) {
+        document.getElementById("fruit-stats-wrap-" + period).style.display = "none";
+        document.getElementById("fruit-stats-empty-" + period).style.display = "block";
+        document.getElementById("fruit-stats-empty-title-" + period).textContent = title;
+        document.getElementById("fruit-stats-empty-text-" + period).textContent = text;
       }
 
       function renderFruitStats() {
-        var canvas = document.getElementById("fruit-stats-chart");
+        Object.keys(FRUIT_PERIODS).forEach(renderFruitStatsPeriod);
+      }
+
+      function renderFruitStatsPeriod(period) {
+        var canvas = document.getElementById("fruit-stats-chart-" + period);
         if (!canvas) return;
 
-        if (fruitStatsChart) {
-          fruitStatsChart.destroy();
-          fruitStatsChart = null;
+        if (fruitStatsCharts[period]) {
+          fruitStatsCharts[period].destroy();
+          fruitStatsCharts[period] = null;
         }
-        document.getElementById("fruit-stats-wrap").style.display = "";
-        document.getElementById("fruit-stats-empty").style.display = "none";
-        var summaryEl = document.getElementById("fruit-stats-summary");
+        document.getElementById("fruit-stats-wrap-" + period).style.display = "";
+        document.getElementById("fruit-stats-empty-" + period).style.display = "none";
+        var summaryEl = document.getElementById("fruit-stats-summary-" + period);
 
         if (typeof Chart === "undefined") {
           summaryEl.textContent = "";
-          fruitStatsShowEmpty("Chart unavailable", "The chart library could not be loaded. Check your connection and refresh.");
+          fruitStatsShowEmpty(period, "Chart unavailable", "The chart library could not be loaded. Check your connection and refresh.");
           return;
         }
 
-        var period = fruitStatsState.period;
         var rows = fruitStatsState.rows;
         if (rows.length === 0) {
           summaryEl.textContent = "";
-          fruitStatsShowEmpty("No completed scans yet", "Detection counts will appear here once scans have been completed.");
+          fruitStatsShowEmpty(period, "No completed scans yet", "Detection counts will appear here once scans have been completed.");
           return;
         }
 
@@ -1288,7 +1288,7 @@
           startBucket = fruitBucketStart(earliest, period);
         }
         // If the scan query hit its limit, older scans were never loaded:
-        // don't draw empty bars for that history as if nothing happened.
+        // don't draw empty buckets for that history as if nothing happened.
         var clampedNote = "";
         if (fruitStatsState.truncated && fruitStatsState.oldestLoaded) {
           var oldestBucket = fruitBucketStart(fruitStatsState.oldestLoaded, period);
@@ -1327,8 +1327,9 @@
         if (scansInWindow === 0) {
           summaryEl.textContent = "";
           fruitStatsShowEmpty(
+            period,
             "No completed scans in this period",
-            "Try a longer period to see earlier scans."
+            "No completed scans fall within this timeline. Earlier scans may appear in the other charts."
           );
           return;
         }
@@ -1345,14 +1346,14 @@
         var gridClr = isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.06)";
         var axisTitle = { yearly: "Year", monthly: "Month", weekly: "Week starting (Monday)" }[period];
 
-        fruitStatsChart = new Chart(canvas.getContext("2d"), {
-          type: "bar",
+        fruitStatsCharts[period] = new Chart(canvas.getContext("2d"), {
+          type: "line",
           data: {
             labels: buckets.map(function (x) { return x.label; }),
             datasets: [
-              { label: "Bearing", data: buckets.map(function (x) { return x.bearing; }), backgroundColor: "#4caf78", borderRadius: 3 },
-              { label: "Non-Bearing", data: buckets.map(function (x) { return x.nonBearing; }), backgroundColor: "#e6a817", borderRadius: 3 },
-              { label: "Non-Viable", data: buckets.map(function (x) { return x.nonViable; }), backgroundColor: "#f0c430", borderRadius: 3 },
+              { label: "Bearing", data: buckets.map(function (x) { return x.bearing; }), backgroundColor: "#4caf78", borderColor: "#4caf78", borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, fill: false },
+              { label: "Non-Bearing", data: buckets.map(function (x) { return x.nonBearing; }), backgroundColor: "#e6a817", borderColor: "#e6a817", borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, fill: false },
+              { label: "Non-Viable", data: buckets.map(function (x) { return x.nonViable; }), backgroundColor: "#f0c430", borderColor: "#f0c430", borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, fill: false },
             ],
           },
           options: {
@@ -1388,13 +1389,11 @@
             },
             scales: {
               x: {
-                stacked: true,
                 grid: { display: false },
                 title: { display: true, text: axisTitle, color: textClr, font: { family: "Inter, sans-serif", size: 12 } },
                 ticks: { color: textClr, font: { family: "Inter, sans-serif", size: 12 } },
               },
               y: {
-                stacked: true,
                 beginAtZero: true,
                 grid: { color: gridClr },
                 title: { display: true, text: "Confirmed detections (sum across scans)", color: textClr, font: { family: "Inter, sans-serif", size: 12 } },

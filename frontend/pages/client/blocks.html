@@ -18,6 +18,9 @@
       })();
     </script>
     <title>Fruit Blocks - PineVision</title>
+    <link rel="icon" type="image/x-icon" href="/frontend/assets/images/pinevision-favicon.ico" />
+    <link rel="icon" type="image/webp" sizes="64x64" href="/frontend/assets/images/pinevision-favicon.webp" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/frontend/assets/images/pinevision-touch-icon.png" />
 
     <!-- CSS: Bootstrap first, then custom overrides -->
     <link rel="stylesheet" href="../../bootstrap/css/bootstrap.min.css" />
@@ -26,6 +29,48 @@
     <link rel="stylesheet" href="../../css/components.css" />
 
     <style>
+      .fb-search {
+        position: relative;
+        flex: 1;
+        min-width: 220px;
+        max-width: 360px;
+      }
+
+      .fb-search-icon {
+        position: absolute;
+        left: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--muted);
+        pointer-events: none;
+        display: flex;
+      }
+
+      .fb-search input {
+        width: 100%;
+        padding: 8px 12px 8px 34px;
+        font-size: var(--font-size-sm);
+        border: 1px solid var(--color-border-primary);
+        border-radius: var(--radius-md);
+        background: var(--color-background-primary);
+        color: var(--color-text-primary);
+        font-family: var(--font-sans);
+        transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+      }
+
+      .fb-search input:focus {
+        outline: none;
+        border-color: var(--green);
+        box-shadow: 0 0 0 3px var(--green-bg);
+      }
+
+      .fb-search input::placeholder { color: var(--color-text-tertiary); }
+
+
+      @media (max-width: 640px) {
+        .filter-bar .fb-search { min-width: 0; max-width: none; flex-basis: 100%; }
+      }
+
       /* ── Filter Bar ─────────────────────────────────────── */
       .filter-bar {
         display: flex;
@@ -199,9 +244,9 @@
         <div class="sidebar-brand">
           <div class="sidebar-logo">
             <img
-              src="/frontend/assets/images/pinevision-logo.svg"
+              src="/frontend/assets/images/pinevision-transparent-logo.svg"
               alt="PineVision"
-              class="sidebar-logo-img"
+              class="sidebar-logo-img" width="56" height="56"
             />
           </div>
           <div class="sidebar-brand-text">
@@ -414,6 +459,12 @@
           <div id="blocks-list-view">
             <!-- Filter Bar (filters left, Add New Block action far right) -->
             <div class="filter-bar">
+              <div class="fb-search">
+                <span class="fb-search-icon" aria-hidden="true">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                </span>
+                <input type="search" id="blocks-search" aria-label="Search blocks" placeholder="Search blocks..." oninput="renderBlocks()" />
+              </div>
               <div class="filter-group">
                 <span class="filter-label">Status:</span>
                 <button
@@ -659,11 +710,6 @@
               plants: blockData.totalPineapples || 0,
               nonViable: blockData.nonViable || 0,
 
-              // Harvest status now lives on the block document itself
-              // (harvestStatus field), synced by blocks-view.html's edit
-              // form, instead of a localStorage-only value.
-              harvestStatus: blockData.harvestStatus || "Still Growing",
-
               // Metadata
               lastScanned: blockData.lastScanned,
               totalScans: blockData.totalScans || 0,
@@ -695,6 +741,14 @@
 
       function renderBlocks() {
         let blocks = ALL_BLOCKS;
+        const search = document.getElementById("blocks-search").value.trim().toLowerCase();
+        if (search) {
+          blocks = blocks.filter(function (block) {
+            return [block.blockName, block.blockId, block.section].some(function (value) {
+              return String(value || "").toLowerCase().includes(search);
+            });
+          });
+        }
 
         // Apply status filter
         if (activeFilters.status !== "all") {
@@ -714,7 +768,7 @@
                                   <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
                               </svg>
                           </div>
-                          <div class="empty-filter-text">No blocks match the selected filters.</div>
+                          <div class="empty-filter-text">No blocks match the search and selected filters.</div>
                       </div>`;
           return;
         }
@@ -725,10 +779,6 @@
             const barColorVal = getBarColor(block.bearing);
             const nonViableColor =
               block.nonViable > 10 ? "var(--red)" : "var(--amber)";
-
-            const harvestBadge = block.harvestStatus === "Harvested"
-              ? '<span class="badge good"><span class="bdot"></span>Harvested</span>'
-              : '<span style="display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:var(--radius-pill);font-size:var(--font-size-xs);font-weight:var(--font-weight-medium);background:var(--surf2);color:var(--color-text-secondary);border:1px solid var(--border);"><span style="width:6px;height:6px;border-radius:50%;background:var(--color-text-secondary);flex-shrink:0;opacity:0.5;"></span>Still Growing</span>';
 
             return `
                       <div class="col">
@@ -741,7 +791,6 @@
                                   </div>
                                   <div style="display:flex;flex-direction:column;align-items:flex-end;gap:var(--space-xs);">
                                       ${statusBadge(statusClass)}
-                                      ${harvestBadge}
                                   </div>
                               </div>
 

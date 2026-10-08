@@ -81,8 +81,8 @@ body {
 }
 
 .auth-brand-logo {
-    width: 68px;
-    height: 68px;
+    width: 80px;
+    height: 80px;
     object-fit: contain;
     filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.45));
 }
@@ -470,7 +470,7 @@ input[type="password"]::-ms-clear { display: none; }
 @media (max-width: 540px) {
     .auth-bg { padding: var(--space-lg) var(--space-md); }
 
-    .auth-brand-logo { width: 54px; height: 54px; }
+    .auth-brand-logo { width: 66px; height: 66px; }
     .auth-brand-name { font-size: 25px; }
 
     .login-card {

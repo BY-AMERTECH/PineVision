@@ -41,6 +41,14 @@ body {
 
 /* ── 1. TOPBAR ──────────────────────────────────────────────── */
 
+.pv-logo {
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
+    border-radius: var(--radius-sm);
+    flex-shrink: 0;
+}
+
 #dv-topbar {
     background: var(--surf);
     border-bottom: 1px solid var(--border);

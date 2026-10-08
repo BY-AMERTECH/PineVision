@@ -18,6 +18,9 @@
       })();
     </script>
     <title>Dashboard - PineVision</title>
+    <link rel="icon" type="image/x-icon" href="/frontend/assets/images/pinevision-favicon.ico" />
+    <link rel="icon" type="image/webp" sizes="64x64" href="/frontend/assets/images/pinevision-favicon.webp" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/frontend/assets/images/pinevision-touch-icon.png" />
 
     <!-- CSS: Bootstrap first, then custom overrides -->
     <link rel="stylesheet" href="../../bootstrap/css/bootstrap.min.css" />
@@ -32,9 +35,9 @@
         <div class="sidebar-brand">
           <div class="sidebar-logo">
             <img
-              src="/frontend/assets/images/pinevision-logo.svg"
+              src="/frontend/assets/images/pinevision-transparent-logo.svg"
               alt="PineVision"
-              class="sidebar-logo-img"
+              class="sidebar-logo-img" width="56" height="56"
             />
           </div>
           <div class="sidebar-brand-text">
@@ -246,11 +249,12 @@
           <!-- Page Header -->
           <div class="mb-4">
 
-            <!-- Scan Metadata -->
+            <!-- Client monitoring summary -->
             <div
-              class="d-flex flex-wrap gap-3 p-3 rounded-3 mb-3"
-              style="background-color: var(--surf2)"
+              class="monitoring-summary mb-3"
               id="scan-meta"
+              role="region"
+              aria-label="Monitoring summary"
             >
               <!-- Populated by JavaScript -->
             </div>
