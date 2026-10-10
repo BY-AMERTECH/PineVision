@@ -63,6 +63,11 @@ POST /api/drone/stop-detection -> stop_detection(): get_scan_status() first;
 `_video_scan_loop_sequential()` (every Nth frame, route default N=5). The manifest
 `<scan_id>_manifest.json` is written *before* `manifestReady=True`; the frontend
 reads `GET /api/drone/scan/<scan_id>/manifest` (scan_id validated in `routes.py`).
+During processing, an upload-only append file exposes timestamped detections
+through `GET /api/drone/scan/<scan_id>/frames?cursor=...`. Playback waits for the
+startup countdown and an initial detection buffer, then continues at 1× without
+automatic pauses. Unavailable or stale boxes are hidden. Processing speed can
+extend the initial wait or leave final results pending after playback ends.
 
 **Scan status.** `create_scan_session()` writes `active`. `complete_scan_session()`
 writes `completed`. `failed` (+ `endTime`) is written by stream-start failure,
@@ -97,6 +102,7 @@ Weights: `backend/best.pt` (classes `bearing`, `non-bearing`, `non-viable`).
 | `POST /api/drone/start-detection` / `stop-detection` | Start/finish a live scan |
 | `POST /api/drone/upload-video` | MP4 background scan |
 | `GET /api/drone/scan/<id>/manifest` | Per-frame detections for an uploaded-video scan |
+| `GET /api/drone/scan/<id>/frames` | Incremental timestamped MP4 detections, with a byte cursor |
 
 ### Testing without a drone
 

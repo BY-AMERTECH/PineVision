@@ -21,6 +21,63 @@ _UPLOADS_DIR = os.path.join(tempfile.gettempdir(), 'pinevision_uploads')
 _db = None
 
 
+def begin_video_detection_stream(scan_id: str, video_fps: float,
+                                 frame_stride: int, duration: float):
+    """Create an upload-only append stream, separate from the final manifest."""
+    os.makedirs(_UPLOADS_DIR, exist_ok=True)
+    metadata = {
+        'scan_id': scan_id, 'video_fps': video_fps,
+        'frame_stride': frame_stride, 'duration': duration,
+    }
+    path = os.path.join(_UPLOADS_DIR, f'{scan_id}_frames.jsonl')
+    with open(path, 'wb') as fh:
+        fh.write((json.dumps(metadata, separators=(',', ':')) + '\n').encode('utf-8'))
+
+
+def append_video_detection_frame(scan_id: str, frame: dict):
+    """Publish one processed MP4 frame immediately, without a Firestore write."""
+    path = os.path.join(_UPLOADS_DIR, f'{scan_id}_frames.jsonl')
+    with open(path, 'ab') as fh:
+        fh.write((json.dumps(frame, separators=(',', ':')) + '\n').encode('utf-8'))
+
+
+def read_video_detection_frames(scan_id: str, cursor: int = 0,
+                                limit: int = 300) -> dict:
+    """Read complete records after a byte cursor; leave partial writes for retry.
+
+    The route validates scan_id. A cursor is accepted only at a record boundary.
+    Reads are bounded so long uploads do not re-send their entire history.
+    """
+    path = os.path.join(_UPLOADS_DIR, f'{scan_id}_frames.jsonl')
+    with open(path, 'rb') as fh:
+        header = fh.readline()
+        if not header.endswith(b'\n'):
+            raise FileNotFoundError('Upload metadata not ready')
+        metadata = json.loads(header)
+        first_record = fh.tell()
+        end = os.fstat(fh.fileno()).st_size
+        if cursor:
+            if cursor < first_record or cursor > end:
+                raise ValueError('Invalid detection cursor')
+            fh.seek(cursor - 1)
+            if fh.read(1) != b'\n':
+                raise ValueError('Invalid detection cursor')
+            fh.seek(cursor)
+        else:
+            cursor = first_record
+        frames = []
+        for _ in range(limit):
+            line = fh.readline()
+            if not line.endswith(b'\n'):
+                break
+            frames.append(json.loads(line))
+            cursor = fh.tell()
+        return {
+            **metadata, 'frames': frames, 'cursor': cursor,
+            'has_more': len(frames) == limit and cursor < end,
+        }
+
+
 def get_firestore_client():
     """
     Return the Firestore client, reusing the app that app.py already
@@ -78,13 +135,9 @@ def update_detection_batch(
     scan_progress: 0–100 percentage of video frames already processed.
     processed_frames / total_frames: raw frame counts for the progress display.
 
-    NOTE: recentFrames is no longer written to Firestore for MP4 analysis.
+    NOTE: MP4 boxes are published through a separate local append stream,
+    then saved as a final manifest; recentFrames is not written to Firestore.
     Live HLS analysis can publish its newest processed frame in live_frame.
-    Detection bounding
-    boxes are now accumulated locally and written as a single manifest JSON
-    file when analysis is complete. The frontend fetches that manifest via
-    GET /api/drone/scan/<scan_id>/manifest and uses it for synchronized
-    overlay rendering at normal 1× playback speed.
     """
     try:
         db = get_firestore_client()

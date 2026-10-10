@@ -96,10 +96,12 @@ body {
 }
 
 /* Status states */
+#dv-status-indicator.dv-status-buffering .dv-status-dot,
 #dv-status-indicator.dv-status-connecting .dv-status-dot {
     background: #f59e0b;
     animation: dv-pulse 1s infinite;
 }
+#dv-status-indicator.dv-status-buffering .dv-status-label,
 #dv-status-indicator.dv-status-connecting .dv-status-label { color: #f59e0b; }
 
 #dv-status-indicator.dv-status-active .dv-status-dot {
@@ -318,16 +320,20 @@ body {
     margin: 10px 0 0;
 }
 
-/* Analysis progress bar (shown during 'analyzing' phase) */
-.dv-analyze-progress {
-    width: 240px;
-    margin: 12px auto 0;
-}
-.dv-connecting-sub {
-    font-size: var(--font-size-xs);
-    color: rgba(255, 255, 255, 0.25);
-    margin: 6px 0 0;
-    text-align: center;
+/* Uploaded-video result availability, above the video and clear of controls. */
+.dv-upload-status {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    right: 60px;
+    z-index: 5;
+    margin: 0;
+    padding: 8px 12px;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.75);
+    color: #fff;
+    font-size: var(--font-size-sm);
+    pointer-events: none;
 }
 
 /* Live badge */

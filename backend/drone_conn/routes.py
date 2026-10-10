@@ -13,7 +13,7 @@ from flask import Blueprint, request, jsonify, send_file
 from werkzeug.utils import secure_filename
 from . import service
 from .detection import get_detector, ScanInProgressError
-from .firebase_client import _UPLOADS_DIR
+from .firebase_client import _UPLOADS_DIR, read_video_detection_frames
 
 log = logging.getLogger(__name__)
 
@@ -318,6 +318,28 @@ def upload_video():
         return jsonify({'ok': False, 'message': 'Failed to start video scan'}), 500
 
     return jsonify({'ok': True, 'scan_id': scan_id}), 200
+
+
+@drone_bp.route('/scan/<scan_id>/frames', methods=['GET'])
+def get_scan_frames(scan_id):
+    """Serve incremental MP4 detections while processing is still active."""
+    if not re.fullmatch(r'[A-Za-z0-9]{10,30}', scan_id):
+        return jsonify({'ok': False, 'error': 'invalid_scan_id'}), 400
+    try:
+        cursor = int(request.args.get('cursor', '0'))
+        if cursor < 0:
+            raise ValueError('Negative cursor')
+        data = read_video_detection_frames(scan_id, cursor)
+    except FileNotFoundError:
+        return jsonify({'ok': False, 'error': 'frames_not_ready'}), 404
+    except ValueError:
+        return jsonify({'ok': False, 'error': 'invalid_cursor'}), 400
+    except OSError:
+        log.exception('frames: failed to read %s', scan_id)
+        return jsonify({'ok': False, 'error': 'frames_read_error'}), 500
+    response = jsonify(data)
+    response.headers['Cache-Control'] = 'no-store'
+    return response
 
 
 @drone_bp.route('/scan/<scan_id>/manifest', methods=['GET'])

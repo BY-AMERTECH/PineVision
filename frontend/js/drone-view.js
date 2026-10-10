@@ -2,9 +2,9 @@
    drone-view.js
    Drone view page — real MediaMTX stream integration + Firebase detection
 
-   MP4 UPLOAD — TWO-PHASE PIPELINE (Option C architecture):
-   Phase 1: Upload → backend YOLO analysis → timestamped manifest on disk
-   Phase 2: Frontend fetches manifest → plays video at 1× → renders bboxes
+   MP4 UPLOAD: processing starts on upload, playback after a short buffer.
+   The backend publishes timestamped boxes during processing. After the
+   startup buffer, playback stays at 1×; final results never restart playback.
 
    The video playback rate is NEVER adjusted based on detection speed.
    video.currentTime is the sole source of truth for bbox lookup.
@@ -17,6 +17,10 @@
 const API_BASE         = '';
 const POLL_INTERVAL_MS = 5_000;
 const MAX_RECONNECT    = 3;
+// Upload-only startup buffer, in seconds after the upload is accepted.
+const UPLOAD_STARTUP_DELAY_SECONDS = 7;
+const UPLOAD_RESULT_POLL_MS = 250;
+const UPLOAD_END_GRACE_SECONDS = 10;
 
 const HLS_CONFIG = {
     maxLoadingDelay:         10,
@@ -28,7 +32,7 @@ const HLS_CONFIG = {
 // ── State ─────────────────────────────────────────────────────
 
 const DRONE_STATE = {
-    status:               'idle',   // idle|connecting|analyzing|active|reconnecting|failed|ending
+    status:               'idle',   // idle|connecting|buffering|active|reconnecting|failed|ending
     streamUrl:            null,
     rtmpUrl:              null,
     streamPath:           null,
@@ -46,7 +50,20 @@ const DRONE_STATE = {
     videoMode:            false,    // true when playing an uploaded MP4 (not live HLS)
     videoBlobUrl:         null,     // object URL for the uploaded file
     videoEnded:           false,    // true when browser video element has finished playing
-    backendCompleted:     false,    // true when manifest is loaded and analysis is done
+    backendCompleted:     false,    // results loaded, or processing done and fetch retries exhausted
+    videoFinishedShown:   false,
+    uploadStartupTimer:   null,
+    manifestLoading:      false,
+    manifestRetryTimer:   null,
+    manifestAttempts:     0,
+    uploadVideoSettings:  null,
+    uploadFramesTimer:    null,
+    uploadFramesAbort:    null,
+    uploadFramesCursor:   0,
+    uploadResultThrough:  -1,
+    uploadDuration:       null,
+    uploadFrameStep:      0.25,
+    uploadEndTimer:       null,
     countingStarting:     false,    // prevents duplicate live start requests
     stats: { total: 0, bearing: 0, nonBearing: 0, discolored: 0, progress: 0 },
 };
@@ -54,7 +71,7 @@ const DRONE_STATE = {
 const STATUS_LABELS = {
     idle:         'No Signal',
     connecting:   'Connecting...',
-    analyzing:    'Analyzing...',
+    buffering:    'Buffering...',
     active:       'Live',
     reconnecting: 'Reconnecting...',
     failed:       'Connection Failed',
@@ -65,9 +82,9 @@ const STATUS_LABELS = {
 //
 // Renders per-frame detection boxes on top of the MP4 video.
 //
-// Phase 2 flow: loadManifest() loads ALL frames at once from the completed
-// manifest.  A requestAnimationFrame loop looks up the closest stored frame
-// time for video.currentTime and draws the matching boxes.
+// loadManifest() loads frames when completion results become available.
+// A requestAnimationFrame loop looks up the latest non-future frame for
+// video.currentTime, subject to a short staleness limit.
 //
 // Coordinate mapping: bboxes arrive normalized (0–1) relative to the
 // inference frame (isotropically scaled from the original video), so
@@ -86,7 +103,9 @@ const BboxOverlay = (() => {
     let frameCache = new Map(); // time → detection[]
     let liveDetections = [];    // newest live detector frame; no timestamp lookup
     let renderMode = 'manifest';
+    let maxFrameAge = 0.25;
     let rafId      = null;
+    let videoFrameId = null;
     let active     = false;
     let canvas     = null;
     let ctx        = null;
@@ -109,6 +128,10 @@ const BboxOverlay = (() => {
     function stop() {
         active = false;
         if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+        if (videoFrameId !== null) {
+            document.getElementById('drone-feed')?.cancelVideoFrameCallback(videoFrameId);
+            videoFrameId = null;
+        }
         if (canvas) {
             canvas.classList.remove('dv-bbox-active');
             if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -116,23 +139,36 @@ const BboxOverlay = (() => {
         frameTimes = [];
         frameCache.clear();
         liveDetections = [];
+        maxFrameAge = 0.25;
     }
 
     // Load the full detection manifest — called once when analysis completes.
-    // Replaces the old streaming ingestFrames() approach.
     function loadManifest(frames) {
         renderMode = 'manifest';
         liveDetections = [];
         frameTimes = [];
         frameCache.clear();
+        ingestFrames(frames);
+        console.log(`📦 Manifest loaded: ${frameTimes.length} detection frames`);
+    }
+
+    // Incremental upload frames are cached by media time, never arrival time.
+    function ingestFrames(frames) {
         if (!Array.isArray(frames)) return;
         for (const f of frames) {
             const t = Number(f.t);
-            if (isNaN(t)) continue;
-            frameTimes.splice(_upperBound(frameTimes, t), 0, t);
+            if (!Number.isFinite(t) || t < 0) continue;
+            if (!frameCache.has(t)) {
+                frameTimes.splice(_upperBound(frameTimes, t), 0, t);
+            }
             frameCache.set(t, Array.isArray(f.d) ? f.d : []);
         }
-        console.log(`📦 Manifest loaded: ${frameTimes.length} detection frames`);
+    }
+
+    function setFrameStep(step) {
+        if (Number.isFinite(step) && step > 0) {
+            maxFrameAge = Math.min(0.25, step + 0.001);
+        }
     }
 
     // Live HLS frames have no stable, seekable timestamp. Replace the prior
@@ -143,10 +179,15 @@ const BboxOverlay = (() => {
 
     function _scheduleRaf() {
         if (!active) return;
+        const videoEl = document.getElementById('drone-feed');
+        if (renderMode === 'manifest' && videoEl?.requestVideoFrameCallback) {
+            videoFrameId = videoEl.requestVideoFrameCallback(_tick);
+            return;
+        }
         rafId = requestAnimationFrame(_tick);
     }
 
-    function _tick() {
+    function _tick(_now, videoFrame) {
         if (!active) return;
 
         const wrapper = document.getElementById('drone-feed-wrapper');
@@ -164,7 +205,7 @@ const BboxOverlay = (() => {
         if (videoEl.readyState >= 1 && videoEl.videoWidth) {
             const dets = renderMode === 'live'
                 ? liveDetections
-                : _findDetections(videoEl.currentTime);
+                : _findDetections(videoFrame?.mediaTime ?? videoEl.currentTime);
             if (dets && dets.length > 0) {
                 const pr = _getVideoPaintRect(videoEl);
                 if (pr) _drawDetections(dets, pr);
@@ -174,16 +215,13 @@ const BboxOverlay = (() => {
         _scheduleRaf();
     }
 
-    // Binary-search: find the latest stored frame time <= timeSec + small
-    // forward tolerance. With the full manifest pre-loaded, every video
-    // timestamp has a nearby processed frame (within process_every_n / fps
-    // seconds, typically < 0.2 s).  We use a 1 s staleness ceiling which
-    // is generous but still prevents showing wildly wrong boxes at seek edges.
+    // Upload-only lookup: never draw a future frame or bridge a missing
+    // result for more than 0.25 s. Empty detection frames also clear boxes.
     function _findDetections(timeSec) {
         if (!frameTimes.length) return null;
-        let idx = _upperBound(frameTimes, timeSec + 0.4) - 1;
+        let idx = _upperBound(frameTimes, timeSec) - 1;
         if (idx < 0) return null;
-        if (timeSec - frameTimes[idx] > 1.0) return null;
+        if (timeSec - frameTimes[idx] > maxFrameAge) return null;
         return frameCache.get(frameTimes[idx]) || null;
     }
 
@@ -253,7 +291,7 @@ const BboxOverlay = (() => {
         return lo;
     }
 
-    return { init, start, stop, loadManifest, setLiveDetections };
+    return { init, start, stop, loadManifest, ingestFrames, setFrameStep, setLiveDetections };
 })();
 
 // ── UI Rendering ──────────────────────────────────────────────
@@ -266,10 +304,12 @@ function renderUI() {
     document.querySelector('.dv-status-label').textContent = STATUS_LABELS[s] ?? s;
 
     const isLive      = s === 'active';
-    const isLoading   = s === 'connecting' || s === 'reconnecting' || s === 'analyzing';
+    const isLoading   = s === 'connecting' || s === 'reconnecting' || s === 'buffering';
     const isInactive  = s === 'idle' || s === 'failed';
-    const isSession   = s === 'active' || s === 'reconnecting' || s === 'analyzing';
-    const isMp4Analyzing = DRONE_STATE.videoMode === true && s === 'analyzing';
+    const isSession   = s === 'active' || s === 'reconnecting' || s === 'buffering';
+    const isMp4Buffering = DRONE_STATE.videoMode === true && s === 'buffering';
+    const uploadStatus = document.getElementById('dv-upload-status');
+    if (uploadStatus) uploadStatus.classList.toggle('d-none', !DRONE_STATE.videoMode || !isSession);
     const statProgressRow = document.getElementById('stat-progress-row');
     if (statProgressRow) {
         statProgressRow.classList.toggle('d-none', !DRONE_STATE.videoMode);
@@ -288,14 +328,7 @@ function renderUI() {
             : 'Click "Connect Drone" or "Upload MP4" to begin a scan session';
 
     const connLabel = document.querySelector('.dv-connecting-label');
-    if (connLabel && !isMp4Analyzing) connLabel.textContent = s === 'reconnecting' ? 'Reconnecting...' : 'Connecting...';
-
-    // This upload-only element must remain hidden for every live-HLS state.
-    const analyzeBar = document.getElementById('dv-analyze-progress');
-    if (analyzeBar) {
-        analyzeBar.classList.toggle('d-none', !isMp4Analyzing);
-        analyzeBar.hidden = !isMp4Analyzing;
-    }
+    if (connLabel && !isMp4Buffering) connLabel.textContent = s === 'reconnecting' ? 'Reconnecting...' : 'Connecting...';
 
     toggleEl('btn-connect',        isInactive);
     toggleEl('btn-upload-video',   isInactive);
@@ -696,14 +729,8 @@ async function stopDetection() {
 
 // ── Video Upload Mode ─────────────────────────────────────────
 //
-// NEW TWO-PHASE FLOW:
-//   1. Upload → 'connecting' ("Uploading...")
-//   2. Upload done → 'analyzing' ("Analyzing video... X%")
-//      - Firestore listener polls scanProgress for progress bar
-//      - manifestReady flag triggers manifest fetch
-//   3. Manifest fetched → load into BboxOverlay → 'active'
-//      - Video plays at 1.0× speed (never adjusted)
-//      - Bboxes displayed via video.currentTime lookup
+// Upload processing and timestamped result polling start before the countdown.
+// Live detections are never used for MP4, and polling never pauses playback.
 
 async function apiUploadVideo(formData) {
     const resp = await fetch(`${API_BASE}/api/drone/upload-video`, {
@@ -779,14 +806,17 @@ async function handleFileSelect(event) {
         DRONE_STATE.videoBlobUrl = null;
     }
 
-    // Pre-load video locally so it's ready to play once analysis completes.
-    // The video element starts paused — it will only play after the manifest
-    // is loaded (Phase 2).  We do NOT call videoEl.play() here.
-    DRONE_STATE.videoBlobUrl = URL.createObjectURL(file);
+    // Disable HTML autoplay before loading the upload. Restore HLS settings
+    // at cleanup; native controls allow pause, seek and manual play fallback.
     const videoEl = document.getElementById('drone-feed');
-    videoEl.src   = DRONE_STATE.videoBlobUrl;
+    DRONE_STATE.uploadVideoSettings = { autoplay: videoEl.autoplay, controls: videoEl.controls };
+    videoEl.autoplay = false;
+    videoEl.controls = false;
+    videoEl.pause();
+    BboxOverlay.stop();
+    DRONE_STATE.videoBlobUrl = URL.createObjectURL(file);
+    videoEl.src = DRONE_STATE.videoBlobUrl;
     videoEl.load();
-
     DRONE_STATE.videoMode = true;
     transitionTo('connecting');
     setConnectingLabel('Uploading video...');
@@ -820,24 +850,159 @@ async function handleFileSelect(event) {
 
     logVideoUploadActivity(DRONE_STATE.blockId, result.scan_id, file.name);
 
-    // ── Upload complete — enter Analysis Phase ────────────────
-    DRONE_STATE.scanId        = result.scan_id;
+    DRONE_STATE.scanId = result.scan_id;
     DRONE_STATE.scanStartTime = new Date();
-    DRONE_STATE.videoEnded    = false;
+    DRONE_STATE.videoEnded = false;
+    DRONE_STATE.videoFinishedShown = false;
     DRONE_STATE.backendCompleted = false;
-
+    DRONE_STATE.manifestAttempts = 0;
+    DRONE_STATE.manifestLoading = false;
+    DRONE_STATE.uploadFramesCursor = 0;
+    DRONE_STATE.uploadResultThrough = -1;
+    DRONE_STATE.uploadDuration = null;
+    DRONE_STATE.uploadFrameStep = 0.25;
+    transitionTo('buffering');
+    setUploadStatus('Buffering timestamped detection results...');
+    startUploadResultPolling();
+    startUploadCountdown();
     startFirebaseListener();
     startScanCompletionListener();
     startScanTimer();
+    utils.showToast('Video uploaded — processing in background', 'success');
+}
 
-    // Transition to 'analyzing' — shows the connecting overlay with progress bar
-    transitionTo('analyzing');
-    setConnectingLabel('Analyzing video... 0%');
+function setUploadStatus(message) {
+    const el = document.getElementById('dv-upload-status');
+    if (el) el.textContent = message;
+}
 
-    utils.showToast('Video uploaded — analyzing in background...', 'success');
+function stopUploadResultPolling() {
+    clearTimeout(DRONE_STATE.uploadFramesTimer);
+    DRONE_STATE.uploadFramesTimer = null;
+    if (DRONE_STATE.uploadFramesAbort) DRONE_STATE.uploadFramesAbort.abort();
+    DRONE_STATE.uploadFramesAbort = null;
+}
+
+// One request at a time; cursor reads preserve every available sampled frame.
+function startUploadResultPolling() {
+    stopUploadResultPolling();
+    const scanId = DRONE_STATE.scanId;
+    const isCurrent = () => DRONE_STATE.videoMode && DRONE_STATE.scanId === scanId &&
+        ['buffering', 'active'].includes(DRONE_STATE.status) && !DRONE_STATE.backendCompleted;
+    const poll = async () => {
+        if (!isCurrent()) return;
+        const controller = new AbortController();
+        DRONE_STATE.uploadFramesAbort = controller;
+        const timeout = setTimeout(() => controller.abort(), 5000);
+        let nextDelay = UPLOAD_RESULT_POLL_MS;
+        try {
+            const resp = await fetch(API_BASE + '/api/drone/scan/' + scanId +
+                '/frames?cursor=' + DRONE_STATE.uploadFramesCursor,
+                { signal: controller.signal, cache: 'no-store' });
+            if (!isCurrent()) return;
+            if (resp.status === 404) return; // worker has not published metadata yet
+            if (!resp.ok) throw new Error('HTTP ' + resp.status);
+            const data = await resp.json();
+            if (!isCurrent()) return;
+            if (data.scan_id !== scanId || !Array.isArray(data.frames) ||
+                !Number.isSafeInteger(data.cursor) || data.cursor < DRONE_STATE.uploadFramesCursor) {
+                throw new Error('Invalid upload detection response');
+            }
+            BboxOverlay.ingestFrames(data.frames);
+            DRONE_STATE.uploadFramesCursor = data.cursor;
+            if (Number.isFinite(data.duration) && data.duration >= 0) {
+                DRONE_STATE.uploadDuration = data.duration;
+            }
+            if (data.video_fps > 0 && data.frame_stride > 0) {
+                DRONE_STATE.uploadFrameStep = data.frame_stride / data.video_fps;
+                BboxOverlay.setFrameStep(DRONE_STATE.uploadFrameStep);
+            }
+            for (const frame of data.frames) {
+                if (Number.isFinite(frame.t)) {
+                    DRONE_STATE.uploadResultThrough = Math.max(DRONE_STATE.uploadResultThrough, frame.t);
+                }
+            }
+            if (DRONE_STATE.status === 'active' && !DRONE_STATE.videoEnded) {
+                const time = document.getElementById('drone-feed').currentTime;
+                setUploadStatus(DRONE_STATE.uploadResultThrough + DRONE_STATE.uploadFrameStep < time
+                    ? 'Detection is behind playback — unavailable boxes are hidden.'
+                    : 'Detection boxes follow video playback time.');
+            }
+            if (data.has_more) nextDelay = 0;
+        } catch (err) {
+            if (isCurrent()) {
+                console.warn('Upload detection polling:', err);
+                setUploadStatus('Waiting for detection results — unavailable boxes are hidden.');
+            }
+        } finally {
+            clearTimeout(timeout);
+            if (DRONE_STATE.uploadFramesAbort === controller) DRONE_STATE.uploadFramesAbort = null;
+            if (isCurrent()) DRONE_STATE.uploadFramesTimer = setTimeout(poll, nextDelay);
+        }
+    };
+    poll();
+}
+
+function startUploadCountdown() {
+    const scanId = DRONE_STATE.scanId;
+    const delay = Number.isFinite(UPLOAD_STARTUP_DELAY_SECONDS)
+        ? Math.max(0, UPLOAD_STARTUP_DELAY_SECONDS) : 7;
+    const deadline = performance.now() + delay * 1000;
+    const tick = () => {
+        if (!DRONE_STATE.videoMode || DRONE_STATE.scanId !== scanId ||
+            DRONE_STATE.status !== 'buffering') {
+            clearInterval(DRONE_STATE.uploadStartupTimer);
+            DRONE_STATE.uploadStartupTimer = null;
+            return;
+        }
+        const remaining = Math.max(0, Math.ceil((deadline - performance.now()) / 1000));
+        setConnectingLabel('Playback starts in ' + remaining + 's — processing in background');
+        // Wait only at startup for an initial lead. Short clips can use the
+        // completed manifest; long clips do not wait for full-video analysis.
+        const target = DRONE_STATE.uploadDuration === null ? delay :
+            Math.min(delay, Math.max(0, DRONE_STATE.uploadDuration - DRONE_STATE.uploadFrameStep));
+        const ready = DRONE_STATE.backendCompleted || DRONE_STATE.uploadResultThrough >= target;
+        if (remaining === 0 && !ready) {
+            setConnectingLabel('Buffering detection results... ' +
+                Math.max(0, DRONE_STATE.uploadResultThrough).toFixed(1) + '/' + target.toFixed(1) + 's');
+        }
+        if (remaining === 0 && ready) {
+            clearInterval(DRONE_STATE.uploadStartupTimer);
+            DRONE_STATE.uploadStartupTimer = null;
+            startVideoPlayback();
+        }
+    };
+    DRONE_STATE.uploadStartupTimer = setInterval(tick, 200);
+    tick();
+}
+
+function cleanupUploadedPlayback() {
+    stopUploadResultPolling();
+    clearTimeout(DRONE_STATE.uploadEndTimer);
+    DRONE_STATE.uploadEndTimer = null;
+    clearInterval(DRONE_STATE.uploadStartupTimer);
+    clearTimeout(DRONE_STATE.manifestRetryTimer);
+    DRONE_STATE.uploadStartupTimer = null;
+    DRONE_STATE.manifestRetryTimer = null;
+    DRONE_STATE.manifestLoading = false;
+    const videoEl = document.getElementById('drone-feed');
+    videoEl.pause();
+    videoEl.removeEventListener('ended', handleVideoEnd);
+}
+
+// Restore autoplay only after the uploaded source has been removed.
+function restoreUploadedVideoSettings() {
+    const videoEl = document.getElementById('drone-feed');
+    if (DRONE_STATE.uploadVideoSettings) {
+        videoEl.autoplay = DRONE_STATE.uploadVideoSettings.autoplay;
+        videoEl.controls = DRONE_STATE.uploadVideoSettings.controls;
+        DRONE_STATE.uploadVideoSettings = null;
+    }
 }
 
 function handleVideoFailed(message) {
+    cleanupUploadedPlayback();
+    stopScanIntervals();
     BboxOverlay.stop();
     DRONE_STATE.videoMode        = false;
     DRONE_STATE.backendCompleted = false;
@@ -847,6 +1012,7 @@ function handleVideoFailed(message) {
     videoEl.pause();
     videoEl.removeAttribute('src');
     videoEl.load();
+    restoreUploadedVideoSettings();
 
     if (DRONE_STATE.videoBlobUrl) {
         URL.revokeObjectURL(DRONE_STATE.videoBlobUrl);
@@ -860,77 +1026,73 @@ function handleVideoFailed(message) {
     utils.showToast(message, 'error');
 }
 
-// Updates the analysis progress bar and connecting overlay label.
-// NEVER adjusts videoEl.playbackRate.
-function updateAnalysisProgress(pct, processedFrames, totalFrames) {
-    // This is exclusively the uploaded-MP4 two-phase analysis UI.
-    if (!DRONE_STATE.videoMode || DRONE_STATE.status !== 'analyzing') return;
-
-    // Update the overlay label
-    const label = document.querySelector('.dv-connecting-label');
-    if (label) {
-        const frameStr = (processedFrames && totalFrames)
-            ? ` (${processedFrames}/${totalFrames} frames)`
-            : '';
-        label.textContent = `Analyzing video... ${Math.round(pct)}%${frameStr}`;
-    }
-    // Update progress bar inside the overlay
-    const fill = document.getElementById('dv-analyze-progress-fill');
-    if (fill) fill.style.width = Math.round(pct) + '%';
-
-    // Update the stats panel progress bar as well
-    DRONE_STATE.stats.progress = pct;
-    const statFill = document.getElementById('stat-progress-fill');
-    if (statFill) {
-        statFill.style.width = pct + '%';
-        statFill.setAttribute('aria-valuenow', pct);
-    }
-    const pctEl = document.getElementById('stat-progress-pct');
-    if (pctEl) pctEl.textContent = Math.round(pct) + '%';
+// Upload background progress remains visible in the statistics panel.
+function updateAnalysisProgress(pct) {
+    if (!DRONE_STATE.videoMode || DRONE_STATE.backendCompleted) return;
+    DRONE_STATE.stats.progress = Math.max(0, Math.min(100, pct));
+    updateStatDisplay();
 }
 
-// Fetch the detection manifest from Flask and start video playback.
-async function loadManifestAndPlay(scanData) {
-    setConnectingLabel('Loading detection results...');
-
+// Manifest arrival never restarts playback or changes currentTime.
+async function loadUploadManifest(scanData) {
+    if (DRONE_STATE.manifestLoading || DRONE_STATE.backendCompleted) return;
+    const scanId = DRONE_STATE.scanId;
+    const isCurrent = () => DRONE_STATE.videoMode && DRONE_STATE.scanId === scanId &&
+        ['buffering', 'active'].includes(DRONE_STATE.status);
+    if (!isCurrent()) return;
+    DRONE_STATE.manifestLoading = true;
+    DRONE_STATE.manifestAttempts++;
     let manifest;
     try {
-        const resp = await fetch(
-            `${API_BASE}/api/drone/scan/${DRONE_STATE.scanId}/manifest`,
-            { signal: AbortSignal.timeout(30_000) },
-        );
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const resp = await fetch(API_BASE + '/api/drone/scan/' + scanId + '/manifest',
+            { signal: AbortSignal.timeout(30_000) });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
         manifest = await resp.json();
+        if (manifest.scan_id !== scanId || !Array.isArray(manifest.frames)) {
+            throw new Error('Invalid detection manifest');
+        }
     } catch (err) {
+        if (!isCurrent()) return;
+        DRONE_STATE.manifestLoading = false;
         console.error('Failed to fetch manifest:', err);
-        handleVideoFailed('Failed to load detection results. Please try again.');
+        if (DRONE_STATE.manifestAttempts < 3) {
+            setUploadStatus('Final detection results unavailable — retrying; buffered boxes remain synchronized.');
+            DRONE_STATE.manifestRetryTimer = setTimeout(() => {
+                DRONE_STATE.manifestRetryTimer = null;
+                if (isCurrent()) loadUploadManifest(scanData);
+            }, 2000);
+        } else {
+            setUploadStatus('Final detection results could not be loaded — showing available buffered boxes.');
+            DRONE_STATE.backendCompleted = true;
+            stopUploadResultPolling();
+            checkVideoScanComplete();
+        }
         return;
     }
-
-    const frames = manifest.frames || [];
-    if (frames.length === 0) {
-        console.warn('⚠️ Manifest contains no detection frames.');
+    if (!isCurrent()) return;
+    DRONE_STATE.manifestLoading = false;
+    clearTimeout(DRONE_STATE.manifestRetryTimer);
+    DRONE_STATE.manifestRetryTimer = null;
+    BboxOverlay.loadManifest(manifest.frames);
+    if (manifest.video_fps > 0 && manifest.frame_stride > 0) {
+        BboxOverlay.setFrameStep(manifest.frame_stride / manifest.video_fps);
     }
-
-    // Load all detections into the overlay (replaces streaming ingestFrames)
-    BboxOverlay.loadManifest(frames);
-
-    // Update stats with final values from Firestore
-    if (scanData) {
-        DRONE_STATE.stats.total      = scanData.total || 0;
-        DRONE_STATE.stats.bearing    = scanData.bearingPercent    || 0;
-        DRONE_STATE.stats.nonBearing = scanData.nonBearingPercent || 0;
-        DRONE_STATE.stats.discolored = scanData.nonViablePercent  || 0;
-        DRONE_STATE.stats.progress   = 100;
-    }
-
+    DRONE_STATE.stats.total = scanData.total || 0;
+    DRONE_STATE.stats.bearing = scanData.bearingPercent || 0;
+    DRONE_STATE.stats.nonBearing = scanData.nonBearingPercent || 0;
+    DRONE_STATE.stats.discolored = scanData.nonViablePercent || 0;
+    DRONE_STATE.stats.progress = 100;
     DRONE_STATE.backendCompleted = true;
-
-    startVideoPlayback();
+    stopUploadResultPolling();
+    updateStatDisplay();
+    setUploadStatus(manifest.frames.length
+        ? 'Detection results ready — boxes follow playback time.'
+        : 'Processing complete — no detection frames available.');
+    checkVideoScanComplete();
 }
 
 // Start normal 1× video playback with bbox overlay active.
-// Only called after the manifest has been successfully loaded.
+// Called only after the upload countdown and initial result buffer are ready.
 function startVideoPlayback() {
     const videoEl = document.getElementById('drone-feed');
 
@@ -947,18 +1109,36 @@ function startVideoPlayback() {
     document.querySelector('.dv-live-badge').innerHTML =
         '<span class="dv-live-dot" aria-hidden="true"></span> MP4';
 
-    videoEl.addEventListener('ended', handleVideoEnd, { once: true });
-    videoEl.play().catch(() => {});
+    videoEl.controls = true;
+    videoEl.removeEventListener('ended', handleVideoEnd);
+    videoEl.addEventListener('ended', handleVideoEnd);
+    const scanId = DRONE_STATE.scanId;
+    videoEl.play().catch(() => {
+        if (DRONE_STATE.videoMode && DRONE_STATE.scanId === scanId && DRONE_STATE.status === 'active') {
+            utils.showToast('Press Play in the video controls to begin playback.', 'info');
+        }
+    });
 
     updateStatDisplay();
-    utils.showToast('Analysis complete — playing with detections', 'success');
+    utils.showToast('Playing uploaded video', 'success');
 }
 
 function handleVideoEnd() {
     if (DRONE_STATE.status !== 'active' || !DRONE_STATE.videoMode) return;
     DRONE_STATE.videoEnded = true;
-    // Analysis is always done before playback starts in the new architecture,
-    // so backendCompleted is already true — show the modal immediately.
+    if (!DRONE_STATE.backendCompleted) {
+        setUploadStatus('Playback ended — finishing scan results (up to ' + UPLOAD_END_GRACE_SECONDS + 's)...');
+        clearTimeout(DRONE_STATE.uploadEndTimer);
+        const scanId = DRONE_STATE.scanId;
+        DRONE_STATE.uploadEndTimer = setTimeout(() => {
+            DRONE_STATE.uploadEndTimer = null;
+            if (DRONE_STATE.videoMode && DRONE_STATE.scanId === scanId &&
+                DRONE_STATE.status === 'active' && !DRONE_STATE.backendCompleted &&
+                document.getElementById('drone-feed').ended) {
+                setUploadStatus('Processing is taking longer than expected — final results are still pending.');
+            }
+        }, UPLOAD_END_GRACE_SECONDS * 1000);
+    }
     checkVideoScanComplete();
 }
 
@@ -974,6 +1154,7 @@ function showScanFinishedModal() {
 }
 
 function handleScanFinished() {
+    cleanupUploadedPlayback();
     closeBsModal('modal-scan-finished');
     BboxOverlay.stop();
     stopFirebaseListener();
@@ -983,6 +1164,7 @@ function handleScanFinished() {
     videoEl.pause();
     videoEl.removeAttribute('src');
     videoEl.load();
+    restoreUploadedVideoSettings();
 
     if (DRONE_STATE.videoBlobUrl) {
         URL.revokeObjectURL(DRONE_STATE.videoBlobUrl);
@@ -1050,7 +1232,7 @@ function stopFirebaseListener() {
 
 // Listens to the scan document for:
 //  - scanProgress / processedFrames / totalFrames → progress bar updates
-//  - manifestReady: true → fetch manifest, start 1× playback
+//  - manifestReady: true → fetch manifest without changing playback
 //  - status: 'failed' → show error
 //  - status: 'completed' → update final stats display
 //
@@ -1058,26 +1240,23 @@ function stopFirebaseListener() {
 function startScanCompletionListener() {
     if (!DRONE_STATE.scanId || typeof firebase === 'undefined') return;
 
-    console.log('🔥 Watching scan:', DRONE_STATE.scanId);
+    const scanId = DRONE_STATE.scanId;
+    console.log('🔥 Watching scan:', scanId);
 
     DRONE_STATE.scanFirebaseListener = firebase.firestore()
         .collection('scans')
-        .doc(DRONE_STATE.scanId)
+        .doc(scanId)
         .onSnapshot((doc) => {
-            if (!doc.exists) return;
+            if (!doc.exists || !DRONE_STATE.videoMode || DRONE_STATE.scanId !== scanId ||
+                !['buffering', 'active'].includes(DRONE_STATE.status)) return;
             const data = doc.data();
 
             // Only an uploaded MP4 uses the scan-document analysis progress.
             if (
                 DRONE_STATE.videoMode === true &&
-                DRONE_STATE.status === 'analyzing' &&
                 typeof data.scanProgress === 'number'
             ) {
-                updateAnalysisProgress(
-                    data.scanProgress,
-                    data.processedFrames,
-                    data.totalFrames,
-                );
+                updateAnalysisProgress(data.scanProgress);
             }
 
             // Failed scan — backend worker crashed or was aborted
@@ -1086,35 +1265,39 @@ function startScanCompletionListener() {
                 return;
             }
 
-            // Manifest is ready — fetch it and start playback.
-            // Guard: only trigger once, from the 'analyzing' state.
-            if (data.manifestReady && DRONE_STATE.status === 'analyzing') {
-                console.log('✅ Manifest ready — fetching and starting playback');
-                loadManifestAndPlay(data);
-                return;
-            }
-
-            // Final stats update (after playback starts or for late Firestore delivery)
+            // Keep final statistics even if fetching overlay results fails.
             if (data.status === 'completed') {
                 DRONE_STATE.stats.total      = data.total || 0;
                 DRONE_STATE.stats.bearing    = data.bearingPercent    || 0;
                 DRONE_STATE.stats.nonBearing = data.nonBearingPercent || 0;
                 DRONE_STATE.stats.discolored = data.nonViablePercent  || 0;
+                DRONE_STATE.stats.progress = 100;
                 updateStatDisplay();
-                DRONE_STATE.backendCompleted = true;
                 checkVideoScanComplete();
+            }
+
+            // Upload results may arrive before or after playback starts.
+            if (data.manifestReady && !DRONE_STATE.backendCompleted) {
+                if (!DRONE_STATE.manifestRetryTimer) loadUploadManifest(data);
             }
         }, (error) => {
             console.error('❌ Scan listener error:', error);
+            if (DRONE_STATE.videoMode && DRONE_STATE.scanId === scanId &&
+                ['buffering', 'active'].includes(DRONE_STATE.status)) {
+                setUploadStatus('Processing status unavailable — boxes hidden until results arrive.');
+            }
         });
 }
 
 function checkVideoScanComplete() {
     if (DRONE_STATE.status !== 'active' || !DRONE_STATE.videoMode) return;
-    // In the new architecture backendCompleted is set when manifest loads,
-    // which always happens before video starts playing.
+    // Wait for playback and background results (or exhausted fetch retries).
     if (!DRONE_STATE.backendCompleted) return;
-    if (!DRONE_STATE.videoEnded) return;  // let video reach its natural end
+    if (!DRONE_STATE.videoEnded || !document.getElementById('drone-feed').ended) return;
+    if (DRONE_STATE.videoFinishedShown) return;
+    DRONE_STATE.videoFinishedShown = true;
+    clearTimeout(DRONE_STATE.uploadEndTimer);
+    DRONE_STATE.uploadEndTimer = null;
 
     stopScanIntervals();
     showScanFinishedModal();
@@ -1201,7 +1384,7 @@ async function handleEndScan() {
     transitionTo('ending');
 
     if (DRONE_STATE.videoMode) {
-        document.getElementById('drone-feed').removeEventListener('ended', handleVideoEnd);
+        cleanupUploadedPlayback();
     }
 
     // For live drone: signals the backend to stop.
@@ -1228,6 +1411,7 @@ async function handleEndScan() {
     videoEl.pause();
     videoEl.removeAttribute('src');
     videoEl.load();
+    if (DRONE_STATE.uploadVideoSettings) restoreUploadedVideoSettings();
 
     DRONE_STATE.stats             = { total: 0, bearing: 0, nonBearing: 0, discolored: 0, progress: 0 };
     DRONE_STATE.scanStartTime     = null;
@@ -1440,7 +1624,7 @@ function setupModalEvents() {
     const endScanModalEl = document.getElementById('modal-end-scan');
     endScanModalEl.addEventListener('show.bs.modal', () => {
         const s = DRONE_STATE.status;
-        if (s === 'active' || s === 'reconnecting' || s === 'analyzing') onEndScanModalShow();
+        if (s === 'active' || s === 'reconnecting' || s === 'buffering') onEndScanModalShow();
         setEndScanButtonLoading(false);
     });
     document.getElementById('btn-confirm-end-scan')

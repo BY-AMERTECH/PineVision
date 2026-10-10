@@ -18,6 +18,8 @@ from .firebase_client import (
     get_block_population,
     update_detection_batch,
     save_detection_manifest,
+    begin_video_detection_stream,
+    append_video_detection_frame,
     create_scan_session,
     complete_scan_session,
     get_scan_status,
@@ -951,14 +953,13 @@ class PineappleDetector:
         update_interval: float,
     ):
         """
-        Phase 1 of the two-phase MP4 scan pipeline.
+        Sequential MP4 scan with incremental timestamped results.
 
         Reads every frame in order via cap.read(), runs YOLO + DeepSORT on
         every Nth frame, and accumulates a complete timestamped detection
-        manifest in memory.  The manifest is written to disk once when the
-        entire video has been processed.  The frontend fetches it via
-        GET /api/drone/scan/<scan_id>/manifest and uses it to render bounding
-        boxes synchronised to normal 1× video playback.
+        manifest in memory. Each processed frame is also published to an
+        upload-only append stream for synchronized playback during processing.
+        The final manifest is written before completion, as before.
 
         Firestore is used ONLY for progress updates (scanProgress,
         processedFrames, totalFrames) and final statistics/completion.
@@ -988,7 +989,7 @@ class PineappleDetector:
         source_fps   = cap.get(cv2.CAP_PROP_FPS) or 25.0
         duration_sec = total_frames / source_fps if source_fps > 0 else 0.0
 
-        print(f"🎬 Two-phase sequential scan: {total_frames} frames @ {source_fps:.1f} FPS | "
+        print(f"🎬 Sequential upload scan: {total_frames} frames @ {source_fps:.1f} FPS | "
               f"process_every={process_every_n_frames} | block={block_id}")
 
         # Write video metadata to Firestore so the frontend can show "X frames"
@@ -1009,6 +1010,9 @@ class PineappleDetector:
         manifest_frames   = []   # full timestamped manifest — kept until analysis is done
 
         try:
+            begin_video_detection_stream(
+                scan_id, source_fps, process_every_n_frames, duration_sec,
+            )
             while self.detection_active:
                 ret, frame = cap.read()
                 if not ret:
@@ -1033,11 +1037,20 @@ class PineappleDetector:
                               f"NV:{results['non_viable']}) "
                               f"[+{results['new_detections']} new]")
 
-                    # Append this processed frame to the in-memory manifest
-                    manifest_frames.append({
-                        't': round(frame_count / source_fps, 3),
+                    # Prefer decoded media time (also handles variable-rate MP4s).
+                    # Some capture backends return zero for unsupported properties;
+                    # cap.read() numbers frames from one, so the fallback is zero-based.
+                    frame_time = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
+                    if not np.isfinite(frame_time) or frame_time < 0 or (
+                        frame_time == 0 and frame_count > 1
+                    ):
+                        frame_time = (frame_count - 1) / source_fps
+                    detection_frame = {
+                        't': frame_time,
                         'd': results.get('bbox_detections', []),
-                    })
+                    }
+                    manifest_frames.append(detection_frame)
+                    append_video_detection_frame(scan_id, detection_frame)
 
                     # Periodic Firestore update — progress bar only, no recentFrames
                     now = time.time()
@@ -1128,6 +1141,7 @@ class PineappleDetector:
         manifest_data = {
             'scan_id':     scan_id,
             'video_fps':   round(source_fps, 2),
+            'frame_stride': process_every_n_frames,
             'frame_count': total_frames,
             'duration':    round(duration_sec, 2),
             'frames':      manifest_frames,
