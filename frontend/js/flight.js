@@ -333,7 +333,7 @@
                             <span class="schedule-field-value">${escapeHtml(item.section)}</span>
                         </div>
                         <div class="schedule-field schedule-field-operator">
-                            <span class="schedule-field-label">Operator</span>
+                            <span class="schedule-field-label">User</span>
                             <span class="schedule-field-value">${escapeHtml(item.operator || '—')}</span>
                         </div>
                     </div>

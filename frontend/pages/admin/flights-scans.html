@@ -392,7 +392,7 @@
       }
 
       // ══════════════════════════════════════════════════════════════
-      // Flights & Scans — live Firestore sync (all client accounts)
+      // Flights & Scans — live Firestore sync (all user accounts)
       //
       // Three collections are kept in sync with onSnapshot listeners and
       // joined client-side on every render:
@@ -402,7 +402,7 @@
       //            atmospheric-conditions field — the removed column here
       //            was previously reading a mock-only value from data.js.
       //   blocks — joined on blockId to resolve a real block name.
-      //   users  — joined on userId to resolve the flight operator name.
+      //   users  — joined on userId to resolve the user name.
       // ══════════════════════════════════════════════════════════════
 
       const SCANS_LIMIT = 300;
@@ -594,9 +594,9 @@
             icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
           },
           {
-            label: "Unique Operators",
+            label: "Unique Users",
             value: uniqueOperators,
-            sub: "Active pilots",
+            sub: "Active users",
             color: "",
             icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
           },
@@ -632,7 +632,7 @@
             '<div class="card"><div class="empty-state">' +
             '<div class="empty-state-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg></div>' +
             '<div class="empty-state-title">No Flights Recorded</div>' +
-            '<div class="empty-state-text">Flight sessions will appear here as soon as a client account logs a scan.</div>' +
+            '<div class="empty-state-text">Flight sessions will appear here as soon as a user account logs a scan.</div>' +
             "</div></div>";
           return;
         }
@@ -647,7 +647,7 @@
           '<col class="c-date"><col class="c-block"><col class="c-operator"><col class="c-duration"><col class="c-status"><col class="c-bearing">' +
           "</colgroup>" +
           "<thead><tr>" +
-          "<th>Date</th><th>Block</th><th>Operator</th><th>Duration</th><th>Status</th><th>Bearing</th>" +
+          "<th>Date</th><th>Block</th><th>User</th><th>Duration</th><th>Status</th><th>Bearing</th>" +
           "</tr></thead><tbody>";
 
         rows.forEach(function (r) {

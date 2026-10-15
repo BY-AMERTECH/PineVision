@@ -396,13 +396,13 @@
       }
 
       // ══════════════════════════════════════════════════════════════
-      // Reports — live Firestore sync (all client accounts)
+      // Reports — live Firestore sync (all user accounts)
       //
       // Four collections are kept in sync with onSnapshot listeners:
       //   scans  — one row per completed scan session (joined against
       //            blocks/users below for a real block name + operator).
       //   blocks — joined on blockId.
-      //   users  — joined on userId, and counted for "Client Coverage".
+      //   users  — joined on userId, and counted for "User Coverage".
       //   alerts — the admin account/security-alerts collection (same
       //            one used on Alerts), counted where resolved === false
       //            for the "Active Alerts" metric.
@@ -609,9 +609,9 @@
             icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>',
           },
           {
-            label: "Client Coverage",
+            label: "User Coverage",
             value: clientCount,
-            sub: "Clients with data",
+            sub: "Users with data",
             color: "",
             icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
           },
@@ -640,7 +640,7 @@
             '<div class="card"><div class="empty-state">' +
             '<div class="empty-state-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>' +
             '<div class="empty-state-title">No Reports Yet</div>' +
-            '<div class="empty-state-text">Reports will appear here as soon as a client account completes a scan.</div>' +
+            '<div class="empty-state-text">Reports will appear here as soon as a user account completes a scan.</div>' +
             "</div></div>";
           return;
         }
@@ -655,7 +655,7 @@
           '<col class="c-date"><col class="c-block"><col class="c-operator"><col class="c-duration"><col class="c-status"><col class="c-bearing"><col class="c-actions">' +
           "</colgroup>" +
           "<thead><tr>" +
-          "<th>Date</th><th>Block</th><th>Operator</th><th>Duration</th><th>Status</th><th>Bearing Rate</th><th>Actions</th>" +
+          "<th>Date</th><th>Block</th><th>User</th><th>Duration</th><th>Status</th><th>Bearing Rate</th><th>Actions</th>" +
           "</tr></thead><tbody>";
 
         rows.forEach(function (r) {
@@ -704,7 +704,7 @@
           ? r.startTime.toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" })
           : "—";
         const rows = [
-          ["Date", "Block", "Operator", "Duration", "Status", "Bearing Rate %"],
+          ["Date", "Block", "User", "Duration", "Status", "Bearing Rate %"],
           [
             dateLabel,
             '"' + (r.blockLabel || "").replace(/"/g, '""') + '"',

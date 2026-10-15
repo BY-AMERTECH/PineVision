@@ -95,7 +95,7 @@
          cards look native to the PineVision UI.
 
          Layout: a single inline row — Date & Time → Block Name →
-         Section → Operator → Status → Actions — with flexbox (not fixed
+         Section → User → Status → Actions — with flexbox (not fixed
          breakpoints) handling graceful wrapping on narrow widths, plus a
          lower-hierarchy Notes row underneath. */
       .schedule-list {
@@ -184,7 +184,7 @@
         white-space: nowrap;
       }
 
-      /* Block Name, Section, Operator — inline fields between the date
+      /* Block Name, Section, User — inline fields between the date
          badge and the status/actions group. */
       .schedule-card-fields {
         display: flex;
@@ -244,7 +244,7 @@
         max-width: 220px;
       }
 
-      /* Section / Operator — secondary hierarchy */
+      /* Section / User — secondary hierarchy */
       .schedule-field-section .schedule-field-value,
       .schedule-field-operator .schedule-field-value {
         color: var(--color-text-secondary);
@@ -773,7 +773,7 @@
                 <input
                   type="text"
                   id="schedule-search"
-                  placeholder="Search by block, section, operator, notes or status…"
+                  placeholder="Search by block, section, user, notes or status…"
                 />
               </div>
               <div class="toolbar-right">
@@ -868,7 +868,7 @@
 
             <div class="form-group">
               <label class="form-label" for="schedule-operator"
-                >Operator *</label
+                >User *</label
               >
               <input
                 type="text"
@@ -960,7 +960,7 @@
 
             <div class="form-group">
               <label class="form-label" for="edit-schedule-operator"
-                >Operator *</label
+                >User *</label
               >
               <input
                 type="text"

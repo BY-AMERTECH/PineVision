@@ -88,7 +88,7 @@
                 console.log(`Final blockName: ${blockName}`);
 
                 // Get user name if userId exists
-                let operatorName = 'Unknown Operator';
+                let operatorName = 'Unknown User';
                 if (data.userId) {
                     try {
                         const userDoc = await firebase.firestore()
@@ -328,7 +328,7 @@
                 </div>
                 <div class="sstats">
                     <span>Plants: <strong>${formatNumber(scan.total)}</strong></span>
-                    <span>Operator: ${scan.operator}</span>
+                    <span>User: ${scan.operator}</span>
                     <span>Drone: ${scan.drone}</span>
                     <span>Start: <strong>${scan.time}</strong></span>
                     <span>Duration: <strong>${scan.duration}</strong></span>

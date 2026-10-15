@@ -965,7 +965,7 @@ tbody tr:hover {
 
 .page-header-left { flex: 1; min-width: 0; }
 
-/* Client dashboard monitoring summary */
+/* User dashboard monitoring summary */
 .monitoring-summary {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));

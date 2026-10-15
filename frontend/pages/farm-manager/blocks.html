@@ -749,7 +749,7 @@
               <input
                 type="text"
                 id="fb-search-input"
-                placeholder="Search by Block ID, section or flight operator…"
+                placeholder="Search by Block ID, section or user…"
                 oninput="filterAndRender()"
               />
             </div>
@@ -764,7 +764,7 @@
               <option value="">All Sections</option>
             </select>
             <select class="fb-filter-select" id="fb-operator-filter" onchange="filterAndRender()">
-              <option value="">All Flight Operators</option>
+              <option value="">All Users</option>
             </select>
             <select class="fb-filter-select" id="fb-sort-select" onchange="filterAndRender()">
               <option value="blockid-asc">Block ID A→Z</option>
@@ -846,7 +846,7 @@
             </div>
 
             <p class="form-hint">
-              Changes save directly to this block's record. The assigned flight operator and scan history are not affected.
+              Changes save directly to this block's record. The assigned user and scan history are not affected.
             </p>
           </div>
           <div class="modal-footer">
@@ -999,7 +999,7 @@
           '<option value="">All Sections</option>' +
           sections.map((s) => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("");
         operatorSelect.innerHTML =
-          '<option value="">All Flight Operators</option>' +
+          '<option value="">All Users</option>' +
           operators.map((o) => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join("");
 
         sectionSelect.value = currentSection;
@@ -1530,7 +1530,7 @@
                 <thead>
                     <tr>
                         <th>Date &amp; Time</th>
-                        <th>Operator</th>
+                        <th>User</th>
                         <th>Notes</th>
                         <th>Status</th>
                     </tr>

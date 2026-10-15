@@ -368,7 +368,7 @@ const USERS = [
     {
         id: 2,
         username: 'client',
-        fullName: 'Client User',
+        fullName: 'User',
         email: 'client@pinewatch.ph',
         role: 'client',
         status: 'active',
@@ -390,7 +390,7 @@ const USERS = [
     {
         id: 4,
         username: 'operator',
-        fullName: 'Drone Operator',
+        fullName: 'Drone User',
         email: 'operator@pinewatch.ph',
         role: 'client',
         status: 'active',

@@ -161,7 +161,7 @@
        SIDEBAR DIMENSIONS
        ======================================== */
 
-    --sidebar-width:           264px;
+    --sidebar-width:           240px;
     --sidebar-collapsed-width: 72px;
     --sidebar-transition:      all 0.28s cubic-bezier(0.4, 0, 0.2, 1);
 
