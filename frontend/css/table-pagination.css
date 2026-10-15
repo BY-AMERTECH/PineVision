@@ -1,0 +1,65 @@
+.table-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+  width: 100%;
+  min-width: 0;
+  padding: var(--space-md) var(--card-padding-x);
+  border-top: 1px solid var(--color-border-secondary);
+  box-sizing: border-box;
+}
+
+.table-pagination-summary {
+  flex: 1 1 160px;
+  min-width: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+}
+
+.table-pagination-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-xs);
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.table-pagination-button {
+  min-width: 34px;
+  padding-right: var(--space-sm);
+  padding-left: var(--space-sm);
+  white-space: nowrap;
+}
+
+.table-pagination-button.is-active {
+  background-color: var(--green);
+  border-color: var(--green);
+  color: #fff;
+}
+
+.table-pagination-button.is-active:hover {
+  background-color: var(--green-700);
+  border-color: var(--green-700);
+  color: #fff;
+}
+
+.table-pagination-ellipsis {
+  padding: 0 var(--space-xs);
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-sm);
+}
+
+@media (max-width: 580px) {
+  .table-pagination {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .table-pagination-controls {
+    justify-content: flex-start;
+    width: 100%;
+  }
+}

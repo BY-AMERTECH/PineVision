@@ -79,7 +79,7 @@
 
       .users-layout {
         display: grid;
-        grid-template-columns: 1fr 300px;
+        grid-template-columns: minmax(0, 1fr);
         gap: var(--grid-gap);
         margin-bottom: var(--space-2xl);
         align-items: stretch;
@@ -357,76 +357,6 @@
       .pag-btn[disabled] {
         opacity: 0.38;
         cursor: not-allowed;
-      }
-
-      .timeline {
-        display: flex;
-        flex-direction: column;
-      }
-
-      .tl-item {
-        display: flex;
-        align-items: flex-start;
-        gap: var(--space-md);
-        padding: 10px 0;
-        border-bottom: 1px solid var(--color-border-secondary);
-      }
-
-      .tl-item:last-child {
-        border-bottom: none;
-      }
-
-      .tl-icon {
-        width: 26px;
-        height: 26px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-        margin-top: 1px;
-      }
-
-      .tl-icon.login {
-        background: var(--green-bg);
-        color: var(--green);
-      }
-
-      .tl-icon.upload {
-        background: var(--amber-bg);
-        color: var(--amber);
-      }
-
-      .tl-icon.report {
-        background: var(--color-background-secondary);
-        color: var(--color-text-secondary);
-      }
-
-      .tl-icon.alert {
-        background: var(--red-bg);
-        color: var(--red);
-      }
-
-      .tl-body {
-        flex: 1;
-        min-width: 0;
-      }
-
-      .tl-text {
-        font-size: var(--font-size-sm);
-        color: var(--color-text-primary);
-        line-height: 1.4;
-      }
-
-      .tl-text strong {
-        font-weight: var(--font-weight-medium);
-      }
-
-      .tl-time {
-        font-size: 11px;
-        color: var(--muted);
-        font-family: var(--font-mono);
-        margin-top: 2px;
       }
 
       .profile-header {
@@ -1271,43 +1201,6 @@
               </div>
             </div>
 
-            <!-- Right Panel -->
-            <div
-              style="
-                display: flex;
-                flex-direction: column;
-                gap: var(--grid-gap);
-                height: 100%;
-              "
-            >
-              <!-- Activity Feed -->
-              <div
-                class="tcard"
-                style="
-                  margin-bottom: 0;
-                  flex: 1;
-                  display: flex;
-                  flex-direction: column;
-                  min-height: 0;
-                "
-              >
-                <div class="thead-row">
-                  <h3 class="thead-title">Activity Feed</h3>
-                  <a href="activity.html" class="btn btn-navigation btn-sm"
-                    >All <svg class="btn-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a>
-                </div>
-                <div
-                  style="
-                    padding: 0 var(--space-lg) var(--space-lg);
-                    flex: 1;
-                    overflow-y: auto;
-                    min-height: 0;
-                  "
-                >
-                  <div class="timeline card-scroll-region" id="activity-timeline" tabindex="0" role="region" aria-label="Activity timeline"></div>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </main>
@@ -1793,7 +1686,6 @@
       // ── Init ─────────────────────────────────────────────────────────────
       window.initPage = function () {
         loadUsersFromBackend();
-        renderTimeline();
         updateTimestamp();
       };
 
@@ -2399,7 +2291,6 @@
           );
 
           await loadUsersFromBackend();
-          await renderTimeline();
         } catch (error) {
           console.error("Error toggling user status:", error);
           utils.showToast("Failed to update user status", "error");
@@ -2857,7 +2748,6 @@
           ).hide();
 
           await loadUsersFromBackend();
-          await renderTimeline();
         } catch (error) {
           console.error("Error saving user:", error);
           if (
@@ -2976,190 +2866,11 @@
             document.getElementById("resetPasswordModal"),
           ).hide();
           utils.showToast("Password reset successfully", "success");
-
-          await renderTimeline();
         } catch (error) {
           console.error("Error resetting password:", error);
           err.textContent = error.message || "Failed to reset password";
           err.style.display = "block";
         }
-      }
-
-      // ── Activity Timeline ────────────────────────────────────────────────
-      async function renderTimeline() {
-        try {
-          // Fetch recent activity logs from Firestore
-          const logsSnapshot = await firebase
-            .firestore()
-            .collection("activity_logs")
-            .orderBy("timestamp", "desc")
-            .limit(10)
-            .get();
-
-          var logs = [];
-          logsSnapshot.forEach(function (doc) {
-            logs.push(doc.data());
-          });
-
-          var labels = {
-            login: "Logged in",
-            logout: "Logged out",
-            view_dashboard: "Viewed dashboard",
-            view_blocks: "Viewed blocks",
-            view_scans: "Viewed scans",
-            view_alerts: "Viewed alerts",
-            generate_report: "Generated report",
-            upload_scan: "Uploaded scan",
-            login_failed: "Login failed",
-            update_user: "Updated user", // NEW
-            reset_password: "Reset password", // NEW
-            toggle_status: "Toggled status", // NEW
-            view_users: "Viewed users",
-          };
-
-          var types = {
-            login: "login",
-            logout: "login",
-            upload_scan: "upload",
-            generate_report: "report",
-            view_alerts: "alert",
-            login_failed: "alert",
-            update_user: "report", // NEW
-            reset_password: "alert", // NEW
-            toggle_status: "report", // NEW
-            view_users: "report",
-            view_dashboard: "report",
-            view_blocks: "report",
-          };
-
-          var html = "";
-
-          if (logs.length === 0) {
-            html =
-              '<div class="empty-state" style="padding:var(--space-xl) 0;"><div class="empty-state-text">No recent activity</div></div>';
-          } else {
-            logs.forEach(function (log) {
-              // Handle timestamp - could be Firestore Timestamp or ISO string
-              var timestamp = log.timestamp;
-              var date;
-              if (timestamp && timestamp.toDate) {
-                // Firestore Timestamp
-                date = timestamp.toDate();
-              } else if (timestamp) {
-                // ISO string
-                date = new Date(timestamp);
-              } else {
-                // No timestamp
-                date = new Date();
-              }
-
-              var ts = date.toLocaleString("en-US", {
-                month: "short",
-                day: "2-digit",
-                hour: "2-digit",
-                minute: "2-digit",
-                hour12: true,
-              });
-
-              var type = types[log.action] || "login";
-              var lbl = labels[log.action] || log.action.replace(/_/g, " ");
-              var statusClass = log.status === "error" ? "crit" : "good";
-              var statusText = log.status === "error" ? "Err" : "OK";
-
-              html +=
-                '<div class="tl-item">' +
-                '<div class="tl-icon ' +
-                type +
-                '">' +
-                getActionIcon(log.action) +
-                "</div>" +
-                '<div class="tl-body"><div class="tl-text"><strong>' +
-                esc(log.user) +
-                "</strong> " +
-                lbl +
-                '</div><div class="tl-time">' +
-                ts +
-                "</div></div>" +
-                '<span class="badge ' +
-                statusClass +
-                '" style="font-size:10px;padding:2px 7px;flex-shrink:0;"><span class="bdot"></span>' +
-                statusText +
-                "</span>" +
-                "</div>";
-            });
-          }
-
-          document.getElementById("activity-timeline").innerHTML = html;
-        } catch (error) {
-          console.error("Error loading activity logs:", error);
-          document.getElementById("activity-timeline").innerHTML =
-            '<div class="empty-state" style="padding:var(--space-xl) 0;"><div class="empty-state-text">Failed to load activity</div></div>';
-        }
-      }
-
-      // ── Helpers ──────────────────────────────────────────────────────────
-      function tlIcon(type) {
-        if (type === "login")
-          return '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>';
-        if (type === "upload")
-          return '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>';
-        if (type === "report")
-          return '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
-        return '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>';
-      }
-
-      function getActionIcon(action) {
-        var icons = {
-          // Login/Logout
-          login:
-            '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>',
-
-          logout:
-            '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>',
-
-          // User Management
-          update_user:
-            '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
-
-          reset_password:
-            '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
-
-          toggle_status:
-            '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>',
-
-          // Errors/Alerts
-          login_failed:
-            '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
-
-          view_alerts:
-            '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>',
-
-          // Upload/Reports
-          upload_scan:
-            '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>',
-
-          generate_report:
-            '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
-
-          // Default/Views
-          view_dashboard:
-            '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>',
-
-          view_users:
-            '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
-
-          view_blocks:
-            '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>',
-
-          view_scans:
-            '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>',
-        };
-
-        // Return specific icon or default to document icon
-        return (
-          icons[action] ||
-          '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>'
-        );
       }
 
       function esc(str) {

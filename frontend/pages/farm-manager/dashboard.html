@@ -29,38 +29,50 @@
       /* ── Hero metrics grid (4 cards) ── */
       .mg {
         display: grid;
-        grid-template-columns: repeat(4, 1fr);
+        grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: var(--grid-gap);
         margin-bottom: var(--space-2xl);
       }
-      @media (max-width: 1280px) {
+      @media (max-width: 960px) {
         .mg {
-          grid-template-columns: repeat(2, 1fr);
+          grid-template-columns: repeat(2, minmax(0, 1fr));
         }
       }
-      @media (max-width: 768px) {
+      @media (max-width: 640px) {
         .mg {
-          grid-template-columns: repeat(2, 1fr);
+          grid-template-columns: 1fr;
         }
       }
 
       /* ── Layout grids ── */
       .dash-grid {
         display: grid;
-        grid-template-columns: 360px 1fr;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+        grid-template-areas: "left detections";
         gap: var(--grid-gap);
         margin-bottom: var(--space-2xl);
-        align-items: start;
+        align-items: stretch;
       }
-      .analytics-grid {
+      .dash-left-column {
+        grid-area: left;
         display: grid;
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-rows: auto minmax(0, 1fr);
         gap: var(--grid-gap);
-        align-content: start;
+        min-height: 0;
+      }
+      .fruit-stats-card {
+        grid-area: detections;
+      }
+      .activity-card {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        margin-bottom: 0;
+        overflow: hidden;
       }
       .bottom-grid {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: var(--grid-gap);
       }
 
@@ -159,25 +171,16 @@
 
       /* ── Fruit detections chart (farm-wide, scan-based) ── */
       .fruit-stats-header {
-        display: flex;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
         align-items: center;
         gap: var(--space-md);
-        flex-wrap: wrap;
-        justify-content: space-between;
-        margin-bottom: var(--space-lg);
-      }
-      .fruit-stats-grid {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: var(--grid-gap);
+        margin-bottom: 0;
       }
       .fruit-stats-card {
         display: flex;
         flex-direction: column;
         min-width: 0;
-      }
-      .fruit-stats-weekly {
-        grid-row: span 2;
       }
       .fruit-stats-body {
         padding: var(--space-lg) var(--card-padding-x) var(--space-xl);
@@ -194,21 +197,110 @@
       }
       .fruit-stats-canvas-wrap {
         position: relative;
-        height: 240px;
-        min-height: 240px;
+        height: 320px;
+        min-height: 320px;
         flex: 1;
       }
+      .fruit-stats-title {
+        grid-column: 1;
+        grid-row: 1;
+        display: flex;
+        align-items: center;
+        gap: var(--space-md);
+        min-width: 0;
+      }
+      .fruit-stats-browse {
+        grid-column: 2;
+        grid-row: 1;
+        justify-self: end;
+      }
+      .fruit-stats-tabs {
+        grid-column: 2;
+        grid-row: 2;
+        justify-self: end;
+        display: flex;
+        align-items: center;
+        gap: var(--space-xs);
+        flex-shrink: 0;
+      }
+      .fruit-stats-info {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: var(--color-text-secondary);
+        cursor: pointer;
+      }
+      .fruit-stats-info:hover {
+        color: var(--green);
+      }
+      .fruit-stats-info:focus-visible {
+        outline: 2px solid var(--green);
+        outline-offset: 2px;
+        border-radius: var(--radius-sm);
+      }
+      .fruit-stats-tab {
+        padding: var(--space-sm) var(--space-md);
+        border: 0;
+        border-bottom: 2px solid transparent;
+        background: transparent;
+        color: var(--color-text-secondary);
+        font-family: var(--font-sans);
+        font-size: var(--font-size-xs);
+        font-weight: var(--font-weight-medium);
+        cursor: pointer;
+      }
+      .fruit-stats-tab:hover,
+      .fruit-stats-tab[aria-selected="true"] {
+        color: var(--green);
+      }
+      .fruit-stats-tab[aria-selected="true"] {
+        border-bottom-color: var(--green);
+      }
+      .fruit-stats-tab:focus-visible {
+        outline: 2px solid var(--green);
+        outline-offset: 2px;
+        border-radius: var(--radius-sm);
+      }
       @media (max-width: 960px) {
-        .fruit-stats-grid {
-          grid-template-columns: minmax(0, 1fr);
+        .dash-grid,
+        .bottom-grid {
+          grid-template-columns: 1fr;
         }
-        .fruit-stats-weekly {
-          grid-row: auto;
+        .dash-grid {
+          grid-template-areas: "detections" "left";
+        }
+        .dash-left-column {
+          grid-template-rows: auto auto;
+        }
+        #activity-feed {
+          flex: none;
         }
         .fruit-stats-canvas-wrap {
-          height: 280px;
-          min-height: 280px;
+          height: 300px;
+          min-height: 300px;
           flex: none;
+        }
+      }
+      @media (max-width: 640px) {
+        .fruit-stats-header {
+          grid-template-columns: minmax(0, 1fr);
+        }
+        .fruit-stats-title,
+        .fruit-stats-browse,
+        .fruit-stats-tabs {
+          grid-column: 1;
+        }
+        .fruit-stats-title {
+          grid-row: 1;
+        }
+        .fruit-stats-browse {
+          grid-row: 2;
+        }
+        .fruit-stats-tabs {
+          grid-row: 3;
         }
       }
 
@@ -219,15 +311,21 @@
         padding: 0 var(--space-lg);
       }
       #activity-feed {
-        max-height: 253px;
+        flex: none;
+        min-height: 0;
+        height: 204px;
         overflow-y: auto;
       }
       .act-item {
         display: flex;
         align-items: flex-start;
         gap: var(--space-md);
+        box-sizing: border-box;
+        height: 68px;
+        flex: 0 0 68px;
         padding: 10px 0;
         border-bottom: 1px solid var(--color-border-secondary);
+        overflow: hidden;
       }
       .act-item:last-child {
         border-bottom: none;
@@ -266,16 +364,22 @@
         display: flex;
         align-items: baseline;
         gap: var(--space-sm);
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
       }
       .act-user {
         font-size: var(--font-size-sm);
         font-weight: var(--font-weight-semibold);
         color: var(--color-text-primary);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
       .act-action {
         font-size: var(--font-size-sm);
         color: var(--color-text-secondary);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
       .act-detail {
         font-size: 11px;
@@ -380,17 +484,6 @@
 
       /* ── Responsive ── */
       @media (max-width: 960px) {
-        .dash-grid {
-          grid-template-columns: 1fr;
-        }
-        .bottom-grid {
-          grid-template-columns: 1fr;
-        }
-      }
-      @media (max-width: 640px) {
-        .analytics-grid {
-          grid-template-columns: 1fr 1fr;
-        }
         .ph {
           flex-direction: column;
           align-items: flex-start;
@@ -720,123 +813,76 @@
           <!-- Hero Metrics -->
           <div class="mg" id="system-stats"></div>
 
-          <!-- Main Grid: Compact Activity Feed + Analytics Sparklines 2×2 -->
+          <!-- Graph Row: Scan Volume and Live Activity beside detections -->
           <div class="dash-grid">
-            <!-- Live Activity Feed (compact, scrollable) -->
-            <div class="tcard" style="margin-bottom: 0; overflow: hidden">
-              <div class="thead-row">
-                <h3 class="thead-title d-flex align-items-center gap-2">
-                  <span class="card-hdr-icon">
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    >
-                      <line x1="8" y1="6" x2="21" y2="6" />
-                      <line x1="8" y1="12" x2="21" y2="12" />
-                      <line x1="8" y1="18" x2="21" y2="18" />
-                      <line x1="3" y1="6" x2="3.01" y2="6" />
-                      <line x1="3" y1="12" x2="3.01" y2="12" />
-                      <line x1="3" y1="18" x2="3.01" y2="18" />
-                    </svg>
-                  </span>
-                  Live Activity Feed
-                </h3>
-                <a href="auditlogs.html" class="btn btn-navigation btn-sm"
-                  ><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg> View All <svg class="btn-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a>
+            <div class="dash-left-column">
+              <div class="spark-card" id="scan-volume-card"></div>
+
+              <div class="tcard activity-card">
+                <div class="thead-row">
+                  <h3 class="thead-title d-flex align-items-center gap-2">
+                    <span class="card-hdr-icon">
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
+                        <line x1="8" y1="6" x2="21" y2="6" />
+                        <line x1="8" y1="12" x2="21" y2="12" />
+                        <line x1="8" y1="18" x2="21" y2="18" />
+                        <line x1="3" y1="6" x2="3.01" y2="6" />
+                        <line x1="3" y1="12" x2="3.01" y2="12" />
+                        <line x1="3" y1="18" x2="3.01" y2="18" />
+                      </svg>
+                    </span>
+                    Live Activity Feed
+                  </h3>
+                  <a href="auditlogs.html" class="btn btn-navigation btn-sm"
+                    ><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg> View All <svg class="btn-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a>
+                </div>
+                <div id="activity-feed"></div>
               </div>
-              <div id="activity-feed"></div>
             </div>
 
-            <!-- Analytics Sparklines 2×2 -->
-            <div
-              class="analytics-grid"
-              id="analytics-grid"
-              style="margin-bottom: 0"
-            ></div>
+            <section class="tcard fruit-stats-card" aria-labelledby="fruit-stats-title">
+              <div class="thead-row fruit-stats-header">
+                <div class="fruit-stats-title">
+                  <h3 class="thead-title d-flex align-items-center gap-2" id="fruit-stats-title">
+                    <span class="card-hdr-icon">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <polyline points="3 17 9 11 14 14 21 5" />
+                      </svg>
+                    </span>
+                    Confirmed Plant Detections per Scan Period
+                    <button type="button" class="fruit-stats-info" onclick="utils.showModal('fruit-stats-details-modal')" title="View details" aria-label="View confirmed plant detection details" aria-haspopup="dialog" aria-controls="fruit-stats-details-modal">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 11v6"/><path d="M12 7h.01"/></svg>
+                    </button>
+                  </h3>
+                </div>
+                <a href="blocks.html" class="btn btn-navigation btn-sm fruit-stats-browse"><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg> Browse Fruit Blocks <svg class="btn-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a>
+                <div class="fruit-stats-tabs" role="tablist" aria-label="Detection time period">
+                  <button type="button" class="fruit-stats-tab" id="fruit-stats-tab-weekly" role="tab" aria-selected="true" aria-controls="fruit-stats-panel" tabindex="0" onclick="selectFruitStatsPeriod('weekly')" onkeydown="handleFruitStatsTabKeydown(event, 'weekly')">Weekly</button>
+                  <button type="button" class="fruit-stats-tab" id="fruit-stats-tab-monthly" role="tab" aria-selected="false" aria-controls="fruit-stats-panel" tabindex="-1" onclick="selectFruitStatsPeriod('monthly')" onkeydown="handleFruitStatsTabKeydown(event, 'monthly')">Monthly</button>
+                  <button type="button" class="fruit-stats-tab" id="fruit-stats-tab-yearly" role="tab" aria-selected="false" aria-controls="fruit-stats-panel" tabindex="-1" onclick="selectFruitStatsPeriod('yearly')" onkeydown="handleFruitStatsTabKeydown(event, 'yearly')">Yearly</button>
+                </div>
+              </div>
+              <div class="fruit-stats-body" id="fruit-stats-panel" role="tabpanel" aria-labelledby="fruit-stats-tab-weekly">
+                <p class="fruit-stats-summary" id="fruit-stats-summary"></p>
+                <div class="fruit-stats-canvas-wrap" id="fruit-stats-wrap">
+                  <canvas id="fruit-stats-chart" role="img" aria-label="Weekly line chart of confirmed plant detections per scan period"></canvas>
+                </div>
+                <div class="empty-state" id="fruit-stats-empty" style="display: none">
+                  <div class="empty-state-title" id="fruit-stats-empty-title"></div>
+                  <div class="empty-state-text" id="fruit-stats-empty-text"></div>
+                </div>
+              </div>
+            </section>
           </div>
-
-          <!-- Farm-wide confirmed plant detections per scan period -->
-          <section aria-labelledby="fruit-stats-title" style="margin-bottom: var(--space-2xl)">
-            <div class="fruit-stats-header">
-              <h3 class="thead-title d-flex align-items-center gap-2" id="fruit-stats-title">
-                <span class="card-hdr-icon">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <polyline points="3 17 9 11 14 14 21 5" />
-                  </svg>
-                </span>
-                Confirmed Plant Detections per Scan Period
-                <button type="button" class="btn btn-secondary btn-sm" onclick="utils.showModal('fruit-stats-details-modal')" title="View details" aria-label="View confirmed plant detection details" aria-haspopup="dialog" aria-controls="fruit-stats-details-modal">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 11v6"/><path d="M12 7h.01"/></svg>
-                </button>
-              </h3>
-              <a href="blocks.html" class="btn btn-navigation btn-sm"><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg> Browse Fruit Blocks <svg class="btn-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a>
-            </div>
-            <div class="fruit-stats-grid">
-              <div class="tcard fruit-stats-card fruit-stats-weekly">
-                <div class="thead-row">
-                  <h4 class="thead-title">Weekly</h4>
-                </div>
-                <div class="fruit-stats-body">
-                  <p class="fruit-stats-summary" id="fruit-stats-summary-weekly"></p>
-                  <div class="fruit-stats-canvas-wrap" id="fruit-stats-wrap-weekly">
-                    <canvas
-                      id="fruit-stats-chart-weekly"
-                      role="img"
-                      aria-label="Weekly line chart of confirmed plant detections per scan period, split into bearing, non-bearing and non-viable"
-                    ></canvas>
-                  </div>
-                  <div class="empty-state" id="fruit-stats-empty-weekly" style="display: none">
-                    <div class="empty-state-title" id="fruit-stats-empty-title-weekly"></div>
-                    <div class="empty-state-text" id="fruit-stats-empty-text-weekly"></div>
-                  </div>
-                </div>
-              </div>
-              <div class="tcard fruit-stats-card">
-                <div class="thead-row">
-                  <h4 class="thead-title">Monthly</h4>
-                </div>
-                <div class="fruit-stats-body">
-                  <p class="fruit-stats-summary" id="fruit-stats-summary-monthly"></p>
-                  <div class="fruit-stats-canvas-wrap" id="fruit-stats-wrap-monthly">
-                    <canvas
-                      id="fruit-stats-chart-monthly"
-                      role="img"
-                      aria-label="Monthly line chart of confirmed plant detections per scan period, split into bearing, non-bearing and non-viable"
-                    ></canvas>
-                  </div>
-                  <div class="empty-state" id="fruit-stats-empty-monthly" style="display: none">
-                    <div class="empty-state-title" id="fruit-stats-empty-title-monthly"></div>
-                    <div class="empty-state-text" id="fruit-stats-empty-text-monthly"></div>
-                  </div>
-                </div>
-              </div>
-              <div class="tcard fruit-stats-card">
-                <div class="thead-row">
-                  <h4 class="thead-title">Yearly</h4>
-                </div>
-                <div class="fruit-stats-body">
-                  <p class="fruit-stats-summary" id="fruit-stats-summary-yearly"></p>
-                  <div class="fruit-stats-canvas-wrap" id="fruit-stats-wrap-yearly">
-                    <canvas
-                      id="fruit-stats-chart-yearly"
-                      role="img"
-                      aria-label="Yearly line chart of confirmed plant detections per scan period, split into bearing, non-bearing and non-viable"
-                    ></canvas>
-                  </div>
-                  <div class="empty-state" id="fruit-stats-empty-yearly" style="display: none">
-                    <div class="empty-state-title" id="fruit-stats-empty-title-yearly"></div>
-                    <div class="empty-state-text" id="fruit-stats-empty-text-yearly"></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
 
           <!-- Bottom: Alerts + Users -->
           <div class="bottom-grid">
@@ -858,7 +904,7 @@
                       <path d="M13.73 21a2 2 0 0 1-3.46 0" />
                     </svg>
                   </span>
-                  Recent Alerts
+                  Recent Account Alerts
                 </h3>
                 <a href="alerts.html" class="btn btn-navigation btn-sm"
                   ><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg> View All <svg class="btn-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a>
@@ -956,20 +1002,16 @@
          *
          * Old flow (sequential):
          *   loadFirebaseData()   → 2 queries (users + logs)
-         *   loadSystemStats()    → 1 query  (unresolved alerts)
-         *   loadAnalytics()      → 6 queries (hourly loop) + 1 duplicate = 7
+         *   loadSystemStats()/loadAnalytics() → separate queries for metrics
          *   loadRecentAlerts()   → 1 query
          *   Total: ~11 sequential round-trips
          *
          * New flow (parallel):
-         *   Promise.all([users, logs, unresolved, recentAlerts, 6h-range]) → 5 parallel
-         *   JS bucketing replaces the 6-query hourly loop
+         *   Promise.all([users, logs, recentAlerts, scans]) → 4 parallel
          *   Total: 1 parallel batch (wait = slowest single query, not their sum)
          */
         try {
           console.log("📥 Loading dashboard data in parallel...");
-
-          var sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000);
 
           var sixDaysAgo = new Date();
           sixDaysAgo.setHours(0, 0, 0, 0);
@@ -986,58 +1028,26 @@
               .limit(10)
               .get(),
 
-            // [2] unresolved alerts count for dashboard analytics
-            firebase.firestore()
-              .collection("alerts")
-              .where("resolved", "==", false)
-              .get(),
-
-            // [3] most-recent alerts for the alerts panel
+            // [2] most-recent alerts for the alerts panel
             firebase.firestore()
               .collection("alerts")
               .orderBy("timestamp", "desc")
               .limit(6)
               .get(),
 
-            // [4] last-6-hours range — JS bucketing replaces the 6-query loop
-            firebase.firestore()
-              .collection("alerts")
-              .where(
-                "timestamp",
-                ">=",
-                firebase.firestore.Timestamp.fromDate(sixHoursAgo)
-              )
-              .get(),
-
-            // [5] scans (all client accounts) — powers Total Scans / Scan
-            //     Success Rate stat cards plus the Scan Volume
-            //     and Avg Bearing Rate sparklines. Was previously hardcoded.
+            // [3] scans (all client accounts) — powers Total Scans and the
+            //     Scan Volume graph. Was previously hardcoded.
             firebase.firestore()
               .collection("scans")
               .orderBy("startTime", "desc")
               .limit(SCANS_LIMIT)
               .get(),
-
-            // [6] activity logs in the same 6-day window, for the User
-            //     Activity sparkline (distinct users active per day) —
-            //     separate from the 10-row feed query above ([1]).
-            firebase.firestore()
-              .collection("activity_logs")
-              .where(
-                "timestamp",
-                ">=",
-                firebase.firestore.Timestamp.fromDate(sixDaysAgo)
-              )
-              .get(),
           ]);
 
           var usersSnap        = results[0];
           var logsSnap         = results[1];
-          var unresolvedSnap   = results[2];
-          var recentAlertsSnap = results[3];
-          var analyticsSnap    = results[4];
-          var scansSnap        = results[5];
-          var scanLogsSnap     = results[6];
+          var recentAlertsSnap = results[2];
+          var scansSnap        = results[3];
 
           // ── Process users — Farm Managers never see Super Admin accounts ─────────────────────────
           dashboardUsers = [];
@@ -1073,33 +1083,11 @@
             dashboardUsers.length,
             "users,",
             dashboardLogs.length,
-            "logs,",
-            unresolvedSnap.size,
-            "unresolved alerts"
+            "logs"
           );
-
-          var pendingAlerts = unresolvedSnap.size;
-
-          // ── Bucket analytics into 6 hourly bins in JS ─────────────────
-          // Replaces 6 sequential time-range queries (one per hour) with a
-          // single range query + client-side bucketing.
-          var alertBuckets = [0, 0, 0, 0, 0, 0];
-          analyticsSnap.forEach(function (doc) {
-            var ts = doc.data().timestamp;
-            if (ts) {
-              var hoursAgo = Math.floor(
-                (Date.now() - ts.toDate().getTime()) / (60 * 60 * 1000)
-              );
-              if (hoursAgo >= 0 && hoursAgo < 6) alertBuckets[5 - hoursAgo]++;
-            }
-          });
 
           // ── Process scans + build 6-day scan stats/sparklines ─────────
           var scanVolData = [0, 0, 0, 0, 0, 0];
-          var bearingSums = [0, 0, 0, 0, 0, 0];
-          var bearingCounts = [0, 0, 0, 0, 0, 0];
-          var bearingTotalSum = 0;
-          var bearingTotalCount = 0;
 
           // Rows for the farm-wide detections chart: completed scans only
           // (active scans hold partial live counts; failed ones stop mid-way).
@@ -1107,6 +1095,8 @@
           // flights-scans.html.
           var fruitRows = [];
           var oldestLoadedScan = null;
+          var bearingRateTotal = 0;
+          var bearingRateScanCount = 0;
 
           scansSnap.forEach(function (doc) {
             var d = doc.data();
@@ -1114,6 +1104,11 @@
             if (!startTime) return;
 
             if (!oldestLoadedScan || startTime < oldestLoadedScan) oldestLoadedScan = startTime;
+            var scanTotal = Number(d.total) || 0;
+            if (scanTotal > 0) {
+              bearingRateTotal += ((Number(d.bearing) || 0) / scanTotal) * 100;
+              bearingRateScanCount++;
+            }
             if (d.status === undefined || d.status === null || d.status === "completed") {
               fruitRows.push({
                 startTime: startTime,
@@ -1123,46 +1118,21 @@
               });
             }
 
-            var total = d.total || 0;
-            var bearingPct = total > 0 ? ((d.bearing || 0) / total) * 100 : null;
-            if (bearingPct !== null) {
-              bearingTotalSum += bearingPct;
-              bearingTotalCount++;
-            }
-
             var dayIdx = Math.floor((startTime - sixDaysAgo) / 86400000);
             if (dayIdx >= 0 && dayIdx < 6) {
               scanVolData[dayIdx]++;
-              if (bearingPct !== null) {
-                bearingSums[dayIdx] += bearingPct;
-                bearingCounts[dayIdx]++;
-              }
             }
           });
 
-          var bearingData = bearingSums.map(function (sum, i) {
-            return bearingCounts[i] > 0 ? sum / bearingCounts[i] : 0;
-          });
           var totalScans = scansSnap.size;
-          var avgBearingRate = bearingTotalCount > 0 ? bearingTotalSum / bearingTotalCount : 0;
-
-          // ── Distinct active users per day, for the User Activity sparkline ──
-          var dayUserSets = [new Set(), new Set(), new Set(), new Set(), new Set(), new Set()];
-          scanLogsSnap.forEach(function (doc) {
-            var d = doc.data();
-            var ts = d.timestamp && typeof d.timestamp.toDate === "function" ? d.timestamp.toDate() : null;
-            if (!ts || !d.user) return;
-            var dayIdx = Math.floor((ts - sixDaysAgo) / 86400000);
-            if (dayIdx >= 0 && dayIdx < 6) dayUserSets[dayIdx].add(d.user);
-          });
-          var sessionData = dayUserSets.map(function (s) {
-            return s.size;
-          });
+          var avgBearingRate = bearingRateScanCount > 0
+            ? bearingRateTotal / bearingRateScanCount
+            : null;
 
           // ── Render all sections synchronously from in-memory data ─────
           loadSystemStats(totalScans, avgBearingRate);
           loadRecentActivity();
-          loadAnalytics(alertBuckets, pendingAlerts, scanVolData, bearingData, sessionData);
+          loadAnalytics(scanVolData);
           fruitStatsState.rows = fruitRows;
           fruitStatsState.oldestLoaded = oldestLoadedScan;
           fruitStatsState.truncated = scansSnap.size >= SCANS_LIMIT;
@@ -1191,7 +1161,8 @@
         oldestLoaded: null,
         truncated: false,
       };
-      var fruitStatsCharts = {};
+      var fruitStatsChart = null;
+      var activeFruitPeriod = "weekly";
       var FRUIT_PERIODS = {
         weekly: { buckets: 12, unit: "weeks" },
         monthly: { buckets: 12, unit: "months" },
@@ -1231,39 +1202,74 @@
         return full ? "Week of " + s : s;
       }
 
-      function fruitStatsShowEmpty(period, title, text) {
-        document.getElementById("fruit-stats-wrap-" + period).style.display = "none";
-        document.getElementById("fruit-stats-empty-" + period).style.display = "block";
-        document.getElementById("fruit-stats-empty-title-" + period).textContent = title;
-        document.getElementById("fruit-stats-empty-text-" + period).textContent = text;
+      function fruitStatsShowEmpty(title, text) {
+        document.getElementById("fruit-stats-wrap").style.display = "none";
+        document.getElementById("fruit-stats-empty").style.display = "block";
+        document.getElementById("fruit-stats-empty-title").textContent = title;
+        document.getElementById("fruit-stats-empty-text").textContent = text;
       }
 
       function renderFruitStats() {
-        Object.keys(FRUIT_PERIODS).forEach(renderFruitStatsPeriod);
+        renderFruitStatsPeriod(activeFruitPeriod);
+      }
+
+      function selectFruitStatsPeriod(period) {
+        if (!FRUIT_PERIODS[period]) return;
+        activeFruitPeriod = period;
+        document.querySelectorAll(".fruit-stats-tab").forEach(function (tab) {
+          var active = tab.id === "fruit-stats-tab-" + period;
+          tab.setAttribute("aria-selected", active ? "true" : "false");
+          tab.tabIndex = active ? 0 : -1;
+        });
+        document.getElementById("fruit-stats-panel").setAttribute(
+          "aria-labelledby",
+          "fruit-stats-tab-" + period,
+        );
+        renderFruitStatsPeriod(period);
+      }
+
+      function handleFruitStatsTabKeydown(event, period) {
+        var periods = Object.keys(FRUIT_PERIODS);
+        var index = periods.indexOf(period);
+        var nextIndex = index;
+        if (event.key === "ArrowRight") nextIndex = (index + 1) % periods.length;
+        else if (event.key === "ArrowLeft") nextIndex = (index - 1 + periods.length) % periods.length;
+        else if (event.key === "Home") nextIndex = 0;
+        else if (event.key === "End") nextIndex = periods.length - 1;
+        else return;
+        event.preventDefault();
+        var nextPeriod = periods[nextIndex];
+        document.getElementById("fruit-stats-tab-" + nextPeriod).focus();
+        selectFruitStatsPeriod(nextPeriod);
       }
 
       function renderFruitStatsPeriod(period) {
-        var canvas = document.getElementById("fruit-stats-chart-" + period);
+        var canvas = document.getElementById("fruit-stats-chart");
         if (!canvas) return;
 
-        if (fruitStatsCharts[period]) {
-          fruitStatsCharts[period].destroy();
-          fruitStatsCharts[period] = null;
+        if (fruitStatsChart) {
+          fruitStatsChart.destroy();
+          fruitStatsChart = null;
         }
-        document.getElementById("fruit-stats-wrap-" + period).style.display = "";
-        document.getElementById("fruit-stats-empty-" + period).style.display = "none";
-        var summaryEl = document.getElementById("fruit-stats-summary-" + period);
+        document.getElementById("fruit-stats-wrap").style.display = "";
+        document.getElementById("fruit-stats-empty").style.display = "none";
+        var summaryEl = document.getElementById("fruit-stats-summary");
+        var periodLabel = period.charAt(0).toUpperCase() + period.slice(1);
+        canvas.setAttribute(
+          "aria-label",
+          periodLabel + " line chart of confirmed plant detections per scan period",
+        );
 
         if (typeof Chart === "undefined") {
           summaryEl.textContent = "";
-          fruitStatsShowEmpty(period, "Chart unavailable", "The chart library could not be loaded. Check your connection and refresh.");
+          fruitStatsShowEmpty("Chart unavailable", "The chart library could not be loaded. Check your connection and refresh.");
           return;
         }
 
         var rows = fruitStatsState.rows;
         if (rows.length === 0) {
           summaryEl.textContent = "";
-          fruitStatsShowEmpty(period, "No completed scans yet", "Detection counts will appear here once scans have been completed.");
+          fruitStatsShowEmpty("No completed scans yet", "Detection counts will appear here once scans have been completed.");
           return;
         }
 
@@ -1318,9 +1324,8 @@
         if (scansInWindow === 0) {
           summaryEl.textContent = "";
           fruitStatsShowEmpty(
-            period,
             "No completed scans in this period",
-            "No completed scans fall within this timeline. Earlier scans may appear in the other charts."
+            "No completed scans fall within this timeline. Select another period to view available detections."
           );
           return;
         }
@@ -1337,7 +1342,7 @@
         var gridClr = isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.06)";
         var axisTitle = { yearly: "Year", monthly: "Month", weekly: "Week starting (Monday)" }[period];
 
-        fruitStatsCharts[period] = new Chart(canvas.getContext("2d"), {
+        fruitStatsChart = new Chart(canvas.getContext("2d"), {
           type: "line",
           data: {
             labels: buckets.map(function (x) { return x.label; }),
@@ -1423,8 +1428,7 @@
         }, 600);
       }
 
-      // totalScans/avgBearingRate are passed from initPage (already computed
-      // from the parallel Promise.all queries).
+      // Scan metrics are computed from the parallel Promise.all results.
       function loadSystemStats(totalScans, avgBearingRate) {
         var clients = dashboardUsers.filter(function (u) {
           return u.role === "client" || u.role === "farm_manager";
@@ -1432,21 +1436,18 @@
         var activeOps = dashboardUsers.filter(function (u) {
           return u.status === "active";
         }).length;
-        var totalUsers = dashboardUsers.length;
-        var successRate = Math.round(avgBearingRate * 10) / 10;
-
         var cards = [
           {
             label: "Total Users",
             value: clients,
-            sub: activeOps + " active",
+            sub: "Total Registered Accounts",
             color: "green",
             icon: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
           },
           {
-            label: "Active Operators",
+            label: "Active User Accounts",
             value: activeOps,
-            sub: "of " + clients + " users",
+            sub: "Enabled Accounts",
             color: "",
             icon: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>',
           },
@@ -1460,13 +1461,10 @@
             icon: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>',
           },
           {
-            label: "Scan Success Rate",
-            value: successRate + "%",
-            sub: "Avg bearing rate",
-            color:
-              successRate >= 75 ? "green" : successRate >= 60 ? "amber" : "red",
-            trend: successRate >= 75 ? "up" : "dn",
-            trendTxt: successRate >= 75 ? "Healthy" : "Below target",
+            label: "AVG. BEARING RATE",
+            value: avgBearingRate === null ? "—" : (Math.round(avgBearingRate * 10) / 10) + "%",
+            sub: "Average percentage of bearing pineapple plants",
+            color: "",
             icon: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
           },
         ];
@@ -1593,69 +1591,21 @@
         document.getElementById("activity-feed").innerHTML = html;
       }
 
-      // alertBuckets: 6-element array [oldest…newest] bucketed in initPage()
-      // from a single 6-hour range query instead of 6 separate hourly queries.
-      // totalAlerts: unresolved count, already fetched in initPage() — no duplicate query.
-      // scanVolData/bearingData/sessionData: 6-day trends bucketed in initPage()
-      // from the live scans/activity_logs collections — previously hardcoded.
-      function loadAnalytics(alertBuckets, totalAlerts, scanVolData, bearingData, sessionData) {
-        var alertData = alertBuckets;
-
+      // scanVolData: six-day scan counts bucketed from the existing scans query.
+      function loadAnalytics(scanVolData) {
         var todayScans = scanVolData[scanVolData.length - 1];
         var scanTrendUp = todayScans >= (scanVolData[scanVolData.length - 2] || 0);
-        var todayBearing = bearingData[bearingData.length - 1];
-        var todaySessions = sessionData[sessionData.length - 1];
-
-        var charts = [
-          {
-            label: "Scan Volume",
-            value: String(todayScans),
-            sub: (scanTrendUp ? '<span class="up">↑</span> ' : '<span class="dn">↓</span> ') + "sessions today",
-            data: scanVolData,
-            color: "#4caf78",
-          },
-          {
-            label: "Avg Bearing Rate",
-            value: todayBearing > 0 ? todayBearing.toFixed(1) + "%" : "—",
-            sub: todayBearing >= 75 ? '<span class="up">↑ Healthy</span>' : todayBearing > 0 ? '<span class="dn">↓ Below target</span>' : "No scans today",
-            data: bearingData,
-            color: "#2d6a3f",
-          },
-          {
-            label: "Alert Frequency",
-            value: totalAlerts + "",
-            sub: '<span class="dn">↓ ' + totalAlerts + " active</span>",
-            data: alertData,
-            color: "#d94f4f",
-          },
-          {
-            label: "User Activity",
-            value: String(todaySessions),
-            sub: '<span class="up">↑ active today</span>',
-            data: sessionData,
-            color: "#8c5c00",
-          },
-        ];
-
-        var html = "";
-        charts.forEach(function (c) {
-          html +=
-            '<div class="spark-card">' +
-            '<div class="spark-label">' +
-            c.label +
-            "</div>" +
-            '<div class="spark-value">' +
-            c.value +
-            "</div>" +
-            '<div class="spark-sub">' +
-            c.sub +
-            "</div>" +
-            '<div class="sparkline-wrap">' +
-            buildSparkSVG(c.data, c.color) +
-            "</div>" +
-            "</div>";
-        });
-        document.getElementById("analytics-grid").innerHTML = html;
+        document.getElementById("scan-volume-card").innerHTML =
+          '<div class="spark-label">Scan Volume</div>' +
+          '<div class="spark-value">' +
+          todayScans +
+          "</div>" +
+          '<div class="spark-sub">' +
+          (scanTrendUp ? '<span class="up">↑</span> ' : '<span class="dn">↓</span> ') +
+          "sessions today</div>" +
+          '<div class="sparkline-wrap">' +
+          buildSparkSVG(scanVolData, "#4caf78") +
+          "</div>";
       }
 
       function buildSparkSVG(data, color) {
