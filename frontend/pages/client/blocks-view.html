@@ -688,15 +688,15 @@
           <!-- Field Info Cards (two side-by-side) -->
           <div class="row g-3 mb-4" id="field-info-row"></div>
 
-          <!-- Bearing Rate Trend (compact — click View to expand in modal) -->
+          <!-- Scan History (compact — click View to expand in modal) -->
           <div class="tcard trend-compact-card mb-4">
             <div
               class="thead-row"
               style="padding: var(--space-md) var(--space-xl)"
             >
               <div class="d-flex align-items-center gap-3">
-                <span class="thead-title">Bearing Rate Trend</span>
-                <span class="trend-view-hint">View Bearing Rate Trends</span>
+                <span class="thead-title">Scan History</span>
+                <span class="trend-view-hint">View Scan History</span>
               </div>
               <div class="d-flex align-items-center gap-2 trend-actions">
                 <button type="button" class="btn btn-sm btn-secondary" onclick="downloadTrendDetails(this)" title="Download scan details" aria-label="Download scan details"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg></button>
@@ -1014,17 +1014,17 @@
 
     <!-- BEARING RATE TREND MODAL -->
     <div id="trend-modal" class="modal">
-      <div class="modal-content" style="max-width: 540px">
+      <div class="modal-content scan-history-modal-content">
         <div class="modal-header">
-          <h2 class="modal-title">Bearing Rate Trends</h2>
+          <h2 class="modal-title">Scan History</h2>
           <div class="d-flex align-items-center gap-2">
             <button type="button" class="btn btn-sm btn-secondary" onclick="downloadTrendDetails(this)" title="Download scan details" aria-label="Download scan details"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg></button>
-            <button type="button" class="modal-close" aria-label="Close bearing rate trends" onclick="closeTrendModal()">
+            <button type="button" class="modal-close" aria-label="Close scan history" onclick="closeTrendModal()">
               &times;
             </button>
           </div>
         </div>
-        <div class="modal-body" id="trend-modal-content">
+        <div class="modal-body scan-history-body" id="trend-modal-content">
           <!-- populated by renderTrendModal() -->
         </div>
         <div
@@ -1463,7 +1463,7 @@
         try {
           const history = await blockScanHistory.load(currentBlock.id, currentUserId, true);
 
-          blockScanHistory.render(history, document.getElementById("trend-modal-content"));
+          blockScanHistory.render(history, document.getElementById("trend-modal-content"), currentBlock);
         } catch (error) {
           console.error("❌ Error loading scan history:", error);
           document.getElementById("trend-modal-content").innerHTML =

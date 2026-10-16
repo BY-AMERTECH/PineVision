@@ -1251,6 +1251,59 @@ tbody tr:hover {
 
 .modal-body { padding: var(--space-xl) var(--space-2xl); }
 
+/* Scan History modal: fixed shell with a separately scrollable record list. */
+.scan-history-modal-content {
+    width: min(calc(100% - 2rem), 760px);
+    height: min(80vh, 760px);
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.scan-history-modal-content > .modal-header,
+.scan-history-modal-content > .modal-footer { flex: 0 0 auto; }
+.scan-history-modal-content > .modal-body.scan-history-body {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+.scan-history-summary { flex: 0 0 auto; padding-bottom: var(--space-md); }
+.scan-history-context { color: var(--color-text-secondary); font-size: var(--font-size-sm); margin-bottom: var(--space-sm); }
+.scan-history-context strong { color: var(--color-text-primary); }
+.scan-history-summary-line { display: flex; flex-wrap: wrap; gap: var(--space-sm) var(--space-lg); color: var(--muted); font-size: var(--font-size-xs); }
+.scan-history-summary-line strong { color: var(--color-text-primary); font-family: var(--font-mono); }
+.scan-history-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; scroll-behavior: smooth; padding-right: var(--space-sm); }
+.scan-history-list:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
+.scan-history-entry { padding: var(--space-lg) 0; border-top: 1px solid var(--border); }
+.scan-history-entry-head { display: flex; justify-content: space-between; align-items: center; gap: var(--space-md); color: var(--color-text-secondary); font-size: var(--font-size-sm); }
+.scan-history-status { flex: 0 0 auto; border-radius: var(--radius-pill); padding: 3px 9px; background: var(--surf2); color: var(--color-text-secondary); font-size: var(--font-size-xs); }
+.scan-history-status.is-complete { background: var(--green-bg); color: var(--green); }
+.scan-history-status.is-failed { background: var(--red-bg); color: var(--red); }
+.scan-history-total { display: flex; align-items: baseline; gap: var(--space-sm); margin: var(--space-sm) 0; color: var(--muted); font-size: var(--font-size-sm); }
+.scan-history-total strong { color: var(--color-text-primary); font-family: var(--font-mono); font-size: var(--font-size-xl); }
+.scan-history-total-unavailable { display: inline-block; margin: var(--space-sm) 0; color: var(--muted); font-size: var(--font-size-sm); }
+.scan-history-breakdown { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-sm); }
+.scan-history-class { display: grid; grid-template-columns: 1fr auto; gap: 2px var(--space-sm); padding: var(--space-sm) var(--space-md); border-radius: var(--radius-md); background: var(--surf2); font-size: var(--font-size-xs); }
+.scan-history-class strong { color: var(--color-text-primary); font-family: var(--font-mono); }
+.scan-history-class small { grid-column: 1 / -1; color: var(--muted); }
+.scan-history-comparison { margin: var(--space-sm) 0 0; color: var(--muted); font-size: var(--font-size-xs); }
+.scan-history-details { margin-top: var(--space-sm); color: var(--muted); font-size: var(--font-size-xs); }
+.scan-history-details summary { width: fit-content; cursor: pointer; color: var(--color-text-secondary); }
+.scan-history-details dl { margin: var(--space-sm) 0 0; }
+.scan-history-details dl > div { display: flex; justify-content: space-between; gap: var(--space-md); padding: 3px 0; }
+.scan-history-details dt { font-weight: var(--font-weight-regular); }
+.scan-history-details dd { margin: 0; color: var(--color-text-primary); text-align: right; overflow-wrap: anywhere; }
+.scan-history-empty { display: grid; flex: 1; place-items: center; color: var(--muted); text-align: center; }
+@media (max-width: 575.98px) {
+    .scan-history-modal-content { width: calc(100% - 1rem); height: 88vh; height: 88dvh; max-height: 88vh; max-height: 88dvh; }
+    .scan-history-modal-content > .modal-header { padding: var(--space-lg); }
+    .scan-history-modal-content > .modal-body.scan-history-body { padding: var(--space-md) var(--space-lg); }
+    .scan-history-modal-content > .modal-footer { padding: var(--space-md) var(--space-lg); }
+    .scan-history-breakdown { grid-template-columns: 1fr; }
+}
+
 .modal-footer {
     padding: var(--space-lg) var(--space-2xl);
     border-top: 1px solid var(--border);

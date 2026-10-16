@@ -859,12 +859,15 @@
 
     <!-- BEARING RATE TREND MODAL -->
     <div id="trend-modal" class="modal">
-      <div class="modal-content" style="max-width: 540px">
+      <div class="modal-content scan-history-modal-content">
         <div class="modal-header">
-          <h2 class="modal-title" id="trend-modal-title">Bearing Rate Trend</h2>
-          <button class="modal-close" onclick="closeTrendModal()">&times;</button>
+          <h2 class="modal-title" id="trend-modal-title">Scan History</h2>
+          <div class="d-flex align-items-center gap-2">
+            <button type="button" class="btn btn-sm btn-secondary" onclick="downloadTrendDetails(this)" title="Download scan details" aria-label="Download scan details"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg></button>
+            <button class="modal-close" aria-label="Close scan history" onclick="closeTrendModal()">&times;</button>
+          </div>
         </div>
-        <div class="modal-body" id="trend-modal-content"></div>
+        <div class="modal-body scan-history-body" id="trend-modal-content"></div>
         <div class="modal-footer" style="justify-content: flex-end">
           <button type="button" class="btn btn-secondary" onclick="closeTrendModal()"><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m18 6-12 12M6 6l12 12"/></svg> Close</button>
         </div>
@@ -897,6 +900,7 @@
     <script src="../../js/auth.js"></script>
     <script src="../../js/data.js"></script>
     <script src="../../js/utils.js"></script>
+    <script src="../../js/block-scan-history.js"></script>
     <script src="../../js/app.js"></script>
 
     <script>
@@ -1157,7 +1161,7 @@
                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
               </svg>
             </button>
-            <button type="button" class="fb-rail-btn" data-tooltip="Bearing Rate Trend" onclick="event.stopPropagation(); openTrendModal('${block.id}')" aria-label="Bearing Rate Trend">
+            <button type="button" class="fb-rail-btn" data-tooltip="Scan History" onclick="event.stopPropagation(); openTrendModal('${block.id}')" aria-label="Scan History">
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
                 <polyline points="16 7 22 7 22 13" />
@@ -1384,49 +1388,40 @@
           });
       }
 
-      // ── Bearing Rate Trend modal (read-only) ──────────────────────
+      // ── Scan History modal (read-only) ────────────────────────────
 
-      function openTrendModal(id) {
+      async function openTrendModal(id) {
         const block = findBlock(id);
         if (!block) return;
         currentActionBlockId = id;
 
         document.getElementById("trend-modal-title").textContent =
-          "Bearing Rate Trend — " + block.blockName;
-        renderTrendModal(block);
+          "Scan History — " + block.blockName;
+        document.getElementById("trend-modal-content").innerHTML =
+          '<div class="scan-history-empty">Loading scan history…</div>';
         utils.showModal("trend-modal");
+        await renderTrendModal(block);
       }
 
       function closeTrendModal() {
         utils.hideModal("trend-modal");
       }
 
-      function renderTrendModal(block) {
-        // Synthetic recent-scan trend ending at the block's current bearing
-        // rate — a lightweight preview until per-scan history is wired up.
-        const labels = ["Mar 28", "Apr 04", "Apr 11", "Apr 18", "Apr 25", "May 02"];
-        const current = block.bearing || 0;
-        const offsets = [-6.5, -5.2, -3.8, -2.5, -1.1, 0];
-        const points = labels.map(function (date, i) {
-          const pct = Math.max(0, Math.min(100, current + offsets[i]));
-          return { date: date, pct: pct };
-        });
+      async function renderTrendModal(block) {
+        const content = document.getElementById("trend-modal-content");
+        try {
+          const history = await blockScanHistory.load(block.id, block.userId, true);
+          blockScanHistory.render(history, content, block);
+        } catch (error) {
+          console.error("❌ Error loading scan history:", error);
+          content.innerHTML = '<div class="scan-history-empty">Couldn’t load scan history. Please try again.</div>';
+        }
+      }
 
-        document.getElementById("trend-modal-content").innerHTML = points
-          .map(function (entry) {
-            const color = entry.pct >= 80 ? "var(--green)" : entry.pct >= 60 ? "var(--amber)" : "var(--red)";
-            return `
-                <div class="trend-row">
-                    <div class="trend-date">${entry.date}</div>
-                    <div class="trend-bar-wrap">
-                        <div class="bar-wrap">
-                            <div class="bar-fill" style="width:${entry.pct}%; background-color:${color};"></div>
-                        </div>
-                    </div>
-                    <div class="trend-val">${entry.pct.toFixed(1)}%</div>
-                </div>`;
-          })
-          .join("");
+      function downloadTrendDetails(button) {
+        const block = findBlock(currentActionBlockId);
+        if (!block) return;
+        return blockScanHistory.download(block, block.userId, button);
       }
 
       // ── Scheduled Scans modal (informational only) ────────────────
