@@ -48,7 +48,7 @@ const DRONE_STATE = {
     videoEnded:           false,    // true when browser video element has finished playing
     backendCompleted:     false,    // true when manifest is loaded and analysis is done
     countingStarting:     false,    // prevents duplicate live start requests
-    stats: { total: 0, bearing: 0, nonBearing: 0, discolored: 0, bearingCount: 0, nonBearingCount: 0, progress: 0 },
+    stats: { total: 0, bearing: 0, nonBearing: 0, discolored: 0, bearingCount: 0, nonBearingCount: 0, nonViableCount: 0, progress: 0 },
 };
 
 const STATUS_LABELS = {
@@ -923,6 +923,7 @@ async function loadManifestAndPlay(scanData) {
         DRONE_STATE.stats.discolored = scanData.nonViablePercent  || 0;
         DRONE_STATE.stats.bearingCount = scanData.bearing || 0;
         DRONE_STATE.stats.nonBearingCount = scanData.nonBearing || 0;
+        DRONE_STATE.stats.nonViableCount = scanData.nonViable || 0;
         DRONE_STATE.stats.progress   = 100;
     }
 
@@ -965,11 +966,22 @@ function handleVideoEnd() {
 }
 
 function showScanFinishedModal() {
+    const bearingAndNonbearingTotal = DRONE_STATE.stats.bearingCount + DRONE_STATE.stats.nonBearingCount;
+    const bearingPercent = bearingAndNonbearingTotal > 0
+        ? (DRONE_STATE.stats.bearingCount / bearingAndNonbearingTotal) * 100
+        : 0;
+    const nonBearingPercent = bearingAndNonbearingTotal > 0
+        ? (DRONE_STATE.stats.nonBearingCount / bearingAndNonbearingTotal) * 100
+        : 0;
+    const nonViablePercent = bearingAndNonbearingTotal > 0
+        ? (DRONE_STATE.stats.nonViableCount / bearingAndNonbearingTotal) * 100
+        : 0;
+
     document.getElementById('sf-duration').textContent    = document.getElementById('dv-timer').textContent;
-    document.getElementById('sf-total').textContent       = (DRONE_STATE.stats.bearingCount + DRONE_STATE.stats.nonBearingCount).toLocaleString();
-    document.getElementById('sf-bearing').textContent     = DRONE_STATE.stats.bearing.toFixed(1) + '%';
-    document.getElementById('sf-non-bearing').textContent = DRONE_STATE.stats.nonBearing.toFixed(1) + '%';
-    document.getElementById('sf-discolored').textContent  = DRONE_STATE.stats.discolored.toFixed(1) + '%';
+    document.getElementById('sf-total').textContent       = bearingAndNonbearingTotal.toLocaleString();
+    document.getElementById('sf-bearing').textContent     = bearingPercent.toFixed(1) + '%';
+    document.getElementById('sf-non-bearing').textContent = nonBearingPercent.toFixed(1) + '%';
+    document.getElementById('sf-discolored').textContent  = nonViablePercent.toFixed(1) + '%';
 
     const modal = new bootstrap.Modal(document.getElementById('modal-scan-finished'));
     modal.show();
@@ -996,7 +1008,7 @@ function handleScanFinished() {
     DRONE_STATE.backendCompleted = false;
     DRONE_STATE.scanId           = null;
     DRONE_STATE.scanStartTime    = null;
-    DRONE_STATE.stats            = { total: 0, bearing: 0, nonBearing: 0, discolored: 0, bearingCount: 0, nonBearingCount: 0, progress: 0 };
+    DRONE_STATE.stats            = { total: 0, bearing: 0, nonBearing: 0, discolored: 0, bearingCount: 0, nonBearingCount: 0, nonViableCount: 0, progress: 0 };
 
     transitionTo('idle');
 
@@ -1104,6 +1116,7 @@ function startScanCompletionListener() {
                 DRONE_STATE.stats.discolored = data.nonViablePercent  || 0;
                 DRONE_STATE.stats.bearingCount = data.bearing || 0;
                 DRONE_STATE.stats.nonBearingCount = data.nonBearing || 0;
+                DRONE_STATE.stats.nonViableCount = data.nonViable || 0;
                 updateStatDisplay();
                 DRONE_STATE.backendCompleted = true;
                 checkVideoScanComplete();
@@ -1233,7 +1246,7 @@ async function handleEndScan() {
     videoEl.removeAttribute('src');
     videoEl.load();
 
-    DRONE_STATE.stats             = { total: 0, bearing: 0, nonBearing: 0, discolored: 0, bearingCount: 0, nonBearingCount: 0, progress: 0 };
+    DRONE_STATE.stats             = { total: 0, bearing: 0, nonBearing: 0, discolored: 0, bearingCount: 0, nonBearingCount: 0, nonViableCount: 0, progress: 0 };
     DRONE_STATE.scanStartTime     = null;
     DRONE_STATE.streamUrl         = null;
     DRONE_STATE.rtmpUrl           = null;

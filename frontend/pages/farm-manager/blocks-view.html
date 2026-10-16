@@ -616,6 +616,17 @@
         const bearingCount = hasScanData ? Math.round((block.bearing / 100) * block.plants) : 0;
         const nonbearingCount = hasScanData ? Math.round((block.nonbearing / 100) * block.plants) : 0;
         const nonViableCount = hasScanData ? Math.round((block.nonViable / 100) * block.plants) : 0;
+        const bearingAndNonbearingTotal = bearingCount + nonbearingCount;
+        const estimatedTotalPlants = block.estimatedTotalPlantCount || bearingAndNonbearingTotal;
+        const bearingPercent = bearingAndNonbearingTotal > 0
+          ? (bearingCount / bearingAndNonbearingTotal) * 100
+          : 0;
+        const nonbearingPercent = bearingAndNonbearingTotal > 0
+          ? (nonbearingCount / bearingAndNonbearingTotal) * 100
+          : 0;
+        const nonViablePercent = estimatedTotalPlants > 0
+          ? (nonViableCount / estimatedTotalPlants) * 100
+          : 0;
         const plantSub = (n) => (hasScanData ? formatNumber(n) + " plants" : "—");
 
         document.getElementById("block-detail-root").innerHTML = `
@@ -643,9 +654,9 @@
 
           <div class="row row-cols-2 row-cols-md-4 g-3 mb-4">
             ${buildMetricCard("Estimated Total Plant Count", block.estimatedTotalPlantCount === null ? "Unavailable" : formatNumber(block.estimatedTotalPlantCount), "Estimated Count of all Pineapple plants", "")}
-            ${buildMetricCard("Bearing", formatPercent(block.bearing), plantSub(bearingCount), "green")}
-            ${buildMetricCard("Non-Bearing", formatPercent(block.nonbearing), plantSub(nonbearingCount), "amber")}
-            ${buildMetricCard("Non-Viable", formatPercent(block.nonViable), plantSub(nonViableCount), "red")}
+            ${buildMetricCard("Bearing", formatPercent(bearingPercent), plantSub(bearingCount), "green")}
+            ${buildMetricCard("Non-Bearing", formatPercent(nonbearingPercent), plantSub(nonbearingCount), "amber")}
+            ${buildMetricCard("Non-Viable", formatPercent(nonViablePercent), plantSub(nonViableCount), "red")}
           </div>
 
           <div class="row g-3 mb-4">
@@ -738,51 +749,62 @@
 
       function renderConditionBreakdown(block, hasScanData, bearingCount, nonbearingCount, nonViableCount) {
         const fmtPlant = (n) => (hasScanData ? formatNumber(n) : "—");
+        const totalPlants = bearingCount + nonbearingCount;
+        const bearingPercent = totalPlants > 0 ? (bearingCount / totalPlants) * 100 : 0;
+        const nonbearingPercent = totalPlants > 0 ? (nonbearingCount / totalPlants) * 100 : 0;
         document.getElementById("condition-breakdown").innerHTML = `
         <div class="thead-row">
             <span class="thead-title">Fruit Condition Breakdown</span>
         </div>
         <div class="twrap">
-            <table>
+            <table class="fruit-breakdown-table">
                 <colgroup>
-                    <col style="width:28%"><col style="width:13%"><col style="width:17%"><col style="width:42%">
+                    <col style="width:38%"><col style="width:14%"><col style="width:48%">
                 </colgroup>
-                <thead>
-                    <tr><th>Condition</th><th>%</th><th>Plants</th><th>Distribution</th></tr>
-                </thead>
                 <tbody>
                     <tr>
-                        <td><span class="badge good"><span class="bdot"></span>Bearing</span></td>
-                        <td style="font-family:var(--font-mono);">${formatPercent(block.bearing)}</td>
-                        <td style="font-family:var(--font-mono);">${fmtPlant(bearingCount)}</td>
-                        <td>
-                            <div style="display:flex;align-items:center;gap:var(--space-sm);">
-                                <div class="bar-wrap" style="margin-bottom:0;"><div class="bar-fill" style="width:${block.bearing}%;background:var(--green);"></div></div>
-                                <span style="font-family:var(--font-mono);font-size:var(--font-size-sm);color:var(--muted);min-width:45px;">${formatPercent(block.bearing)}</span>
-                            </div>
-                        </td>
+                        <td><div class="fruit-breakdown-condition">
+                            <span class="badge good"><span class="bdot"></span>Bearing</span>
+                            <span class="fruit-breakdown-note">Fruit detected</span>
+                        </div></td>
+                        <td class="fruit-breakdown-count">${fmtPlant(bearingCount)}</td>
+                        <td><div class="fruit-breakdown-distribution">
+                            <div class="fruit-breakdown-track"><span class="fruit-breakdown-fill" style="width:${bearingPercent}%;background:var(--green);"></span></div>
+                            <span class="fruit-breakdown-percent">${totalPlants > 0 ? formatPercent(bearingPercent) : "—"}</span>
+                        </div></td>
                     </tr>
                     <tr>
-                        <td><span class="badge warn"><span class="bdot"></span>Non-Bearing</span></td>
-                        <td style="font-family:var(--font-mono);">${formatPercent(block.nonbearing)}</td>
-                        <td style="font-family:var(--font-mono);">${fmtPlant(nonbearingCount)}</td>
-                        <td>
-                            <div style="display:flex;align-items:center;gap:var(--space-sm);">
-                                <div class="bar-wrap" style="margin-bottom:0;"><div class="bar-fill" style="width:${block.nonbearing}%;background:var(--amber);"></div></div>
-                                <span style="font-family:var(--font-mono);font-size:var(--font-size-sm);color:var(--muted);min-width:45px;">${formatPercent(block.nonbearing)}</span>
-                            </div>
-                        </td>
+                        <td><div class="fruit-breakdown-condition">
+                            <span class="badge warn"><span class="bdot"></span>Non-Bearing</span>
+                            <span class="fruit-breakdown-note">No fruit yet</span>
+                        </div></td>
+                        <td class="fruit-breakdown-count">${fmtPlant(nonbearingCount)}</td>
+                        <td><div class="fruit-breakdown-distribution">
+                            <div class="fruit-breakdown-track"><span class="fruit-breakdown-fill" style="width:${nonbearingPercent}%;background:var(--amber);"></span></div>
+                            <span class="fruit-breakdown-percent">${totalPlants > 0 ? formatPercent(nonbearingPercent) : "—"}</span>
+                        </div></td>
                     </tr>
-                    <tr>
-                        <td><span class="badge crit"><span class="bdot"></span>Non-Viable</span></td>
-                        <td style="font-family:var(--font-mono);">${formatPercent(block.nonViable)}</td>
-                        <td style="font-family:var(--font-mono);">${fmtPlant(nonViableCount)}</td>
-                        <td>
-                            <div style="display:flex;align-items:center;gap:var(--space-sm);">
-                                <div class="bar-wrap" style="margin-bottom:0;"><div class="bar-fill" style="width:${block.nonViable}%;background:var(--red);"></div></div>
-                                <span style="font-family:var(--font-mono);font-size:var(--font-size-sm);color:var(--muted);min-width:45px;">${formatPercent(block.nonViable)}</span>
+                    <tr class="fruit-breakdown-total">
+                        <td class="fruit-breakdown-total-label">Total Plants</td>
+                        <td class="fruit-breakdown-count">${fmtPlant(totalPlants)}</td>
+                        <td><div class="fruit-breakdown-distribution">
+                            <div class="fruit-breakdown-track">
+                                <span class="fruit-breakdown-fill" style="width:${bearingPercent}%;background:var(--green);"></span>
+                                <span class="fruit-breakdown-fill" style="width:${nonbearingPercent}%;background:var(--amber);"></span>
                             </div>
-                        </td>
+                            <span class="fruit-breakdown-percent">${totalPlants > 0 ? "100%" : "—"}</span>
+                        </div></td>
+                    </tr>
+                    <tr class="fruit-breakdown-other">
+                        <td colspan="3" class="fruit-breakdown-other-label-cell"><span class="fruit-breakdown-other-label">Other Detections</span></td>
+                    </tr>
+                    <tr class="fruit-breakdown-other">
+                        <td><div class="fruit-breakdown-other-content">
+                            <span class="badge crit"><span class="bdot"></span>Non-Viable</span>
+                            <span class="fruit-breakdown-not-counted">Not counted</span>
+                        </div></td>
+                        <td class="fruit-breakdown-count">${fmtPlant(nonViableCount)}</td>
+                        <td><span class="fruit-breakdown-excluded">Excluded from total and distribution</span></td>
                     </tr>
                 </tbody>
             </table>

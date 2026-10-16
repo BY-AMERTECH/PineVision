@@ -724,6 +724,127 @@ tbody tr:hover {
     background-color: var(--green-50);
 }
 
+/* Fruit condition breakdown rows */
+.fruit-breakdown-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.fruit-breakdown-table td {
+    padding: var(--space-lg) var(--space-xl);
+    font-size: var(--font-size-sm);
+    color: var(--color-text-primary);
+    border-bottom: var(--border-width-thin) solid var(--border);
+    vertical-align: middle;
+}
+
+.fruit-breakdown-condition {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-xs);
+}
+
+.fruit-breakdown-note {
+    color: var(--muted);
+    font-size: var(--font-size-sm);
+}
+
+.fruit-breakdown-count {
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: var(--font-size-base) !important;
+    font-weight: var(--font-weight-semibold);
+}
+
+.fruit-breakdown-distribution {
+    display: flex;
+    align-items: center;
+    gap: var(--space-lg);
+}
+
+.fruit-breakdown-track {
+    display: flex;
+    width: 100%;
+    height: 10px;
+    overflow: hidden;
+    border-radius: var(--radius-pill);
+    background-color: var(--surf2);
+}
+
+.fruit-breakdown-fill {
+    display: block;
+    height: 100%;
+    transition: width 0.3s ease;
+}
+
+.fruit-breakdown-percent {
+    min-width: 52px;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    text-align: right;
+}
+
+.fruit-breakdown-total {
+    background-color: var(--surf2);
+}
+
+.fruit-breakdown-total td {
+    border-bottom: 1px dashed var(--border);
+    font-weight: var(--font-weight-semibold);
+}
+
+.fruit-breakdown-total-label,
+.fruit-breakdown-other-label {
+    color: var(--muted);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-bold);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.fruit-breakdown-total .fruit-breakdown-percent {
+    color: var(--color-text-primary);
+    font-weight: var(--font-weight-semibold);
+}
+
+.fruit-breakdown-other td { border-bottom: none; }
+
+.fruit-breakdown-other-label-cell {
+    padding-top: var(--space-md) !important;
+    padding-bottom: var(--space-xs) !important;
+    border-bottom: 1px dashed var(--border) !important;
+}
+
+.fruit-breakdown-other-content {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+}
+
+.fruit-breakdown-not-counted {
+    padding: 2px var(--space-sm);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--muted);
+    font-size: var(--font-size-xs);
+}
+
+.fruit-breakdown-excluded {
+    color: var(--muted);
+    font-size: var(--font-size-sm);
+    font-style: italic;
+}
+
+@media (max-width: 540px) {
+    .fruit-breakdown-table td { padding: var(--space-md) var(--space-sm); }
+    .fruit-breakdown-distribution { gap: var(--space-sm); }
+    .fruit-breakdown-percent { min-width: 46px; }
+}
+
 /* ========================================
    SCAN ENTRY (.scan-entry)
    ======================================== */
