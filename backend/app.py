@@ -18,6 +18,7 @@ from flask import Flask, send_from_directory, abort, request, jsonify
 from flask_cors import CORS
 import firebase_admin
 from firebase_admin import credentials, firestore, auth
+import requests
 
 from drone_conn.routes import drone_bp
 
@@ -106,6 +107,62 @@ def api_test():
         'status': 'success',
         'firebase': 'connected' if db else 'disconnected'
     }), 200
+
+
+@app.route('/api/auth/password-reset', methods=['POST'])
+def request_password_reset():
+    """Send Firebase's password reset email for a username or email address."""
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        data = {}
+    identifier = data.get('identifier', '')
+    if not isinstance(identifier, str) or not identifier.strip():
+        return jsonify({'error': 'Username or email is required'}), 400
+
+    identifier = identifier.strip()
+    email = identifier if '@' in identifier else None
+
+    if email is None:
+        if not db:
+            return jsonify({'error': 'Password reset is temporarily unavailable'}), 503
+        try:
+            matches = db.collection('users').where('username', '==', identifier).limit(1).get()
+            if matches:
+                email = (matches[0].to_dict() or {}).get('email')
+        except Exception as error:
+            print(f"❌ Password reset lookup failed: {error}")
+            return jsonify({'error': 'Password reset is temporarily unavailable'}), 503
+
+    # Keep the response the same for unknown usernames/emails to avoid account discovery.
+    if not email:
+        return jsonify({'message': 'If an account matches those details, you’ll receive a password reset email.'}), 200
+
+    try:
+        response = requests.post(
+            'https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode',
+            params={'key': 'AIzaSyBQT2B0OHvBeoDgEWGt9dnMfpeu_D1T34c'},
+            json={'requestType': 'PASSWORD_RESET', 'email': email},
+            timeout=10,
+        )
+    except requests.RequestException as error:
+        print(f"❌ Firebase password reset request failed: {error}")
+        return jsonify({'error': 'Password reset is temporarily unavailable'}), 503
+
+    if response.ok:
+        return jsonify({'message': 'If an account matches those details, you’ll receive a password reset email.'}), 200
+
+    try:
+        error_data = response.json().get('error', {})
+    except ValueError:
+        error_data = {}
+    error_code = error_data.get('message', '')
+    if error_code in ('EMAIL_NOT_FOUND', 'INVALID_EMAIL'):
+        return jsonify({'message': 'If an account matches those details, you’ll receive a password reset email.'}), 200
+    if error_code == 'TOO_MANY_ATTEMPTS_TRY_LATER':
+        return jsonify({'error': 'Too many reset requests. Please try again later.'}), 429
+
+    print(f"❌ Firebase password reset failed: {error_code or response.status_code}")
+    return jsonify({'error': 'Password reset is temporarily unavailable'}), 503
 
 
 @app.route('/api/users', methods=['GET'])
