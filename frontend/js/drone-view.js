@@ -602,6 +602,7 @@ async function startDetection() {
             console.log('✅ Detection started:', result.scan_id);
             DRONE_STATE.scanId = result.scan_id;
             startFirebaseListener();
+            startLiveScanStatsListener();
             BboxOverlay.start('live');
             startLiveCountdown();
             return true;
@@ -1034,7 +1035,7 @@ function startFirebaseListener() {
             if (!doc.exists) return;
 
             const data = doc.data();
-            updateStatsFromFirebase(data);
+            if (DRONE_STATE.videoMode) updateStatsFromFirebase(data);
 
             // The block document is shared across scan sessions. Ignore
             // upload mode and data written by a previous live scan.
@@ -1048,6 +1049,43 @@ function startFirebaseListener() {
             }
         }, (error) => {
             console.error('❌ Firebase listener error:', error);
+        });
+}
+
+function startLiveScanStatsListener() {
+    if (!DRONE_STATE.scanId || typeof firebase === 'undefined') return;
+
+    const scanId = DRONE_STATE.scanId;
+    DRONE_STATE.scanFirebaseListener = firebase.firestore()
+        .collection('scans')
+        .doc(scanId)
+        .onSnapshot((doc) => {
+            if (!doc.exists || DRONE_STATE.videoMode || DRONE_STATE.scanId !== scanId) return;
+
+            const data = doc.data();
+            const bearingCount = Number(data.bearing) || 0;
+            const nonBearingCount = Number(data.nonBearing) || 0;
+            const nonViableCount = Number(data.nonViable) || 0;
+            const bearingAndNonbearingTotal = bearingCount + nonBearingCount;
+
+            DRONE_STATE.stats.total = Number(data.total) || 0;
+            DRONE_STATE.stats.bearingCount = bearingCount;
+            DRONE_STATE.stats.nonBearingCount = nonBearingCount;
+            DRONE_STATE.stats.nonViableCount = nonViableCount;
+            DRONE_STATE.stats.bearing = bearingAndNonbearingTotal > 0
+                ? (bearingCount / bearingAndNonbearingTotal) * 100
+                : 0;
+            DRONE_STATE.stats.nonBearing = bearingAndNonbearingTotal > 0
+                ? (nonBearingCount / bearingAndNonbearingTotal) * 100
+                : 0;
+            DRONE_STATE.stats.discolored = bearingAndNonbearingTotal > 0
+                ? (nonViableCount / bearingAndNonbearingTotal) * 100
+                : 0;
+            DRONE_STATE.stats.progress = Math.round(DRONE_STATE.stats.bearing);
+
+            updateStatDisplay();
+        }, (error) => {
+            console.error('❌ Live scan stats listener error:', error);
         });
 }
 
