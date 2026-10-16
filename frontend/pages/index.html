@@ -138,6 +138,21 @@
       Super Admin access
     </button>
 
+    <dialog id="forgot-password-dialog" class="forgot-dialog" aria-labelledby="forgot-password-title">
+      <form id="forgot-password-form" class="forgot-dialog-form">
+        <h2 id="forgot-password-title" class="login-card-title">Reset your password</h2>
+        <p class="forgot-dialog-description">Enter your username or email and we’ll send a reset link if an account matches.</p>
+        <label class="form-label" for="forgot-password-identifier">Username or email</label>
+        <input id="forgot-password-identifier" class="form-input" type="text" autocomplete="username" required>
+        <p id="forgot-password-status" class="forgot-dialog-status" role="status" aria-live="polite"></p>
+        <div class="forgot-dialog-actions">
+          <button type="button" id="forgot-password-cancel" class="forgot-dialog-cancel">Cancel</button>
+          <button type="button" id="forgot-password-done" class="forgot-dialog-cancel" hidden>Done</button>
+          <button type="submit" id="forgot-password-submit" class="forgot-dialog-submit">Send reset link</button>
+        </div>
+      </form>
+    </dialog>
+
   </div>
 
   <script src="../js/auth.js"></script>
@@ -154,8 +169,57 @@
       var rememberInput = document.getElementById("remember-me");
       var btnEye        = document.getElementById("btn-eye");
       var btnSuperAdmin = document.getElementById("btn-superadmin");
+      var forgotLink    = document.querySelector(".forgot-link");
+      var formOptions   = document.querySelector(".form-options");
+      var forgotDialog  = document.getElementById("forgot-password-dialog");
+      var forgotForm    = document.getElementById("forgot-password-form");
+      var forgotInput   = document.getElementById("forgot-password-identifier");
+      var forgotStatus  = document.getElementById("forgot-password-status");
+      var forgotSubmit  = document.getElementById("forgot-password-submit");
+      var forgotDone    = document.getElementById("forgot-password-done");
+      var forgotCancel  = document.getElementById("forgot-password-cancel");
       var tabs          = document.querySelectorAll(".login-tab");
       var selectedRole  = "client";
+
+      formOptions.removeChild(forgotLink);
+
+      forgotLink.addEventListener("click", function (event) {
+        event.preventDefault();
+        forgotInput.value = usernameInput.value.trim();
+        forgotStatus.textContent = "";
+        forgotDone.hidden = true;
+        forgotSubmit.hidden = false;
+        forgotCancel.hidden = false;
+        forgotDialog.showModal();
+        forgotInput.focus();
+      });
+
+      document.getElementById("forgot-password-cancel").addEventListener("click", function () {
+        forgotDialog.close();
+      });
+
+      forgotDone.addEventListener("click", function () {
+        forgotDialog.close();
+      });
+
+      forgotForm.addEventListener("submit", async function (event) {
+        event.preventDefault();
+        var identifier = forgotInput.value.trim();
+        if (!identifier) return;
+
+        forgotSubmit.disabled = true;
+        forgotStatus.textContent = "Sending reset link…";
+        try {
+          forgotStatus.textContent = await auth.requestPasswordReset(identifier);
+          forgotDone.hidden = false;
+          forgotSubmit.hidden = true;
+          forgotCancel.hidden = true;
+        } catch (error) {
+          forgotStatus.textContent = error.message || "Password reset is temporarily unavailable. Please try again.";
+        } finally {
+          forgotSubmit.disabled = false;
+        }
+      });
 
       var ROLE_PLACEHOLDERS = {
         "client":       "Enter your username",
@@ -163,9 +227,18 @@
         "admin":        "Super Admin username"
       };
 
+      function clearLoginFields() {
+        usernameInput.value = "";
+        passwordInput.value = "";
+        passwordInput.type = "password";
+        btnEye.setAttribute("aria-label", "Show password");
+        document.getElementById("error-message").style.display = "none";
+      }
+
       // ── Role tab switching ──────────────────────────────────────
       tabs.forEach(function (tab) {
         tab.addEventListener("click", function () {
+          clearLoginFields();
           tabs.forEach(function (t) {
             t.classList.remove("active");
             t.setAttribute("aria-selected", "false");
@@ -173,6 +246,11 @@
           tab.classList.add("active");
           tab.setAttribute("aria-selected", "true");
           selectedRole = tab.dataset.role;
+          if (selectedRole === "client") {
+            if (forgotLink.parentNode) formOptions.removeChild(forgotLink);
+          } else if (!forgotLink.parentNode) {
+            formOptions.appendChild(forgotLink);
+          }
           usernameInput.placeholder = ROLE_PLACEHOLDERS[selectedRole] || "Enter your username";
           btnSuperAdmin.classList.remove("admin-active");
         });
@@ -180,9 +258,11 @@
 
       // ── Super Admin access toggle ───────────────────────────────
       btnSuperAdmin.addEventListener("click", function () {
+        clearLoginFields();
         if (selectedRole === "admin") {
           // Deactivate — switch back to client
           selectedRole = "client";
+          if (forgotLink.parentNode) formOptions.removeChild(forgotLink);
           tabs.forEach(function (t) { t.classList.remove("active"); t.setAttribute("aria-selected", "false"); });
           document.getElementById("tab-client").classList.add("active");
           document.getElementById("tab-client").setAttribute("aria-selected", "true");
@@ -192,6 +272,7 @@
           // Activate admin mode
           tabs.forEach(function (t) { t.classList.remove("active"); t.setAttribute("aria-selected", "false"); });
           selectedRole = "admin";
+          if (!forgotLink.parentNode) formOptions.appendChild(forgotLink);
           usernameInput.placeholder = ROLE_PLACEHOLDERS["admin"];
           btnSuperAdmin.classList.add("admin-active");
         }
@@ -210,7 +291,7 @@
         var username = usernameInput.value.trim();
         var password = passwordInput.value;
         if (!username || !password) return;
-        auth.login(username, password, rememberInput.checked);
+        auth.login(username, password, rememberInput.checked, selectedRole);
       });
     })();
   </script>

@@ -189,7 +189,7 @@ var auth = (function () {
      * Login function - connects to Firebase
      * Accepts username OR email
      */
-    async function login(usernameOrEmail, password, remember) {
+    async function login(usernameOrEmail, password, remember, expectedRole) {
         setLoading(true);
 
         try {
@@ -225,6 +225,22 @@ var auth = (function () {
             }
 
             const userData = userDoc.data();
+
+            // Reject accounts that do not match the selected login role.
+            if (userData.role !== expectedRole) {
+                sessionStorage.removeItem(SESSION_KEY);
+                localStorage.removeItem(REMEMBER_KEY);
+
+                try {
+                    await firebaseAuth.signOut();
+                } catch (signOutError) {
+                    console.error("Could not sign out after role mismatch:", signOutError);
+                }
+
+                const roleError = new Error("Invalid credentials for this login type");
+                roleError.code = "auth/role-mismatch";
+                throw roleError;
+            }
 
             // Check if account is disabled
             if (userData.status === "disabled") {
@@ -317,7 +333,9 @@ var auth = (function () {
             // Handle specific Firebase errors
             let errorMessage = "Login failed. Please try again.";
 
-            if (error.code === "auth/user-not-found" ||
+            if (error.code === "auth/role-mismatch") {
+                errorMessage = "Invalid credentials for this login type";
+            } else if (error.code === "auth/user-not-found" ||
                 error.code === "auth/wrong-password" ||
                 error.code === "auth/invalid-login-credentials") {
                 errorMessage = "Invalid username or password. Please try again.";
@@ -332,6 +350,17 @@ var auth = (function () {
             showError(errorMessage);
             console.error("Login error:", error);
         }
+    }
+
+    async function requestPasswordReset(identifier) {
+        const response = await fetch('/api/auth/password-reset', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ identifier: identifier })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Password reset is temporarily unavailable');
+        return result.message;
     }
 
     /**
@@ -406,6 +435,7 @@ var auth = (function () {
     // Public API
     return {
         login: login,
+        requestPasswordReset: requestPasswordReset,
         logout: logout,
         confirmLogout: confirmLogout,
         closeLogoutModal: closeLogoutModal,

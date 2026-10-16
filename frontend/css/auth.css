@@ -406,6 +406,95 @@ input[type="password"]::-ms-clear { display: none; }
     box-shadow: none;
 }
 
+/* ── Forgot Password Dialog ── */
+.forgot-dialog {
+    width: min(440px, calc(100% - 32px));
+    max-width: 440px;
+    padding: var(--space-2xl);
+    color: var(--white);
+    background: rgba(13, 38, 19, 0.94);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 20px;
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+}
+
+.forgot-dialog::backdrop {
+    background: rgba(3, 14, 7, 0.72);
+    backdrop-filter: blur(4px);
+}
+
+.forgot-dialog-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+}
+
+.forgot-dialog .login-card-title {
+    margin-bottom: 0;
+}
+
+.forgot-dialog-description {
+    color: rgba(255, 255, 255, 0.62);
+    font-size: 13px;
+    text-align: center;
+    margin-bottom: var(--space-sm);
+}
+
+.forgot-dialog .form-input { margin-bottom: var(--space-xs); }
+
+.forgot-dialog-status {
+    min-height: 20px;
+    color: rgba(255, 255, 255, 0.76);
+    font-size: 13px;
+}
+
+.forgot-dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-sm);
+    margin-top: var(--space-xs);
+}
+
+.forgot-dialog-cancel,
+.forgot-dialog-submit {
+    min-height: 42px;
+    padding: 10px var(--space-lg);
+    border-radius: 10px;
+    font-family: var(--font-sans);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.forgot-dialog-cancel {
+    color: rgba(255, 255, 255, 0.78);
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.forgot-dialog-cancel:hover { background: rgba(255, 255, 255, 0.12); }
+
+.forgot-dialog-submit {
+    color: var(--white);
+    background: linear-gradient(135deg, #5cba82 0%, #2d6a3f 100%);
+    border: 0;
+    box-shadow: 0 4px 18px rgba(45, 106, 63, 0.35);
+}
+
+.forgot-dialog-submit:hover {
+    background: linear-gradient(135deg, #6dcc90 0%, #3a7a4e 100%);
+    transform: translateY(-1px);
+}
+
+.forgot-dialog-submit:disabled {
+    opacity: 0.55;
+    cursor: wait;
+    transform: none;
+}
+
 .btn-loader {
     display: flex;
     align-items: center;
@@ -480,4 +569,6 @@ input[type="password"]::-ms-clear { display: none; }
 
     .login-card-title { font-size: 21px; }
     .login-tab { font-size: 13px; padding: 9px 8px; }
+
+    .forgot-dialog { padding: var(--space-xl); border-radius: 16px; }
 }
