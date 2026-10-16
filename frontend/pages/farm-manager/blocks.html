@@ -1139,6 +1139,17 @@
         const bearingCount = hasScanData ? Math.round((block.bearing / 100) * block.plants) : null;
         const nonBearingCount = hasScanData ? Math.round((block.nonbearing / 100) * block.plants) : null;
         const nonViableCount = hasScanData ? Math.round((block.nonViable / 100) * block.plants) : null;
+        const bearingAndNonbearingTotal = (bearingCount || 0) + (nonBearingCount || 0);
+        const estimatedTotalPlants = block.estimatedTotalPlantCount || bearingAndNonbearingTotal;
+        const bearingPercent = bearingAndNonbearingTotal > 0
+          ? ((bearingCount || 0) / bearingAndNonbearingTotal) * 100
+          : 0;
+        const nonBearingPercent = bearingAndNonbearingTotal > 0
+          ? ((nonBearingCount || 0) / bearingAndNonbearingTotal) * 100
+          : 0;
+        const nonViablePercent = estimatedTotalPlants > 0
+          ? ((nonViableCount || 0) / estimatedTotalPlants) * 100
+          : 0;
 
         return `
         <div class="fb-card">
@@ -1222,9 +1233,9 @@
                 Estimated Total Plant Count <strong>${block.estimatedTotalPlantCount === null ? "Unavailable" : formatNumber(block.estimatedTotalPlantCount)}</strong>
               </span>
               <div class="fb-breakdown">
-                <span class="fb-stat"><span class="fb-stat-dot" style="background:var(--green-500);"></span>Bearing <span class="fb-stat-val" style="color:var(--green);">${formatPercent(block.bearing)}</span>${bearingCount !== null ? " (" + formatNumber(bearingCount) + ")" : ""}</span>
-                <span class="fb-stat"><span class="fb-stat-dot" style="background:var(--amber-mid);"></span>Non-Bearing <span class="fb-stat-val" style="color:var(--amber);">${formatPercent(block.nonbearing)}</span>${nonBearingCount !== null ? " (" + formatNumber(nonBearingCount) + ")" : ""}</span>
-                <span class="fb-stat"><span class="fb-stat-dot" style="background:var(--red-mid);"></span>Non-Viable <span class="fb-stat-val" style="color:var(--red);">${formatPercent(block.nonViable)}</span>${nonViableCount !== null ? " (" + formatNumber(nonViableCount) + ")" : ""}</span>
+                <span class="fb-stat"><span class="fb-stat-dot" style="background:var(--green-500);"></span>Bearing <span class="fb-stat-val" style="color:var(--green);">${formatPercent(bearingPercent)}</span>${bearingCount !== null ? " (" + formatNumber(bearingCount) + ")" : ""}</span>
+                <span class="fb-stat"><span class="fb-stat-dot" style="background:var(--amber-mid);"></span>Non-Bearing <span class="fb-stat-val" style="color:var(--amber);">${formatPercent(nonBearingPercent)}</span>${nonBearingCount !== null ? " (" + formatNumber(nonBearingCount) + ")" : ""}</span>
+                <span class="fb-stat"><span class="fb-stat-dot" style="background:var(--red-mid);"></span>Non-Viable <span class="fb-stat-val" style="color:var(--red);">${formatPercent(nonViablePercent)}</span>${nonViableCount !== null ? " (" + formatNumber(nonViableCount) + ")" : ""}</span>
               </div>
             </div>
           </div>
