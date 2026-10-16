@@ -46,11 +46,12 @@ service cloud.firestore {
       allow create: if signedIn() && !isFarmManager() &&
         request.resource.data.userId == request.auth.uid &&
         !request.resource.data.keys().hasAny(['declaredPopulation']);
-      allow update: if (isFarmManager() || ownsBlock(resource.data)) &&
-        request.resource.data.userId == resource.data.userId &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+      allow update: if request.resource.data.userId == resource.data.userId &&
+        ((isFarmManager() && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'blockName', 'section', 'area', 'planted', 'forcingDate', 'daf'
-        ]);
+        ])) || (ownsBlock(resource.data) && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'blockName', 'section', 'area'
+        ])));
       allow delete: if ownsBlock(resource.data);
     }
 

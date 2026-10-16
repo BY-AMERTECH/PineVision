@@ -217,6 +217,16 @@
         border-style: dashed;
       }
 
+      .btn-icon-only { width: 38px; min-width: 38px; padding: 0; justify-content: center; }
+      .cycle-history-list, .cycle-audit-list { max-height: 320px; overflow-y: auto; }
+      .cycle-history-item { padding: var(--space-sm) 0; border-bottom: 1px solid var(--border); }
+      .cycle-history-item summary { cursor: pointer; font-size: var(--font-size-sm); color: var(--color-text-primary); }
+      .cycle-history-item summary .stat-value { float: right; }
+      .cycle-history-detail { padding: var(--space-sm) var(--space-md); color: var(--muted); font-size: var(--font-size-sm); }
+      .cycle-update-form { display: grid; gap: var(--space-sm); max-width: 480px; }
+      .cycle-close-form, .cycle-new-form { max-width: 480px; }
+      .cycle-update-input { min-height: 2.75rem; }
+
       @media (max-width: 580px) {
         .block-page-header {
           flex-direction: column;
@@ -228,6 +238,7 @@
           flex: 1;
           justify-content: center;
         }
+        .block-header-buttons .btn-icon-only { flex: 0 0 38px; }
         .modal .form-row {
           grid-template-columns: 1fr;
         }
@@ -606,7 +617,7 @@
             </div>
             <!-- Right: action buttons -->
             <div class="d-flex gap-2 block-header-buttons">
-              <button class="btn btn-secondary" onclick="openEditModal()">
+              <button type="button" class="btn btn-secondary btn-icon-only" onclick="openEditModal()" aria-label="Edit Block" title="Edit Block">
                 <svg
                   width="15"
                   height="15"
@@ -624,8 +635,8 @@
                     d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"
                   />
                 </svg>
-                Edit Block
               </button>
+              <button type="button" class="btn btn-secondary" onclick="openUpdateBlock()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="m9 16 2 2 4-4"/></svg> Update Block</button>
               <a
                 href="drone-view.html"
                 id="btn-new-scan"
@@ -657,6 +668,8 @@
 
           <!-- Field Info Cards (two side-by-side) -->
           <div class="row g-3 mb-4" id="field-info-row"></div>
+
+          <div class="info-card mb-4" id="crop-cycle-card"><div id="crop-cycle-history"></div></div>
 
           <!-- Scan History (compact — click View to expand in modal) -->
           <div class="tcard trend-compact-card mb-4">
@@ -734,50 +747,7 @@
               </div>
             </div>
 
-            <div class="form-row">
-              <div class="form-group">
-                <label class="form-label" for="edit-planted"
-                  >Planting Date *</label
-                >
-                <input
-                  type="text"
-                  id="edit-planted"
-                  name="planted"
-                  class="form-input"
-                  placeholder="e.g., Jan 2024"
-                  required
-                />
-              </div>
-              <div class="form-group">
-                <label class="form-label" for="edit-forcingDate"
-                  >Forcing Date *</label
-                >
-                <input
-                  type="text"
-                  id="edit-forcingDate"
-                  name="forcingDate"
-                  class="form-input"
-                  placeholder="e.g., Aug 15, 2024"
-                  required
-                />
-              </div>
-            </div>
-
-            <div class="form-row">
-              <div class="form-group">
-                <label class="form-label" for="edit-daf"
-                  >Growth Stage (DAF)</label
-                >
-                <input
-                  type="number"
-                  id="edit-daf"
-                  name="daf"
-                  class="form-input"
-                  placeholder="e.g., 245"
-                  min="0"
-                />
-              </div>
-            </div>
+            <p class="form-hint">Crop dates and growth stage are managed separately through Update Block.</p>
           </div>
           <div class="modal-footer" style="justify-content: space-between;">
             <button
@@ -872,6 +842,7 @@
     <script src="../../js/auth.js"></script>
     <script src="../../js/utils.js"></script>
     <script src="../../js/block-scan-history.js"></script>
+    <script src="../../js/crop-cycle-ui.js"></script>
     <script src="../../js/app.js"></script>
 
     <script>
@@ -958,8 +929,8 @@
             // Details
             stage: blockData.stage || blockData.blockName,
             daf: blockData.daf || 0,
-            planted: blockData.planted || "Not set",
-            forcingDate: blockData.forcingDate || "Not set",
+            planted: blockData.planted || "",
+            forcingDate: blockData.forcingDate || "",
             estimatedTotalPlantCount: null,
             flightDuration: blockData.flightDuration || null,
 
@@ -967,6 +938,13 @@
             totalScans: blockData.totalScans || 0,
             lastScanned: blockData.lastScanned,
           };
+
+          try {
+            const activeCycle = await cropCycleUI.prepare(currentBlock);
+            currentBlock.activeCycle = activeCycle;
+          } catch (cycleError) {
+            console.error("❌ Error loading active crop cycle:", cycleError);
+          }
 
           try {
             const latestCounts = await blockScanHistory.loadLatestPlantCounts(
@@ -1017,6 +995,7 @@
         renderMetricCards(block);
         renderFieldInfo(block);
         renderConditionBreakdown(block);
+        cropCycleUI.mount(block.id, document.getElementById("crop-cycle-history"), block.blockName);
       }
 
       function renderMetricCards(block) {
@@ -1040,7 +1019,7 @@
 
         document.getElementById("metric-cards-row").innerHTML =
           buildMetricCard(
-            "Estimated Total Plant Count",
+            "Total Plant Estimate",
             block.estimatedTotalPlantCount === null ? "Unavailable" : formatNumber(block.estimatedTotalPlantCount),
             "Estimated Count of all Pineapple plants",
             "",
@@ -1089,12 +1068,12 @@
                 <div class="info-card">
                     <div class="info-card-title">Crop &amp; Growth Details</div>
                     <div class="stat-row">
-                        <span class="stat-label">Planting Date</span>
-                        <span class="stat-value">${block.planted}</span>
+                        <span class="stat-label">Planting Date (Current Cycle)</span>
+                        <span class="stat-value">${block.planted || "Not yet recorded"}</span>
                     </div>
                     <div class="stat-row">
-                        <span class="stat-label">Forcing Date</span>
-                        <span class="stat-value">${block.forcingDate}</span>
+                        <span class="stat-label">Forcing Date (Current Cycle)</span>
+                        <span class="stat-value">${block.forcingDate || "Not yet recorded"}</span>
                     </div>
                     <div class="stat-row">
                         <span class="stat-label">Growth Stage (DAF)</span>
@@ -1270,10 +1249,12 @@
         document.getElementById("edit-blockName").value = currentBlock.blockName || "";
         document.getElementById("edit-section").value = currentBlock.section || "";
         document.getElementById("edit-area").value = currentBlock.area || "";
-        document.getElementById("edit-planted").value = currentBlock.planted || "";
-        document.getElementById("edit-forcingDate").value = currentBlock.forcingDate || "";
-        document.getElementById("edit-daf").value = currentBlock.daf || "";
         utils.showModal("edit-block-modal");
+      }
+
+      function openUpdateBlock() {
+        const card = document.getElementById("crop-cycle-card");
+        if (card) { card.scrollIntoView({ behavior: "smooth", block: "center" }); card.querySelector("select")?.focus({ preventScroll: true }); }
       }
 
       function closeEditModal() {
@@ -1312,10 +1293,7 @@
         const blockName = document.getElementById("edit-blockName").value.trim();
         const section = document.getElementById("edit-section").value.trim();
         const area = parseFloat(document.getElementById("edit-area").value);
-        const planted = document.getElementById("edit-planted").value.trim();
-        const forcingDate = document.getElementById("edit-forcingDate").value.trim();
-        const daf = parseInt(document.getElementById("edit-daf").value) || 0;
-        if (!blockName || !section || !area || !planted || !forcingDate) {
+        if (!blockName || !section || !area || area <= 0) {
           utils.showFormError("edit-block-form", "Please fill in all required fields.");
           return;
         }
@@ -1324,25 +1302,16 @@
           blockName: currentBlock.blockName,
           section: currentBlock.section,
           area: currentBlock.area,
-          planted: currentBlock.planted,
-          forcingDate: currentBlock.forcingDate,
-          daf: currentBlock.daf,
         };
         const newValues = {
           blockName: blockName,
           section: section,
           area: area,
-          planted: planted,
-          forcingDate: forcingDate,
-          daf: daf,
         };
 
         currentBlock.blockName = blockName;
         currentBlock.section = section;
         currentBlock.area = area;
-        currentBlock.planted = planted;
-        currentBlock.forcingDate = forcingDate;
-        currentBlock.daf = daf;
 
         firebase
           .firestore()
@@ -1352,9 +1321,6 @@
             blockName: blockName,
             section: section,
             area: area,
-            planted: planted,
-            forcingDate: forcingDate,
-            daf: daf,
           })
           .then(function () {
             logBlockUpdateActivity(previousValues, newValues, currentBlock.id);

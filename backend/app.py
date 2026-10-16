@@ -14,6 +14,8 @@ if hasattr(sys.stderr, 'reconfigure'):
     sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
 import os
+import re
+from datetime import date
 from flask import Flask, send_from_directory, abort, request, jsonify
 from flask_cors import CORS
 import firebase_admin
@@ -98,6 +100,285 @@ except Exception as e:
 # ═══════════════════════════════════════════════════════════════════════
 # FIREBASE API ROUTES - User Management
 # ═══════════════════════════════════════════════════════════════════════
+
+def _verify_block_owner(block_id):
+    header = request.headers.get('Authorization', '')
+    if not header.startswith('Bearer ') or not db:
+        return None, None, (jsonify({'ok': False, 'message': 'Sign in again to continue.'}), 401)
+    try:
+        decoded = auth.verify_id_token(header.split('Bearer ', 1)[1].strip())
+        user = db.collection('users').document(decoded['uid']).get()
+        block = db.collection('blocks').document(block_id).get()
+    except Exception:
+        return None, None, (jsonify({'ok': False, 'message': 'Unable to verify access.'}), 401)
+    if not user.exists or user.to_dict().get('role') != 'client':
+        return None, None, (jsonify({'ok': False, 'message': 'Client access required.'}), 403)
+    if not block.exists or block.to_dict().get('userId') != decoded['uid']:
+        return None, None, (jsonify({'ok': False, 'message': 'Block not found.'}), 404)
+    user_data = user.to_dict()
+    decoded['displayName'] = user_data.get('username') or user_data.get('name') or user_data.get('email')
+    return decoded, block, None
+
+
+def _valid_crop_date(value, label):
+    if not isinstance(value, str) or not re.fullmatch(r'\d{4}-\d{2}-\d{2}', value):
+        raise ValueError(label + ' must be a valid date.')
+    try:
+        parsed = date.fromisoformat(value)
+    except ValueError:
+        raise ValueError(label + ' must be a valid date.')
+    if parsed > date.today():
+        raise ValueError(label + ' cannot be in the future.')
+    return value
+
+
+def _date_is_before(first, second):
+    try:
+        return date.fromisoformat(first) < date.fromisoformat(second)
+    except (TypeError, ValueError):
+        # Legacy records may contain display-formatted dates; preserve them and
+        # enforce ordering once both values are stored in the new ISO format.
+        return False
+
+
+def _crop_actor(decoded):
+    return decoded.get('displayName') or decoded.get('name') or decoded.get('email') or decoded.get('uid')
+
+
+@app.route('/api/blocks/<block_id>/cycles', methods=['GET', 'POST'])
+def block_cycles(block_id):
+    decoded, block, error = _verify_block_owner(block_id)
+    if error:
+        return error
+    block_ref = db.collection('blocks').document(block_id)
+    if request.method == 'GET':
+        cycles = []
+        for snap in block_ref.collection('cycles').order_by('createdAt').stream():
+            item = snap.to_dict()
+            item['id'] = snap.id
+            for key in ('createdAt', 'updatedAt', 'harvestedAt'):
+                if item.get(key) and hasattr(item[key], 'isoformat'):
+                    item[key] = item[key].isoformat()
+            cycles.append(item)
+        block_data = block.to_dict()
+        return jsonify({'ok': True, 'cycles': cycles, 'activeCycleId': block_data.get('activeCycleId'),
+                        'latestCycleId': block_data.get('latestCycleId'),
+                        'legacyCurrent': not block_data.get('latestCycleId') and bool(block_data.get('planted') or block_data.get('forcingDate'))}), 200
+
+    body = request.get_json(silent=True) or {}
+    try:
+        planting = _valid_crop_date(body.get('plantingDate'), 'Planting date')
+        forcing = body.get('forcingDate')
+        if forcing:
+            forcing = _valid_crop_date(forcing, 'Forcing date')
+            if forcing < planting:
+                raise ValueError('Forcing date cannot be before planting date.')
+    except ValueError as exc:
+        return jsonify({'ok': False, 'message': str(exc)}), 400
+    cycle_ref = block_ref.collection('cycles').document()
+    transaction = db.transaction()
+    @firestore.transactional
+    def create_cycle(txn):
+        latest = txn.get(block_ref)
+        latest_data = latest.to_dict()
+        if latest_data.get('activeCycleId'):
+            raise ValueError('Complete the current crop cycle before starting another.')
+        now = firestore.SERVER_TIMESTAMP
+        # Preserve pre-cycle-schema dates before updating the legacy block fields.
+        if latest_data.get('planted') or latest_data.get('forcingDate'):
+            legacy_ref = block_ref.collection('cycles').document()
+            txn.set(legacy_ref, {'plantingDate': latest_data.get('planted') or '',
+                                 'forcingDate': latest_data.get('forcingDate') or '',
+                                 'status': 'completed', 'legacy': True, 'createdAt': now,
+                                 'updatedAt': now, 'createdBy': _crop_actor(decoded)})
+        txn.set(cycle_ref, {'plantingDate': planting, 'forcingDate': forcing or '', 'daf': 0, 'status': 'active',
+                            'createdAt': now, 'updatedAt': now, 'createdBy': _crop_actor(decoded)})
+        txn.update(block_ref, {'activeCycleId': cycle_ref.id, 'latestCycleId': cycle_ref.id, 'planted': planting,
+                               'forcingDate': forcing or '', 'daf': 0})
+        audit = cycle_ref.collection('history').document()
+        txn.set(audit, {'type': 'Crop Cycle Started', 'field': 'plantingDate', 'previousValue': '',
+                        'newValue': planting, 'updatedBy': _crop_actor(decoded), 'updatedAt': now,
+                        'cropCycleId': cycle_ref.id})
+        if forcing:
+            txn.set(cycle_ref.collection('history').document(), {'type': 'forcingDate Updated',
+                    'field': 'forcingDate', 'previousValue': '', 'newValue': forcing,
+                    'updatedBy': _crop_actor(decoded), 'updatedAt': now, 'cropCycleId': cycle_ref.id})
+    try:
+        create_cycle(transaction)
+    except ValueError as exc:
+        return jsonify({'ok': False, 'message': str(exc)}), 409
+    except Exception:
+        return jsonify({'ok': False, 'message': 'Could not start crop cycle.'}), 500
+    return jsonify({'ok': True, 'cycleId': cycle_ref.id}), 201
+
+
+@app.route('/api/blocks/<block_id>/cycles/<cycle_id>', methods=['PATCH'])
+def update_block_cycle(block_id, cycle_id):
+    decoded, block, error = _verify_block_owner(block_id)
+    if error:
+        return error
+    body = request.get_json(silent=True) or {}
+    allowed = {'plantingDate', 'forcingDate', 'daf'}
+    if set(body) != {'field', 'value'} or body.get('field') not in allowed:
+        return jsonify({'ok': False, 'message': 'Choose exactly one supported field to update.'}), 400
+    field = body['field']
+    try:
+        if field == 'daf':
+            value = body['value']
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise ValueError('Growth Stage (DAF) must be a whole number of 0 or more.')
+        else:
+            value = _valid_crop_date(body['value'], field.replace('Date', ' date'))
+    except ValueError as exc:
+        return jsonify({'ok': False, 'message': str(exc)}), 400
+    block_ref = db.collection('blocks').document(block_id)
+    cycle_ref = block_ref.collection('cycles').document(cycle_id)
+    transaction = db.transaction()
+    @firestore.transactional
+    def update_cycle(txn):
+        cycle = txn.get(cycle_ref)
+        if not cycle.exists or cycle.to_dict().get('status') != 'active' or block.to_dict().get('activeCycleId') != cycle_id:
+            raise ValueError('Only the current active crop cycle can be corrected.')
+        old = cycle.to_dict().get(field, '') or ''
+        other = cycle.to_dict().get('forcingDate' if field == 'plantingDate' else 'plantingDate', '') or ''
+        if field == 'forcingDate' and other and _date_is_before(value, other):
+            raise ValueError('Forcing date cannot be before planting date.')
+        if field == 'plantingDate' and other and _date_is_before(other, value):
+            raise ValueError('Planting date cannot be after forcing date.')
+        now = firestore.SERVER_TIMESTAMP
+        txn.update(cycle_ref, {field: value, 'updatedAt': now})
+        block_field = {'plantingDate': 'planted', 'forcingDate': 'forcingDate', 'daf': 'daf'}[field]
+        txn.update(block_ref, {block_field: value})
+        audit = cycle_ref.collection('history').document()
+        txn.set(audit, {'type': field + ' Updated', 'field': field, 'previousValue': old,
+                        'newValue': value, 'updatedBy': _crop_actor(decoded), 'updatedAt': now,
+                        'cropCycleId': cycle_id})
+    try:
+        update_cycle(transaction)
+    except ValueError as exc:
+        return jsonify({'ok': False, 'message': str(exc)}), 400
+    except Exception:
+        return jsonify({'ok': False, 'message': 'Could not update crop cycle.'}), 500
+    return jsonify({'ok': True}), 200
+
+
+@app.route('/api/blocks/<block_id>/cycles/legacy-correction', methods=['POST'])
+def correct_legacy_block_cycle(block_id):
+    decoded, block, error = _verify_block_owner(block_id)
+    if error:
+        return error
+    body = request.get_json(silent=True) or {}
+    if set(body) != {'field', 'value'} or body.get('field') not in {'plantingDate', 'forcingDate', 'daf'}:
+        return jsonify({'ok': False, 'message': 'Choose exactly one supported field to update.'}), 400
+    field = body['field']
+    try:
+        if field == 'daf':
+            value = body['value']
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise ValueError('Growth Stage (DAF) must be a whole number of 0 or more.')
+        else:
+            value = _valid_crop_date(body['value'], field.replace('Date', ' date'))
+    except ValueError as exc:
+        return jsonify({'ok': False, 'message': str(exc)}), 400
+    block_ref = db.collection('blocks').document(block_id)
+    if list(block_ref.collection('cycles').limit(1).stream()):
+        return jsonify({'ok': False, 'message': 'This block already has crop cycle history. Select its current cycle or start a new cycle.'}), 409
+    transaction = db.transaction()
+    @firestore.transactional
+    def materialize_legacy(txn):
+        latest = txn.get(block_ref)
+        data = latest.to_dict()
+        if data.get('activeCycleId') or data.get('latestCycleId'):
+            raise ValueError('A crop cycle was added while this update was open. Reload and try again.')
+        planting = data.get('planted') or ''
+        forcing = data.get('forcingDate') or ''
+        if field == 'forcingDate' and planting and _date_is_before(value, planting):
+            raise ValueError('Forcing date cannot be before planting date.')
+        if field == 'plantingDate' and forcing and _date_is_before(forcing, value):
+            raise ValueError('Planting date cannot be after forcing date.')
+        now = firestore.SERVER_TIMESTAMP
+        cycle_ref = block_ref.collection('cycles').document()
+        cycle_data = {'plantingDate': planting, 'forcingDate': forcing, 'daf': data.get('daf', 0),
+                      'status': 'active', 'legacy': True, 'createdAt': now, 'updatedAt': now,
+                      'createdBy': _crop_actor(decoded)}
+        final_value = value
+        cycle_data[field] = final_value
+        txn.set(cycle_ref, cycle_data)
+        block_field = {'plantingDate': 'planted', 'forcingDate': 'forcingDate', 'daf': 'daf'}[field]
+        txn.update(block_ref, {'activeCycleId': cycle_ref.id, 'latestCycleId': cycle_ref.id,
+                               block_field: final_value})
+        txn.set(cycle_ref.collection('history').document(), {'type': 'Legacy Cycle Recorded',
+                'field': 'plantingDate', 'previousValue': '', 'newValue': planting,
+                'updatedBy': _crop_actor(decoded), 'updatedAt': now, 'cropCycleId': cycle_ref.id})
+        previous = data.get(block_field, '')
+        txn.set(cycle_ref.collection('history').document(), {'type': field + ' Updated', 'field': field,
+                'previousValue': previous, 'newValue': final_value, 'updatedBy': _crop_actor(decoded),
+                'updatedAt': now, 'cropCycleId': cycle_ref.id})
+    try:
+        materialize_legacy(transaction)
+    except ValueError as exc:
+        return jsonify({'ok': False, 'message': str(exc)}), 409
+    except Exception:
+        return jsonify({'ok': False, 'message': 'Could not update legacy crop information.'}), 500
+    return jsonify({'ok': True}), 200
+
+
+@app.route('/api/blocks/<block_id>/cycles/<cycle_id>/history', methods=['GET'])
+def get_block_cycle_history(block_id, cycle_id):
+    _, block, error = _verify_block_owner(block_id)
+    if error:
+        return error
+    cycle_ref = db.collection('blocks').document(block_id).collection('cycles').document(cycle_id)
+    if not cycle_ref.get().exists:
+        return jsonify({'ok': False, 'message': 'Crop cycle not found.'}), 404
+    history = []
+    for snap in cycle_ref.collection('history').order_by('updatedAt').stream():
+        item = snap.to_dict()
+        item['id'] = snap.id
+        if item.get('updatedAt') and hasattr(item['updatedAt'], 'isoformat'):
+            item['updatedAt'] = item['updatedAt'].isoformat()
+        history.append(item)
+    return jsonify({'ok': True, 'history': history}), 200
+
+
+@app.route('/api/blocks/<block_id>/cycles/<cycle_id>/close', methods=['POST'])
+def close_block_cycle(block_id, cycle_id):
+    decoded, block, error = _verify_block_owner(block_id)
+    if error:
+        return error
+    body = request.get_json(silent=True) or {}
+    try:
+        harvested = _valid_crop_date(body.get('harvestedAt'), 'Harvest date')
+    except ValueError as exc:
+        return jsonify({'ok': False, 'message': str(exc)}), 400
+    block_ref = db.collection('blocks').document(block_id)
+    cycle_ref = block_ref.collection('cycles').document(cycle_id)
+    transaction = db.transaction()
+    @firestore.transactional
+    def close_cycle(txn):
+        cycle = txn.get(cycle_ref)
+        if not cycle.exists or cycle.to_dict().get('status') != 'active' or block.to_dict().get('activeCycleId') != cycle_id:
+            raise ValueError('This crop cycle is not active.')
+        planting = cycle.to_dict().get('plantingDate', '')
+        if _date_is_before(harvested, planting):
+            raise ValueError('Harvest date cannot be before planting date.')
+        forcing = cycle.to_dict().get('forcingDate', '')
+        if forcing and _date_is_before(harvested, forcing):
+            raise ValueError('Harvest date cannot be before forcing date.')
+        now = firestore.SERVER_TIMESTAMP
+        txn.update(cycle_ref, {'status': 'completed', 'harvestedAt': harvested, 'updatedAt': now,
+                               'completedBy': _crop_actor(decoded)})
+        txn.update(block_ref, {'activeCycleId': firestore.DELETE_FIELD})
+        txn.set(cycle_ref.collection('history').document(), {'type': 'Crop Cycle Completed',
+                'field': 'status', 'previousValue': 'active', 'newValue': 'completed',
+                'updatedBy': _crop_actor(decoded), 'updatedAt': now, 'cropCycleId': cycle_id})
+    try:
+        close_cycle(transaction)
+    except ValueError as exc:
+        return jsonify({'ok': False, 'message': str(exc)}), 400
+    except Exception:
+        return jsonify({'ok': False, 'message': 'Could not complete crop cycle.'}), 500
+    return jsonify({'ok': True}), 200
 
 @app.route('/api/test', methods=['GET'])
 def api_test():
