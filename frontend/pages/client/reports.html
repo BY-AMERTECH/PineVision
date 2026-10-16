@@ -507,6 +507,7 @@
     <script src="../../js/auth.js"></script>
     <script src="../../js/data.js"></script>
     <script src="../../js/utils.js"></script>
+    <script src="../../js/block-scan-history.js"></script>
     <script src="../../js/app.js"></script>
 
     <script>
@@ -556,11 +557,9 @@
 
         Promise.all([
           firebase.firestore().collection("blocks").where("userId", "==", currentUser.uid).get(),
-          firebase.firestore().collection("scans").where("userId", "==", currentUser.uid).get(),
         ])
-          .then(function (results) {
+          .then(async function (results) {
             const blocksSnap = results[0];
-            const scansSnap = results[1];
 
             BLOCKS_RAW = [];
             blocksSnap.forEach(function (doc) {
@@ -575,18 +574,35 @@
                 bearing: d.bearingPercent || 0,
                 nonbearing: d.nonBearingPercent || 0,
                 nonViable: d.nonViable || 0,
-                plants: d.declaredPopulation || d.totalPineapples || 0,
+                plants: 0,
                 totalScans: d.totalScans || 0,
               });
             });
 
+            const scanSnapshots = await Promise.all(BLOCKS_RAW.map(function (block) {
+              return firebase.firestore().collection("scans")
+                .where("blockId", "==", block.id)
+                .where("userId", "==", currentUser.uid)
+                .get();
+            }));
+            const latestCounts = blockScanHistory.latestPlantCountsFromSnapshots(
+              BLOCKS_RAW.map((block) => block.id),
+              scanSnapshots,
+              currentUser.uid,
+            );
+            BLOCKS_RAW.forEach(function (block) {
+              block.plants = latestCounts.get(block.id) || 0;
+            });
+
             SCANS_RAW = [];
-            scansSnap.forEach(function (doc) {
-              const d = doc.data();
-              SCANS_RAW.push({
-                id: doc.id,
-                blockId: d.blockId || "",
-                startTime: d.startTime && typeof d.startTime.toDate === "function" ? d.startTime.toDate() : null,
+            scanSnapshots.forEach(function (snapshot) {
+              snapshot.forEach(function (doc) {
+                const d = doc.data();
+                SCANS_RAW.push({
+                  id: doc.id,
+                  blockId: d.blockId || "",
+                  startTime: d.startTime && typeof d.startTime.toDate === "function" ? d.startTime.toDate() : null,
+                });
               });
             });
 
@@ -721,7 +737,7 @@
 
         document.getElementById("report-metrics").innerHTML = `
                 ${utils.buildMetricCard("Blocks in Report", blocks.length, blocks.length + " of " + BLOCKS_RAW.length + " total", "")}
-                ${utils.buildMetricCard("Total Plants", utils.formatNumber(totalPlants), "across selected blocks", "")}
+                ${utils.buildMetricCard("Estimated Total Plant Count", utils.formatNumber(totalPlants), "Estimated Count of all Pineapple plants", "")}
                 ${utils.buildMetricCard("Avg Bearing Rate", utils.formatPercent(avgBearing), "of selected blocks", "green")}
                 ${utils.buildMetricCard("Avg Non-Bearing", utils.formatPercent(avgNonbearing), "of selected blocks", "amber")}
                 ${utils.buildMetricCard("Avg Non-Viable", utils.formatPercent(avgNonViable), "fruit yellowing", "yellow")}

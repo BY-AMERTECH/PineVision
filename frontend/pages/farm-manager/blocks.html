@@ -839,10 +839,6 @@
                 <label class="form-label" for="edit-daf">Growth Stage (DAF)</label>
                 <input type="number" id="edit-daf" name="daf" class="form-input" placeholder="e.g., 245" min="0" />
               </div>
-              <div class="form-group">
-                <label class="form-label" for="edit-declaredPopulation">Declared Population *</label>
-                <input type="number" id="edit-declaredPopulation" name="declaredPopulation" class="form-input" placeholder="e.g., 12500" required />
-              </div>
             </div>
 
             <p class="form-hint">
@@ -952,15 +948,24 @@
               daf: typeof d.daf === "number" ? d.daf : (parseInt(d.daf, 10) || 0),
               planted: d.planted || "",
               forcingDate: d.forcingDate || "",
-              declaredPopulation: d.declaredPopulation || d.totalPineapples || 0,
               bearing: d.bearingPercent || 0,
               nonbearing: d.nonBearingPercent || 0,
               nonViable: d.nonViable || 0,
               plants: d.totalPineapples || 0,
               totalScans: d.totalScans || 0,
               lastScanned: d.lastScanned || null,
+              estimatedTotalPlantCount: null,
             });
           });
+
+          try {
+            const latestCounts = await blockScanHistory.loadLatestPlantCounts(ALL_BLOCKS.map((block) => block.id));
+            ALL_BLOCKS.forEach(function (block) {
+              block.estimatedTotalPlantCount = latestCounts.get(block.id) || 0;
+            });
+          } catch (scanError) {
+            console.error("❌ Error loading latest completed plant counts:", scanError);
+          }
 
           console.log("✅ Loaded", ALL_BLOCKS.length, "blocks across", usersSnap.size, "accounts");
 
@@ -1202,7 +1207,7 @@
                   <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z" />
                   <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12" />
                 </svg>
-                Forced <strong>${escapeHtml(formatDateValue(block.forcingDate))}</strong>
+                Forcing Date <strong>${escapeHtml(formatDateValue(block.forcingDate))}</strong>
               </span>
             </div>
 
@@ -1214,7 +1219,7 @@
                   <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
                   <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
                 </svg>
-                Declared Population <strong>${formatNumber(block.declaredPopulation)}</strong>
+                Estimated Total Plant Count <strong>${block.estimatedTotalPlantCount === null ? "Unavailable" : formatNumber(block.estimatedTotalPlantCount)}</strong>
               </span>
               <div class="fb-breakdown">
                 <span class="fb-stat"><span class="fb-stat-dot" style="background:var(--green-500);"></span>Bearing <span class="fb-stat-val" style="color:var(--green);">${formatPercent(block.bearing)}</span>${bearingCount !== null ? " (" + formatNumber(bearingCount) + ")" : ""}</span>
@@ -1302,7 +1307,6 @@
         document.getElementById("edit-planted").value = block.planted || "";
         document.getElementById("edit-forcingDate").value = block.forcingDate || "";
         document.getElementById("edit-daf").value = block.daf || "";
-        document.getElementById("edit-declaredPopulation").value = block.declaredPopulation || "";
         utils.showModal("edit-block-modal");
       }
 
@@ -1322,9 +1326,7 @@
         const planted = document.getElementById("edit-planted").value.trim();
         const forcingDate = document.getElementById("edit-forcingDate").value.trim();
         const daf = parseInt(document.getElementById("edit-daf").value, 10) || 0;
-        const declaredPopulation = parseInt(document.getElementById("edit-declaredPopulation").value, 10);
-
-        if (!blockName || !section || !area || !planted || !forcingDate || !declaredPopulation) {
+        if (!blockName || !section || !area || !planted || !forcingDate) {
           utils.showFormError("edit-block-form", "Please fill in all required fields.");
           return;
         }
@@ -1340,7 +1342,6 @@
             planted: planted,
             forcingDate: forcingDate,
             daf: daf,
-            declaredPopulation: declaredPopulation,
           })
           .then(function () {
             block.blockName = blockName;
@@ -1350,7 +1351,6 @@
             block.planted = planted;
             block.forcingDate = forcingDate;
             block.daf = daf;
-            block.declaredPopulation = declaredPopulation;
 
             populateFilterOptions();
             filterAndRender();

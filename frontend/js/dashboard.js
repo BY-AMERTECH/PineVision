@@ -57,8 +57,8 @@
                     section: data.section || 'N/A',
                     area: data.area || 0,
                     daf: data.daysAfterFlowering || data.daf || 0,
-                    declaredPopulation: data.declaredPopulation || 0,
                     totalPineapples: data.totalPineapples || 0,
+                    estimatedTotalPlantCount: null,
                     bearing: data.bearingPercent || 0,
                     nonBearing: data.nonBearingPercent || 0,
                     discolored: data.nonViable || 0,
@@ -66,6 +66,18 @@
                     totalScans: data.totalScans || 0
                 });
             });
+
+            try {
+                const latestCounts = await blockScanHistory.loadLatestPlantCounts(
+                    blocksData.map(block => block.id),
+                    currentUser.uid
+                );
+                blocksData.forEach(block => {
+                    block.estimatedTotalPlantCount = latestCounts.get(block.id) || 0;
+                });
+            } catch (scanError) {
+                console.error('❌ Error loading latest completed plant counts:', scanError);
+            }
 
             console.log(`✅ Loaded ${blocksData.length} blocks from Firestore`);
 
@@ -92,7 +104,6 @@
         if (blocksData.length === 0) {
             return {
                 totalPlants: 0,
-                totalDeclared: 0,
                 avgBearing: 0,
                 avgNonbearing: 0,
                 avgDiscolored: 0,
@@ -100,8 +111,8 @@
             };
         }
 
-        const totalPlants = blocksData.reduce((sum, b) => sum + (b.totalPineapples || 0), 0);
-        const totalDeclared = blocksData.reduce((sum, b) => sum + (b.declaredPopulation || 0), 0);
+        const totalPlants = blocksData.reduce((sum, b) => sum + (b.estimatedTotalPlantCount || 0), 0);
+        const weightingTotal = blocksData.reduce((sum, b) => sum + (b.totalPineapples || 0), 0);
 
         // Weighted average by total pineapples
         let weightedBearing = 0;
@@ -109,7 +120,7 @@
         let weightedDiscolored = 0;
 
         blocksData.forEach(block => {
-            const weight = (block.totalPineapples || 0) / totalPlants;
+            const weight = weightingTotal > 0 ? (block.totalPineapples || 0) / weightingTotal : 0;
             weightedBearing += (block.bearing || 0) * weight;
             weightedNonBearing += (block.nonBearing || 0) * weight;
             weightedDiscolored += (block.discolored || 0) * weight;
@@ -117,7 +128,6 @@
 
         return {
             totalPlants,
-            totalDeclared,
             avgBearing: weightedBearing,
             avgNonbearing: weightedNonBearing,
             avgDiscolored: weightedDiscolored,
@@ -198,9 +208,9 @@
 
         const metricsHTML = `
             ${buildMetricCard(
-            'Total Plants',
+            'Estimated Total Plant Count',
             formatNumber(totals.totalPlants),
-            `Declared: ${formatNumber(totals.totalDeclared)}`,
+            'Estimated Count of all Pineapple plants',
             ''
         )}
             ${buildMetricCard(
@@ -252,7 +262,7 @@
                 <td style="font-family: var(--font-mono);">${block.daf} days</td>
                 <td>${block.section}</td>
                 <td style="font-family: var(--font-mono);">${formatArea(block.area)}</td>
-                <td style="font-family: var(--font-mono);">${formatNumber(block.declaredPopulation)}</td>
+                <td style="font-family: var(--font-mono);">${block.estimatedTotalPlantCount === null ? 'Unavailable' : formatNumber(block.estimatedTotalPlantCount)}</td>
                 <td>${buildInlineBar(block.bearing, barColor)}</td>
                 <td style="font-family: var(--font-mono);">${formatPercent(block.discolored)}</td>
                 <td>${buildStatusBadge(statusClass)}</td>

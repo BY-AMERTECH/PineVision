@@ -649,7 +649,7 @@
             </div>
           </div>
 
-          <!-- Metric Cards: Declared Pop. first, then Bearing, Non-Bearing, Discolored -->
+          <!-- Metric Cards: Estimated Total, Bearing, Non-Bearing, Discolored -->
           <div
             class="row row-cols-2 row-cols-md-4 g-3 mb-4"
             id="metric-cards-row"
@@ -777,19 +777,6 @@
                   min="0"
                 />
               </div>
-              <div class="form-group">
-                <label class="form-label" for="edit-declaredPopulation"
-                  >Declared Population *</label
-                >
-                <input
-                  type="number"
-                  id="edit-declaredPopulation"
-                  name="declaredPopulation"
-                  class="form-input"
-                  placeholder="e.g., 12500"
-                  required
-                />
-              </div>
             </div>
           </div>
           <div class="modal-footer" style="justify-content: space-between;">
@@ -892,10 +879,6 @@
         /* redirects */
       }
 
-      // ── Feature toggle ──────────────────────────────────────────────
-      // Set to true to re-enable declared population in calculations.
-      const INCLUDE_DECLARED_POPULATION = false;
-
       let currentBlock = null;
       let currentUserId = null;
 
@@ -977,14 +960,23 @@
             daf: blockData.daf || 0,
             planted: blockData.planted || "Not set",
             forcingDate: blockData.forcingDate || "Not set",
-            declaredPopulation:
-              blockData.declaredPopulation || blockData.totalPineapples || 0,
+            estimatedTotalPlantCount: null,
             flightDuration: blockData.flightDuration || null,
 
             // Metadata
             totalScans: blockData.totalScans || 0,
             lastScanned: blockData.lastScanned,
           };
+
+          try {
+            const latestCounts = await blockScanHistory.loadLatestPlantCounts(
+              [blockDoc.id],
+              currentUserId,
+            );
+            currentBlock.estimatedTotalPlantCount = latestCounts.get(blockDoc.id) || 0;
+          } catch (scanError) {
+            console.error("❌ Error loading latest completed plant counts:", scanError);
+          }
 
           console.log("✅ Block loaded:", currentBlock);
 
@@ -1037,9 +1029,9 @@
 
         document.getElementById("metric-cards-row").innerHTML =
           buildMetricCard(
-            "Declared Pop.",
-            formatNumber(block.declaredPopulation) + " plants",
-            "Registered Population",
+            "Estimated Total Plant Count",
+            block.estimatedTotalPlantCount === null ? "Unavailable" : formatNumber(block.estimatedTotalPlantCount),
+            "Estimated Count of all Pineapple plants",
             "",
           ) +
           buildMetricCard(
@@ -1279,7 +1271,6 @@
         document.getElementById("edit-planted").value = currentBlock.planted || "";
         document.getElementById("edit-forcingDate").value = currentBlock.forcingDate || "";
         document.getElementById("edit-daf").value = currentBlock.daf || "";
-        document.getElementById("edit-declaredPopulation").value = currentBlock.declaredPopulation || "";
         utils.showModal("edit-block-modal");
       }
 
@@ -1322,9 +1313,7 @@
         const planted = document.getElementById("edit-planted").value.trim();
         const forcingDate = document.getElementById("edit-forcingDate").value.trim();
         const daf = parseInt(document.getElementById("edit-daf").value) || 0;
-        const declaredPopulation = parseInt(document.getElementById("edit-declaredPopulation").value);
-
-        if (!blockName || !section || !area || !planted || !forcingDate || !declaredPopulation) {
+        if (!blockName || !section || !area || !planted || !forcingDate) {
           utils.showFormError("edit-block-form", "Please fill in all required fields.");
           return;
         }
@@ -1336,7 +1325,6 @@
           planted: currentBlock.planted,
           forcingDate: currentBlock.forcingDate,
           daf: currentBlock.daf,
-          declaredPopulation: currentBlock.declaredPopulation,
         };
         const newValues = {
           blockName: blockName,
@@ -1345,7 +1333,6 @@
           planted: planted,
           forcingDate: forcingDate,
           daf: daf,
-          declaredPopulation: declaredPopulation,
         };
 
         currentBlock.blockName = blockName;
@@ -1354,7 +1341,6 @@
         currentBlock.planted = planted;
         currentBlock.forcingDate = forcingDate;
         currentBlock.daf = daf;
-        currentBlock.declaredPopulation = declaredPopulation;
 
         firebase
           .firestore()
@@ -1367,7 +1353,6 @@
             planted: planted,
             forcingDate: forcingDate,
             daf: daf,
-            declaredPopulation: declaredPopulation,
           })
           .then(function () {
             logBlockUpdateActivity(previousValues, newValues, currentBlock.id);

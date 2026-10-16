@@ -566,6 +566,7 @@
     <script src="../../js/auth.js"></script>
     <script src="../../js/data.js"></script>
     <script src="../../js/utils.js"></script>
+    <script src="../../js/block-scan-history.js"></script>
     <script src="../../js/app.js"></script>
     <script>
       if (!auth.requireFarmManager()) {
@@ -646,7 +647,7 @@
           .collection("blocks")
           .limit(RP_LIMIT)
           .onSnapshot(
-            function (snap) {
+            async function (snap) {
               BLOCKS_RAW = [];
               snap.forEach(function (doc) {
                 const d = doc.data();
@@ -660,11 +661,20 @@
                   bearing: d.bearingPercent || 0,
                   nonbearing: d.nonBearingPercent || 0,
                   nonViable: d.nonViable || 0,
-                  declaredPopulation: d.declaredPopulation || d.totalPineapples || 0,
                   totalScans: d.totalScans || 0,
-                  plants: d.totalPineapples || 0,
+                  plants: null,
                 });
               });
+              try {
+                const latestCounts = await blockScanHistory.loadLatestPlantCounts(
+                  BLOCKS_RAW.map((block) => block.id),
+                );
+                BLOCKS_RAW.forEach(function (block) {
+                  block.plants = latestCounts.get(block.id) || 0;
+                });
+              } catch (scanError) {
+                console.error("❌ Error loading latest completed plant counts:", scanError);
+              }
               rpBlocksLoaded = true;
               setLiveStatus(true);
               onDataChanged();
@@ -881,7 +891,8 @@
           return;
         }
 
-        const totalPlants = blocks.reduce((s, b) => s + b.declaredPopulation, 0);
+        const plantsAvailable = blocks.every((block) => Number.isSafeInteger(block.plants));
+        const totalPlants = blocks.reduce((s, b) => s + (b.plants || 0), 0);
         const avgBearing = blocks.reduce((s, b) => s + b.bearing, 0) / blocks.length;
         const avgNonbearing = blocks.reduce((s, b) => s + b.nonbearing, 0) / blocks.length;
         const avgNonViable = blocks.reduce((s, b) => s + b.nonViable, 0) / blocks.length;
@@ -890,7 +901,7 @@
         document.getElementById("rp-metrics").innerHTML =
           utils.buildMetricCard("Blocks in Report", blocks.length, blocks.length + " of " + BLOCKS_RAW.length + " total", "") +
           utils.buildMetricCard("Scans in Range", scansInRange.length, "Linked scan sessions", "green") +
-          utils.buildMetricCard("Total Declared Pop.", utils.formatNumber(totalPlants), "across selected blocks", "") +
+          utils.buildMetricCard("Estimated Total Plant Count", plantsAvailable ? utils.formatNumber(totalPlants) : "Unavailable", "Estimated Count of all Pineapple plants", "") +
           utils.buildMetricCard("Avg Bearing Rate", utils.formatPercent(avgBearing), "of selected blocks", "green") +
           utils.buildMetricCard("Avg Non-Bearing", utils.formatPercent(avgNonbearing), "of selected blocks", "amber") +
           utils.buildMetricCard("Avg Non-Viable", utils.formatPercent(avgNonViable), "of selected blocks", "yellow") +

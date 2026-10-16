@@ -53,6 +53,57 @@ window.blockScanHistory = (function () {
         return Number.isFinite(value) ? value : null;
     }
 
+    function scanStartDate(data) {
+        const value = data && data.startTime;
+        const date = value && typeof value.toDate === 'function'
+            ? value.toDate()
+            : value instanceof Date ? value : null;
+        return date && Number.isFinite(date.getTime()) ? date : null;
+    }
+
+    function completedPlantCount(data) {
+        if (!data || (data.status != null && data.status !== 'completed')) return null;
+        const date = scanStartDate(data);
+        const bearing = metric(data, 'bearing');
+        const nonBearing = metric(data, 'nonBearing');
+        if (!date || !Number.isSafeInteger(bearing) || bearing < 0 ||
+            !Number.isSafeInteger(nonBearing) || nonBearing < 0) return null;
+        return { date: date, count: bearing + nonBearing };
+    }
+
+    async function loadLatestPlantCounts(blockIds, userId) {
+        const ids = new Set((blockIds || []).filter(Boolean).map(String));
+        if (!ids.size) return new Map();
+
+        const scans = firebase.firestore().collection('scans');
+        const snapshots = await Promise.all(Array.from(ids, function (blockId) {
+            let query = scans.where('blockId', '==', blockId);
+            if (userId) query = query.where('userId', '==', userId);
+            return query.get();
+        }));
+        return latestPlantCountsFromSnapshots(Array.from(ids), snapshots, userId);
+    }
+
+    function latestPlantCountsFromSnapshots(blockIds, snapshots, userId) {
+        const ids = new Set((blockIds || []).filter(Boolean).map(String));
+        const latest = new Map();
+        if (!ids.size) return latest;
+        snapshots.forEach(function (snapshot) {
+            snapshot.forEach(function (doc) {
+                const data = doc.data() || {};
+                const blockId = data.blockId == null ? '' : String(data.blockId);
+                if (!ids.has(blockId) || (userId && data.userId !== userId)) return;
+                const result = completedPlantCount(data);
+                if (!result) return;
+                const previous = latest.get(blockId);
+                if (!previous || result.date > previous.date) latest.set(blockId, result);
+            });
+        });
+        return new Map(Array.from(latest, function (entry) {
+            return [entry[0], entry[1].count];
+        }));
+    }
+
     function escapeHtml(value) {
         return String(value == null ? '' : value).replace(/[&<>"']/g, function (char) {
             return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char];
@@ -242,5 +293,12 @@ window.blockScanHistory = (function () {
         }
     }
 
-    return { load: load, render: render, download: download, toCSV: toCSV };
+    return {
+        load: load,
+        loadLatestPlantCounts: loadLatestPlantCounts,
+        latestPlantCountsFromSnapshots: latestPlantCountsFromSnapshots,
+        render: render,
+        download: download,
+        toCSV: toCSV,
+    };
 })();

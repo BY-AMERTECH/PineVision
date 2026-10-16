@@ -568,21 +568,28 @@
             blockId: d.blockId || blockDoc.id,
             blockName: d.blockName || d.blockId || blockDoc.id,
             userId: d.userId || "",
-            operatorName: usersById[d.userId] || d.userId || "Unassigned",
+            registeredBy: usersById[d.userId] || d.userId || "Unassigned",
             section: d.section || "—",
             area: typeof d.area === "number" ? d.area : parseFloat(d.area) || 0,
             stage: d.stage || "",
             daf: typeof d.daf === "number" ? d.daf : parseInt(d.daf, 10) || 0,
             planted: d.planted || "",
             forcingDate: d.forcingDate || "",
-            declaredPopulation: d.declaredPopulation || d.totalPineapples || 0,
             bearing: d.bearingPercent || 0,
             nonbearing: d.nonBearingPercent || 0,
             nonViable: d.nonViable || 0,
             plants: d.totalPineapples || 0,
             totalScans: d.totalScans || 0,
             lastScanned: d.lastScanned || null,
+            estimatedTotalPlantCount: null,
           };
+
+          try {
+            const latestCounts = await blockScanHistory.loadLatestPlantCounts([blockDoc.id]);
+            currentBlock.estimatedTotalPlantCount = latestCounts.get(blockDoc.id) || 0;
+          } catch (scanError) {
+            console.error("❌ Error loading latest completed plant counts:", scanError);
+          }
 
           document.title = currentBlock.blockName + " — PineVision";
           renderPage(currentBlock);
@@ -627,7 +634,7 @@
                   </span>
                 </div>
                 <div class="block-page-subtitle">
-                  ${escapeHtml(block.operatorName)} &middot; ${escapeHtml(block.section)} &middot; ${formatArea(block.area)} &middot; ${escapeHtml(growthStageLabel(block))}
+                  Registered by ${escapeHtml(block.registeredBy)} &middot; ${escapeHtml(block.section)} &middot; ${formatArea(block.area)} &middot; ${escapeHtml(growthStageLabel(block))}
                 </div>
                 ${utils.recentScanBadge(block.lastScanned)}
               </div>
@@ -635,7 +642,7 @@
           </div>
 
           <div class="row row-cols-2 row-cols-md-4 g-3 mb-4">
-            ${buildMetricCard("Declared Pop.", formatNumber(block.declaredPopulation) + " plants", "Registered Population", "")}
+            ${buildMetricCard("Estimated Total Plant Count", block.estimatedTotalPlantCount === null ? "Unavailable" : formatNumber(block.estimatedTotalPlantCount), "Estimated Count of all Pineapple plants", "")}
             ${buildMetricCard("Bearing", formatPercent(block.bearing), plantSub(bearingCount), "green")}
             ${buildMetricCard("Non-Bearing", formatPercent(block.nonbearing), plantSub(nonbearingCount), "amber")}
             ${buildMetricCard("Non-Viable", formatPercent(block.nonViable), plantSub(nonViableCount), "red")}
@@ -655,9 +662,9 @@
                 <div class="stat-row">
                   <span class="stat-label">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                    Flight User
+                    Registered By
                   </span>
-                  <span class="stat-value">${escapeHtml(block.operatorName)}</span>
+                  <span class="stat-value">${escapeHtml(block.registeredBy)}</span>
                 </div>
                 <div class="stat-row">
                   <span class="stat-label">
