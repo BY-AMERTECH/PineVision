@@ -68,7 +68,7 @@ const app = (function() {
 
         navLinks.forEach(link => {
             const linkPath = link.getAttribute('href');
-            
+
             if (linkPath && currentPath.includes(linkPath)) {
                 link.classList.add('active');
             } else {
@@ -208,10 +208,6 @@ const app = (function() {
             icon: 'cog',
             client: { title: 'Settings', subtitle: 'Customize your PineVision experience' },
             default: { title: 'Settings', subtitle: 'Manage your PineVision admin preferences' }
-        },
-        'flight': {
-            icon: 'flight',
-            default: { title: 'Flight Schedules', subtitle: 'View and manage drone flight schedules configured across all fruit blocks' }
         },
         'flights-scans': {
             icon: 'flight',

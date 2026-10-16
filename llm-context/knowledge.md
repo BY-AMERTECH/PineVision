@@ -129,7 +129,8 @@ Windows consoles that fail on emoji (`UnicodeEncodeError ... charmap`), set
 - `firestore.rules`: any authenticated user can read/write `blocks`, `scans`,
   `monitoring_alerts`, `missions`, and `users` (except `users` read is public, for
   username lookup); `activity_logs` and `alerts` allow unauthenticated `create`;
-  `scheduled_scans` is owner-only.
+
+Scheduled Scan scheduling and its application reads/writes have been removed; existing Firestore records are retained and were not deleted.
 
 ## Known gaps and stale docs
 

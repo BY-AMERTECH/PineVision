@@ -492,18 +492,6 @@
             <div class="nav-section-title">Field Operations</div>
             <ul class="nav-links">
               <li>
-                <a href="flight.html" class="nav-link">
-                  <span class="nav-link-icon">
-                    <img
-                      src="/frontend/assets/icons/flight.svg"
-                      alt="Flight Schedules"
-                      width="20"
-                    />
-                  </span>
-                  <span class="nav-link-text">Flight Schedules</span>
-                </a>
-              </li>
-              <li>
                 <a href="reports.html" class="nav-link">
                   <span class="nav-link-icon">
                     <img
@@ -638,24 +626,6 @@
                 </svg>
                 Edit Block
               </button>
-              <button class="btn btn-navigation" onclick="openScheduleScanModal()">
-                <svg
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                 aria-hidden="true" focusable="false">
-                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                  <line x1="16" y1="2" x2="16" y2="6" />
-                  <line x1="8" y1="2" x2="8" y2="6" />
-                  <line x1="3" y1="10" x2="21" y2="10" />
-                </svg>
-                Schedule Scan
-              </button>
               <a
                 href="drone-view.html"
                 id="btn-new-scan"
@@ -707,9 +677,6 @@
 
           <!-- Fruit Condition Breakdown -->
           <div class="tcard mb-4" id="condition-breakdown"></div>
-
-          <!-- Scheduled Scans (manual scheduling for this block) -->
-          <div class="tcard" id="scheduled-scans-card"></div>
         </div>
       </main>
     </div>
@@ -844,174 +811,6 @@
       </div>
     </div>
 
-    <!-- SCHEDULE SCAN MODAL -->
-    <div id="schedule-scan-modal" class="modal">
-      <div class="modal-content" style="max-width: 500px">
-        <div class="modal-header">
-          <h2 class="modal-title">Schedule Scan</h2>
-          <button class="modal-close" onclick="closeScheduleScanModal()">
-            &times;
-          </button>
-        </div>
-        <form id="schedule-scan-form" onsubmit="handleScheduleScan(event)">
-          <div class="modal-body">
-            <div class="form-error" id="scan-form-error"></div>
-            <div class="form-row">
-              <div class="form-group">
-                <label class="form-label" for="scan-date">Scan Date *</label>
-                <input
-                  type="date"
-                  id="scan-date"
-                  name="scanDate"
-                  class="form-input"
-                  required
-                />
-              </div>
-              <div class="form-group">
-                <label class="form-label" for="scan-time">Scan Time *</label>
-                <input
-                  type="time"
-                  id="scan-time"
-                  name="scanTime"
-                  class="form-input"
-                  required
-                />
-              </div>
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="scan-operator">User *</label>
-              <input
-                type="text"
-                id="scan-operator"
-                name="operator"
-                class="form-input"
-                placeholder="e.g., Juan Dela Cruz"
-                required
-              />
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="scan-notes">Notes</label>
-              <input
-                type="text"
-                id="scan-notes"
-                name="notes"
-                class="form-input"
-                placeholder="Optional notes about this scan"
-              />
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button
-              type="button"
-              class="btn btn-secondary"
-              onclick="closeScheduleScanModal()"
-            ><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m18 6-12 12M6 6l12 12"/></svg> Cancel</button>
-            <button type="submit" class="btn btn-primary"><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18M9 16h2"/></svg> Schedule Scan</button>
-          </div>
-        </form>
-      </div>
-    </div>
-
-    <!-- EDIT SCHEDULED SCAN MODAL -->
-    <div id="edit-schedule-scan-modal" class="modal">
-      <div class="modal-content" style="max-width: 500px">
-        <div class="modal-header">
-          <h2 class="modal-title">Edit Scheduled Scan</h2>
-          <button class="modal-close" onclick="closeEditScheduleScanModal()">
-            &times;
-          </button>
-        </div>
-        <form id="edit-schedule-scan-form" onsubmit="handleEditScheduledScan(event)">
-          <div class="modal-body">
-            <div class="form-error" id="edit-scan-form-error"></div>
-            <input type="hidden" id="edit-scan-id" name="scanId" />
-            <div class="form-row">
-              <div class="form-group">
-                <label class="form-label" for="edit-scan-date">Scan Date *</label>
-                <input
-                  type="date"
-                  id="edit-scan-date"
-                  name="scanDate"
-                  class="form-input"
-                  required
-                />
-              </div>
-              <div class="form-group">
-                <label class="form-label" for="edit-scan-time">Scan Time *</label>
-                <input
-                  type="time"
-                  id="edit-scan-time"
-                  name="scanTime"
-                  class="form-input"
-                  required
-                />
-              </div>
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="edit-scan-operator">User *</label>
-              <input
-                type="text"
-                id="edit-scan-operator"
-                name="operator"
-                class="form-input"
-                placeholder="e.g., Juan Dela Cruz"
-                required
-              />
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="edit-scan-notes">Notes</label>
-              <input
-                type="text"
-                id="edit-scan-notes"
-                name="notes"
-                class="form-input"
-                placeholder="Optional notes about this scan"
-              />
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button
-              type="button"
-              class="btn btn-secondary"
-              onclick="closeEditScheduleScanModal()"
-            ><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m18 6-12 12M6 6l12 12"/></svg> Cancel</button>
-            <button type="submit" class="btn btn-primary"><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12l4 4v12a2 2 0 0 1-2 2zM17 21v-8H7v8M7 3v5h8"/></svg> Save Changes</button>
-          </div>
-        </form>
-      </div>
-    </div>
-
-    <!-- CANCEL SCHEDULED SCAN CONFIRMATION MODAL -->
-    <div id="cancel-scan-modal" class="modal">
-      <div class="modal-content" style="max-width: 420px">
-        <div class="modal-header">
-          <h2 class="modal-title">Cancel Scheduled Scan</h2>
-          <button class="modal-close" onclick="closeCancelScanModal()">
-            &times;
-          </button>
-        </div>
-        <div class="modal-body">
-          <p style="font-size:var(--font-size-sm);color:var(--color-text-secondary);margin:0;">
-            Are you sure you want to cancel the scan scheduled for
-            <strong id="cancel-scan-datetime" style="color:var(--color-text-primary);"></strong>?
-            This will mark it as cancelled; it will remain in the block's history.
-          </p>
-        </div>
-        <div class="modal-footer">
-          <button
-            type="button"
-            class="btn btn-secondary"
-            onclick="closeCancelScanModal()"
-          ><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m20 6-11 11-5-5"/></svg> Keep Scan</button>
-          <button
-            type="button"
-            class="btn btn-danger"
-            onclick="confirmCancelScheduledScan()"
-          ><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m18 6-12 12M6 6l12 12"/></svg> Cancel Scan</button>
-        </div>
-      </div>
-    </div>
-
     <!-- BEARING RATE TREND MODAL -->
     <div id="trend-modal" class="modal">
       <div class="modal-content scan-history-modal-content">
@@ -1100,11 +899,6 @@
       let currentBlock = null;
       let currentUserId = null;
 
-      // In-memory cache of the block's loaded scheduled scans (Firestore
-      // doc id -> record), refreshed by loadScheduledScans(). Used so the
-      // edit/cancel modals don't need an extra round-trip to populate.
-      let scheduledScans = [];
-
       window.initPage = async function () {
         // Mark "Fruit Blocks" as the active nav link
         document
@@ -1114,7 +908,7 @@
         if (blocksLink) blocksLink.classList.add("active");
 
         // Current authenticated user (already verified by auth.requireAuth()
-        // above) — used to scope scheduled-scan reads/writes to this user.
+        // above).
         const session = auth.getSession();
         currentUserId = session ? session.uid : null;
 
@@ -1135,10 +929,6 @@
         }
 
         setupModals();
-
-        // Independent of the block metadata above — load this block's
-        // scheduled scans without blocking the rest of the page.
-        loadScheduledScans();
       };
 
       // ── Load Block from Firebase ─────────────────────────────────
@@ -1289,7 +1079,7 @@
                         <span class="stat-label">Area</span>
                         <span class="stat-value">${formatArea(block.area)}</span>
                     </div>
-                    
+
                 </div>
             </div>
             <div class="col-md-6">
@@ -1475,9 +1265,6 @@
 
       function setupModals() {
         utils.setupModalClose("edit-block-modal");
-        utils.setupModalClose("schedule-scan-modal");
-        utils.setupModalClose("edit-schedule-scan-modal");
-        utils.setupModalClose("cancel-scan-modal");
         utils.setupModalClose("trend-modal");
         utils.setupModalClose("delete-block-modal");
       }
@@ -1629,422 +1416,6 @@
           });
       }
 
-      // ── Scheduled Scans ─────────────────────────────────────────────
-      // Manual scheduling only: records are created/edited/cancelled by
-      // the signed-in user for this block. No automation, no exports.
-
-      const SCHEDULED_SCANS_COLLECTION = "scheduled_scans";
-
-      function scheduledScanCollection() {
-        return firebase.firestore().collection(SCHEDULED_SCANS_COLLECTION);
-      }
-
-      /**
-       * Combine a date input value ("YYYY-MM-DD") and a time input value
-       * ("HH:MM") into a JS Date. Returns null if either part is missing
-       * or the result isn't a valid date (invalid-date guard).
-       */
-      function parseScheduledDateTime(dateStr, timeStr) {
-        if (!dateStr || !timeStr) return null;
-        const combined = new Date(dateStr + "T" + timeStr);
-        if (isNaN(combined.getTime())) return null;
-        return combined;
-      }
-
-      /**
-       * Format a JS Date for display, e.g. "Sep 20, 2026 · 6:00 AM".
-       * Defensive against bad/missing data so a malformed record can't
-       * break the whole list.
-       */
-      function formatScheduledDateTime(date) {
-        if (!(date instanceof Date) || isNaN(date.getTime())) {
-          return "Unknown date";
-        }
-        const datePart = date.toLocaleDateString("en-US", {
-          year: "numeric",
-          month: "short",
-          day: "2-digit",
-        });
-        const timePart = date.toLocaleTimeString("en-US", {
-          hour: "numeric",
-          minute: "2-digit",
-        });
-        return datePart + " · " + timePart;
-      }
-
-      function scheduledScanStatusBadge(status) {
-        if (status === "cancelled") {
-          return '<span class="badge crit"><span class="bdot"></span>Cancelled</span>';
-        }
-        return '<span class="badge good"><span class="bdot"></span>Scheduled</span>';
-      }
-
-      // ── Load & render ────────────────────────────────────────────
-
-      async function loadScheduledScans() {
-        const container = document.getElementById("scheduled-scans-card");
-        if (!container) return;
-
-        if (!currentBlock || !currentUserId) {
-          renderScheduledScansError("You must be signed in to view scheduled scans.");
-          return;
-        }
-
-        renderScheduledScansLoading();
-
-        try {
-          // Two equality filters (blockId, userId) — deliberately no
-          // orderBy() in the query itself so this never depends on a
-          // Firestore composite index; results are sorted client-side
-          // below, same pattern as flight.js's loadMissions().
-          const snapshot = await scheduledScanCollection()
-            .where("blockId", "==", currentBlock.id)
-            .where("userId", "==", currentUserId)
-            .get();
-
-          const now = new Date();
-          const items = [];
-
-          snapshot.forEach((doc) => {
-            const data = doc.data() || {};
-            const scheduledAt =
-              data.scheduledAt && typeof data.scheduledAt.toDate === "function"
-                ? data.scheduledAt.toDate()
-                : null;
-
-            items.push({
-              id: doc.id,
-              scheduledAt: scheduledAt,
-              operator: data.operator || "",
-              notes: data.notes || "",
-              status: data.status === "cancelled" ? "cancelled" : "scheduled",
-            });
-          });
-
-          // Only show future schedules (per spec), and only records with
-          // a parseable scheduledAt — anything unparseable is silently
-          // excluded from this compact view rather than breaking render.
-          const future = items.filter(
-            (item) => item.scheduledAt && item.scheduledAt.getTime() >= now.getTime(),
-          );
-
-          future.sort((a, b) => a.scheduledAt - b.scheduledAt);
-
-          scheduledScans = future;
-          renderScheduledScansList(future);
-        } catch (error) {
-          console.error("❌ Error loading scheduled scans:", error);
-          scheduledScans = [];
-          renderScheduledScansError("Failed to load scheduled scans. Please try again.");
-        }
-      }
-
-      function renderScheduledScansLoading() {
-        const container = document.getElementById("scheduled-scans-card");
-        if (!container) return;
-        container.innerHTML = `
-        <div class="thead-row">
-            <span class="thead-title">Scheduled Scans</span>
-        </div>
-        <div style="padding:var(--space-xl);color:var(--muted);font-size:var(--font-size-sm);">
-            Loading scheduled scans…
-        </div>`;
-      }
-
-      function renderScheduledScansError(message) {
-        const container = document.getElementById("scheduled-scans-card");
-        if (!container) return;
-        container.innerHTML = `
-        <div class="thead-row">
-            <span class="thead-title">Scheduled Scans</span>
-        </div>
-        <div style="padding:var(--space-xl);color:var(--muted);font-size:var(--font-size-sm);">
-            ${message}
-            <button type="button" class="btn btn-sm btn-secondary" style="margin-left:var(--space-md);" onclick="loadScheduledScans()"><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Retry</button>
-        </div>`;
-      }
-
-      function renderScheduledScansList(items) {
-        const container = document.getElementById("scheduled-scans-card");
-        if (!container) return;
-
-        if (!items.length) {
-          container.innerHTML = `
-          <div class="thead-row">
-              <span class="thead-title">Scheduled Scans</span>
-          </div>
-          <div style="padding:var(--space-xl);color:var(--muted);font-size:var(--font-size-sm);">
-              No upcoming scans scheduled for this block. Use "Schedule Scan" above to add one.
-          </div>`;
-          return;
-        }
-
-        const rows = items
-          .map((item) => {
-            const actions =
-              item.status === "scheduled"
-                ? `<button type="button" class="btn btn-sm btn-secondary" onclick="openEditScheduleScanModal('${item.id}')"><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L9 17l-4 1 1-4z"/></svg> Edit</button>
-                   <button type="button" class="btn btn-sm btn-secondary" style="color:var(--red);border-color:rgba(139,32,32,0.3);margin-left:var(--space-sm);" onclick="openCancelScanModal('${item.id}')"><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m18 6-12 12M6 6l12 12"/></svg> Cancel</button>`
-                : `<span style="color:var(--muted);font-size:var(--font-size-xs);">—</span>`;
-
-            return `
-                    <tr>
-                        <td style="font-family:var(--font-mono);white-space:nowrap;">${formatScheduledDateTime(item.scheduledAt)}</td>
-                        <td>${item.operator || "—"}</td>
-                        <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${item.notes || "—"}</td>
-                        <td>${scheduledScanStatusBadge(item.status)}</td>
-                        <td style="white-space:nowrap;">${actions}</td>
-                    </tr>`;
-          })
-          .join("");
-
-        container.innerHTML = `
-        <div class="thead-row">
-            <span class="thead-title">Scheduled Scans</span>
-        </div>
-        <div class="twrap">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Date &amp; Time</th>
-                        <th>User</th>
-                        <th>Notes</th>
-                        <th>Status</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>${rows}</tbody>
-            </table>
-        </div>`;
-      }
-
-      // ── Schedule scan modal (create) ────────────────────────────────
-
-      function openScheduleScanModal() {
-        if (!currentBlock) return;
-
-        const form = document.getElementById("schedule-scan-form");
-        if (form) form.reset();
-
-        // Default to tomorrow, 06:00 — same convention as Flight Missions.
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        document.getElementById("scan-date").value = tomorrow.toISOString().split("T")[0];
-        document.getElementById("scan-time").value = "06:00";
-
-        const session = auth.getSession();
-        document.getElementById("scan-operator").value =
-          (session && (session.fullName || session.username)) || "";
-        document.getElementById("scan-notes").value = "";
-
-        utils.showModal("schedule-scan-modal");
-      }
-
-      function closeScheduleScanModal() {
-        utils.hideModal("schedule-scan-modal");
-      }
-
-      async function handleScheduleScan(event) {
-        event.preventDefault();
-        if (!currentBlock || !currentUserId) {
-          utils.showToast("You must be signed in to schedule a scan.", "error");
-          return;
-        }
-
-        const dateStr = document.getElementById("scan-date").value;
-        const timeStr = document.getElementById("scan-time").value;
-        const operator = document.getElementById("scan-operator").value.trim();
-        const notes = document.getElementById("scan-notes").value.trim();
-
-        if (!dateStr || !timeStr || !operator) {
-          utils.showFormError("schedule-scan-form", "Please fill in all required fields.");
-          return;
-        }
-
-        const scheduledDate = parseScheduledDateTime(dateStr, timeStr);
-        if (!scheduledDate) {
-          utils.showFormError("schedule-scan-form", "Please enter a valid scan date and time.");
-          return;
-        }
-
-        const submitBtn = document.querySelector('#schedule-scan-form button[type="submit"]');
-        if (submitBtn) submitBtn.disabled = true;
-
-        try {
-          await scheduledScanCollection().add({
-            blockId: currentBlock.id,
-            userId: currentUserId,
-            scheduledAt: firebase.firestore.Timestamp.fromDate(scheduledDate),
-            operator: operator,
-            notes: notes,
-            status: "scheduled",
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-          });
-
-          utils.showToast("Scan scheduled successfully!", "success");
-          closeScheduleScanModal();
-          await loadScheduledScans();
-        } catch (error) {
-          console.error("❌ Error scheduling scan:", error);
-          utils.showToast("Failed to schedule scan. Please try again.", "error");
-        } finally {
-          if (submitBtn) submitBtn.disabled = false;
-        }
-      }
-
-      // ── Edit scheduled scan modal ───────────────────────────────────
-
-      function openEditScheduleScanModal(scanId) {
-        const item = scheduledScans.find((s) => s.id === scanId);
-        if (!item) {
-          utils.showToast("Scheduled scan not found. It may have changed — refreshing.", "error");
-          loadScheduledScans();
-          return;
-        }
-        if (item.status !== "scheduled") {
-          utils.showToast("Cancelled scans can't be edited.", "error");
-          return;
-        }
-
-        const form = document.getElementById("edit-schedule-scan-form");
-        if (form) form.reset();
-
-        document.getElementById("edit-scan-id").value = item.id;
-
-        const d = item.scheduledAt;
-        if (d instanceof Date && !isNaN(d.getTime())) {
-          const pad = (n) => String(n).padStart(2, "0");
-          document.getElementById("edit-scan-date").value =
-            d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
-          document.getElementById("edit-scan-time").value =
-            pad(d.getHours()) + ":" + pad(d.getMinutes());
-        } else {
-          document.getElementById("edit-scan-date").value = "";
-          document.getElementById("edit-scan-time").value = "";
-        }
-
-        document.getElementById("edit-scan-operator").value = item.operator || "";
-        document.getElementById("edit-scan-notes").value = item.notes || "";
-
-        utils.showModal("edit-schedule-scan-modal");
-      }
-
-      function closeEditScheduleScanModal() {
-        utils.hideModal("edit-schedule-scan-modal");
-      }
-
-      async function handleEditScheduledScan(event) {
-        event.preventDefault();
-        if (!currentUserId) {
-          utils.showToast("You must be signed in to edit a scheduled scan.", "error");
-          return;
-        }
-
-        const scanId = document.getElementById("edit-scan-id").value;
-        const dateStr = document.getElementById("edit-scan-date").value;
-        const timeStr = document.getElementById("edit-scan-time").value;
-        const operator = document.getElementById("edit-scan-operator").value.trim();
-        const notes = document.getElementById("edit-scan-notes").value.trim();
-
-        if (!scanId) {
-          utils.showToast("Missing scheduled scan reference.", "error");
-          return;
-        }
-
-        if (!dateStr || !timeStr || !operator) {
-          utils.showFormError("edit-schedule-scan-form", "Please fill in all required fields.");
-          return;
-        }
-
-        const scheduledDate = parseScheduledDateTime(dateStr, timeStr);
-        if (!scheduledDate) {
-          utils.showFormError("edit-schedule-scan-form", "Please enter a valid scan date and time.");
-          return;
-        }
-
-        const submitBtn = document.querySelector('#edit-schedule-scan-form button[type="submit"]');
-        if (submitBtn) submitBtn.disabled = true;
-
-        try {
-          // Ownership re-check straight from the loaded cache (already
-          // scoped to this user/block by the query in loadScheduledScans)
-          // before writing — belt-and-braces alongside the security rules.
-          const item = scheduledScans.find((s) => s.id === scanId);
-          if (!item) {
-            utils.showToast("Scheduled scan not found. Refreshing…", "error");
-            await loadScheduledScans();
-            return;
-          }
-
-          await scheduledScanCollection().doc(scanId).update({
-            scheduledAt: firebase.firestore.Timestamp.fromDate(scheduledDate),
-            operator: operator,
-            notes: notes,
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-          });
-
-          utils.showToast("Scheduled scan updated!", "success");
-          closeEditScheduleScanModal();
-          await loadScheduledScans();
-        } catch (error) {
-          console.error("❌ Error updating scheduled scan:", error);
-          utils.showToast("Failed to update scheduled scan. Please try again.", "error");
-        } finally {
-          if (submitBtn) submitBtn.disabled = false;
-        }
-      }
-
-      // ── Cancel scheduled scan modal ─────────────────────────────────
-
-      let scanPendingCancel = null;
-
-      function openCancelScanModal(scanId) {
-        const item = scheduledScans.find((s) => s.id === scanId);
-        if (!item) {
-          utils.showToast("Scheduled scan not found. It may have changed — refreshing.", "error");
-          loadScheduledScans();
-          return;
-        }
-        if (item.status !== "scheduled") {
-          utils.showToast("This scan is already cancelled.", "error");
-          return;
-        }
-
-        scanPendingCancel = scanId;
-        document.getElementById("cancel-scan-datetime").textContent =
-          formatScheduledDateTime(item.scheduledAt);
-        utils.showModal("cancel-scan-modal");
-      }
-
-      function closeCancelScanModal() {
-        scanPendingCancel = null;
-        utils.hideModal("cancel-scan-modal");
-      }
-
-      async function confirmCancelScheduledScan() {
-        if (!scanPendingCancel) {
-          closeCancelScanModal();
-          return;
-        }
-        const scanId = scanPendingCancel;
-
-        try {
-          // Status update only — never delete — so cancelled scans stay
-          // in the block's history instead of disappearing.
-          await scheduledScanCollection().doc(scanId).update({
-            status: "cancelled",
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-          });
-
-          utils.showToast("Scheduled scan cancelled.", "success");
-          closeCancelScanModal();
-          await loadScheduledScans();
-        } catch (error) {
-          console.error("❌ Error cancelling scheduled scan:", error);
-          utils.showToast("Failed to cancel scheduled scan. Please try again.", "error");
-        }
-      }
     </script>
   </body>
 </html>

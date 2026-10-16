@@ -1,5 +1,7 @@
 # PineVision — Incomplete / Missing Feature Audit
 
+> Historical snapshot (2026-09-22): its Schedule Scan findings describe the application at that date. The Schedule Scan feature was subsequently removed; do not use these references as a description of current functionality.
+
 **Date:** 2026-09-22
 **Scope:** Full repo (`backend/`, `frontend/`, `firestore.rules`) as it currently stands on disk — verified against source, not against the older `FIXES_NEEDED.md` / `CODEBASE_ANALYSIS.md` docs, which are stale (dated 2026-05-30/08-26). A prior session's `Claude outputs/PineVision_Drone_Pipeline_Fixes.md` (2026-09-18) already resolved every item in `FIXES_NEEDED.md` and several items in `CODEBASE_ANALYSIS.md` (block deletion, harvest status sync, Schedule Scan modal, trend chart, live bounding-box overlay, `alerts` UI reader) — those are **not** re-reported here; each was individually re-verified against the current file contents before being excluded.
 **Hard constraint honored:** no drone connection / RTMP / MediaMTX / HLS / YOLO / DeepSORT / tracking / counting / frame-processing / scan-processing code was modified. Any issue discovered in that territory is listed in its own section, undisturbed.

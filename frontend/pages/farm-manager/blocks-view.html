@@ -525,8 +525,6 @@
       if (!auth.requireFarmManager()) {
         /* redirects */
       }
-
-      const SCHEDULED_SCANS_COLLECTION = "scheduled_scans";
       let currentBlock = null;
 
       window.initPage = async function () {
@@ -588,7 +586,6 @@
 
           document.title = currentBlock.blockName + " — PineVision";
           renderPage(currentBlock);
-          loadScheduledScans(currentBlock);
         } catch (error) {
           console.error("❌ Error loading block:", error);
           renderNotFound();
@@ -727,8 +724,6 @@
           </div>
 
           <div class="tcard mb-4" id="condition-breakdown"></div>
-
-          <div class="tcard" id="scheduled-scans-card"></div>
         `;
 
         renderConditionBreakdown(block, hasScanData, bearingCount, nonbearingCount, nonViableCount);
@@ -785,85 +780,6 @@
                 </tbody>
             </table>
         </div>`;
-      }
-
-      // ── Scheduled scans (read-only) ─────────────────────────────────
-
-      async function loadScheduledScans(block) {
-        const container = document.getElementById("scheduled-scans-card");
-        if (!container) return;
-        container.innerHTML = `
-          <div class="thead-row"><span class="thead-title">Scheduled Scans</span></div>
-          <div style="padding:var(--space-xl);color:var(--muted);font-size:var(--font-size-sm);">Loading scheduled scans…</div>`;
-
-        try {
-          const snapshot = await firebase
-            .firestore()
-            .collection(SCHEDULED_SCANS_COLLECTION)
-            .where("blockId", "==", block.id)
-            .get();
-
-          const now = new Date();
-          const items = [];
-          snapshot.forEach(function (doc) {
-            const d = doc.data() || {};
-            const scheduledAt = d.scheduledAt && typeof d.scheduledAt.toDate === "function" ? d.scheduledAt.toDate() : null;
-            items.push({
-              scheduledAt: scheduledAt,
-              operator: d.operator || "",
-              notes: d.notes || "",
-              status: d.status === "cancelled" ? "cancelled" : "scheduled",
-            });
-          });
-          items.sort((a, b) => (a.scheduledAt ? a.scheduledAt.getTime() : 0) - (b.scheduledAt ? b.scheduledAt.getTime() : 0));
-
-          if (!items.length) {
-            container.innerHTML = `
-              <div class="thead-row"><span class="thead-title">Scheduled Scans</span></div>
-              <div style="padding:var(--space-xl);color:var(--muted);font-size:var(--font-size-sm);">
-                No scheduled scans found for this block. This is an informational view — scans are scheduled from the user account.
-              </div>`;
-            return;
-          }
-
-          const rows = items
-            .map(function (item) {
-              const isFuture = item.scheduledAt && item.scheduledAt.getTime() >= now.getTime();
-              let stateBadge;
-              if (item.status === "cancelled") {
-                stateBadge = '<span class="badge crit"><span class="bdot"></span>Cancelled</span>';
-              } else if (isFuture) {
-                stateBadge = '<span class="badge good"><span class="bdot"></span>Upcoming</span>';
-              } else {
-                stateBadge = '<span class="badge" style="background-color:var(--surf2);color:var(--color-text-secondary);border-color:var(--border);"><span class="bdot" style="background-color:var(--color-text-tertiary);"></span>Past</span>';
-              }
-              return `
-                <tr>
-                    <td style="font-family:var(--font-mono);white-space:nowrap;">${formatScheduledDateTime(item.scheduledAt)}</td>
-                    <td>${escapeHtml(item.operator || "—")}</td>
-                    <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(item.notes || "—")}</td>
-                    <td>${stateBadge}</td>
-                </tr>`;
-            })
-            .join("");
-
-          container.innerHTML = `
-            <div class="thead-row"><span class="thead-title">Scheduled Scans</span></div>
-            <div class="twrap">
-                <table>
-                    <thead><tr><th>Date &amp; Time</th><th>User</th><th>Notes</th><th>Status</th></tr></thead>
-                    <tbody>${rows}</tbody>
-                </table>
-            </div>`;
-        } catch (error) {
-          console.error("❌ Error loading scheduled scans:", error);
-          container.innerHTML = `
-            <div class="thead-row"><span class="thead-title">Scheduled Scans</span></div>
-            <div style="padding:var(--space-xl);color:var(--muted);font-size:var(--font-size-sm);">
-              Failed to load scheduled scans.
-              <button type="button" class="btn btn-sm btn-secondary" style="margin-left:var(--space-md);" onclick="loadScheduledScans(currentBlock)"><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Retry</button>
-            </div>`;
-        }
       }
 
       // ── Scan History modal ──────────────────────────────────────────

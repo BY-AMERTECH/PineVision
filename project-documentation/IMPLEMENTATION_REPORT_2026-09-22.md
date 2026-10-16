@@ -1,5 +1,7 @@
 # PineVision — Implementation Report (Phase 3)
 
+> Historical snapshot (2026-09-22): its scheduled-scan rule references describe the application at that date. The Schedule Scan feature and its Firestore rule were subsequently removed; existing records were retained.
+
 Companion to `AUDIT_REPORT_2026-09-22.md`. Covers what was actually changed, what was deliberately left alone, and how it was verified.
 
 ---

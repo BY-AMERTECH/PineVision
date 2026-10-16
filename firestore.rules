@@ -27,14 +27,6 @@ service cloud.firestore {
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastLogin']));
     }
 
-    // Scheduled Scans
-    match /scheduled_scans/{docId} {
-      allow read, update: if request.auth != null &&
-    resource.data.userId == request.auth.uid;
-      allow create: if request.auth != null &&
-    request.resource.data.userId == request.auth.uid;
-    }
-
     // Activity logs collection
     match /activity_logs/{logId} {
       allow read: if request.auth != null;  // Logged-in users can read

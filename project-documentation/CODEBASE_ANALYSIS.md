@@ -1,5 +1,7 @@
 # PineVision — Full Codebase Analysis Report
 
+> Historical analysis: its Schedule Scan section describes an earlier implementation state. The Schedule Scan feature has since been removed.
+
 > **Analysis date:** 2026-05-30
 > **Scope:** All backend Python, frontend HTML/JS/CSS, Firestore rules
 > **Purpose:** Read-only audit — no code was modified
