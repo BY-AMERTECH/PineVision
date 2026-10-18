@@ -218,14 +218,24 @@
       }
 
       .btn-icon-only { width: 38px; min-width: 38px; padding: 0; justify-content: center; }
-      .cycle-history-list, .cycle-audit-list { max-height: 320px; overflow-y: auto; }
+      .cycle-history-list { max-height: 320px; overflow-y: auto; }
       .cycle-history-item { padding: var(--space-sm) 0; border-bottom: 1px solid var(--border); }
       .cycle-history-item summary { cursor: pointer; font-size: var(--font-size-sm); color: var(--color-text-primary); }
-      .cycle-history-item summary .stat-value { float: right; }
+      .cycle-history-item summary { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-md); flex-wrap: wrap; }
+      .cycle-entry-label { font-weight: var(--font-weight-semibold); }
+      .cycle-entry-dates { color: var(--muted); text-align: right; }
       .cycle-history-detail { padding: var(--space-sm) var(--space-md); color: var(--muted); font-size: var(--font-size-sm); }
-      .cycle-update-form { display: grid; gap: var(--space-sm); max-width: 480px; }
-      .cycle-close-form, .cycle-new-form { max-width: 480px; }
-      .cycle-update-input { min-height: 2.75rem; }
+      .cycle-card-header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); padding-bottom: var(--space-md); margin-bottom: var(--space-md); border-bottom: 1px solid var(--border); }
+      .cycle-card-header .info-card-title { margin: 0; padding: 0; border: 0; }
+      .cycle-card-body { max-height: 420px; overflow-y: auto; }
+      .cycle-lifecycle-action { border-top: 1px solid var(--border); margin-top: var(--space-md); padding-top: var(--space-md); }
+      .crop-update-options { display: grid; gap: var(--space-sm); }
+      .crop-update-option { display: flex; align-items: center; gap: var(--space-sm); padding: var(--space-sm) var(--space-md); border: 1px solid var(--border); border-radius: var(--radius-md); cursor: pointer; }
+      .crop-update-option:has(input:checked) { border-color: var(--green); background: var(--green-bg); }
+      .crop-audit-modal-content { max-width: 760px; max-height: 85vh; }
+      .crop-audit-content { max-height: 60vh; overflow-y: auto; }
+      .audit-history-entry { padding: var(--space-md) 0; border-bottom: 1px solid var(--border); font-size: var(--font-size-sm); }
+      .audit-history-meta { display: flex; justify-content: space-between; gap: var(--space-md); color: var(--muted); margin-bottom: var(--space-xs); }
 
       @media (max-width: 580px) {
         .block-page-header {
@@ -239,6 +249,10 @@
           justify-content: center;
         }
         .block-header-buttons .btn-icon-only { flex: 0 0 38px; }
+        .cycle-card-header { align-items: flex-start; flex-wrap: wrap; }
+        .cycle-card-header .btn { margin-left: auto; }
+        .cycle-entry-dates { text-align: left; width: 100%; }
+        .audit-history-meta { flex-direction: column; gap: var(--space-xs); }
         .modal .form-row {
           grid-template-columns: 1fr;
         }
@@ -665,11 +679,21 @@
             class="row row-cols-2 row-cols-md-4 g-3 mb-4"
             id="metric-cards-row"
           ></div>
+          <p id="cycle-scan-status" class="form-hint mb-3" hidden>Awaiting first scan for this crop cycle.</p>
 
           <!-- Field Info Cards (two side-by-side) -->
           <div class="row g-3 mb-4" id="field-info-row"></div>
 
-          <div class="info-card mb-4" id="crop-cycle-card"><div id="crop-cycle-history"></div></div>
+          <section class="info-card mb-4" id="crop-cycle-card" aria-labelledby="crop-cycle-title">
+            <div class="cycle-card-header">
+              <h2 class="info-card-title" id="crop-cycle-title">Crop Cycle History</h2>
+              <button type="button" class="btn btn-secondary" onclick="openCropAuditModal()" aria-label="View crop update audit history" title="View Audit History">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/><path d="M8 2 5 5M16 2l3 3"/></svg>
+                View Audit History
+              </button>
+            </div>
+            <div class="cycle-card-body" id="crop-cycle-history" aria-live="polite"></div>
+          </section>
 
           <!-- Scan History (compact — click View to expand in modal) -->
           <div class="tcard trend-compact-card mb-4">
@@ -765,6 +789,45 @@
             </div>
           </div>
         </form>
+      </div>
+    </div>
+
+    <!-- UPDATE CROP DETAILS MODAL -->
+    <div id="update-block-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="update-block-title">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title" id="update-block-title">Update Block</h2>
+          <button type="button" class="modal-close" aria-label="Close Update Block" onclick="closeUpdateBlockModal()">&times;</button>
+        </div>
+        <form id="crop-update-form">
+          <div class="modal-body">
+            <p>Selected block: <strong id="update-block-name"></strong></p>
+            <fieldset class="crop-update-options" aria-describedby="crop-update-help">
+              <legend class="form-label">Choose one action</legend>
+              <label class="crop-update-option"><input type="radio" name="cropWorkflow" value="correction"> Correct an existing crop value</label>
+              <label class="crop-update-option"><input type="radio" id="crop-workflow-new" name="cropWorkflow" value="newCycle"> Start a new crop cycle</label>
+            </fieldset>
+            <div id="crop-update-type-input" class="mt-3"></div>
+            <p id="crop-update-help" class="form-hint"></p>
+            <p id="crop-update-error" class="form-error" role="alert" aria-live="assertive"></p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closeUpdateBlockModal()">Cancel</button>
+            <button type="submit" class="btn btn-primary" id="crop-update-save">Save Changes</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- CROP UPDATE AUDIT HISTORY MODAL -->
+    <div id="crop-audit-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="crop-audit-title">
+      <div class="modal-content crop-audit-modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title" id="crop-audit-title">Crop Update Audit History</h2>
+          <button type="button" class="modal-close" aria-label="Close audit history" onclick="closeCropAuditModal()">&times;</button>
+        </div>
+        <div class="modal-body crop-audit-content" id="crop-audit-content" aria-live="polite"></div>
+        <div class="modal-footer"><button type="button" class="btn btn-secondary" onclick="closeCropAuditModal()">Close</button></div>
       </div>
     </div>
 
@@ -883,6 +946,7 @@
         }
 
         setupModals();
+        cropCycleUI.initialize();
       };
 
       // ── Load Block from Firebase ─────────────────────────────────
@@ -947,11 +1011,13 @@
           }
 
           try {
-            const latestCounts = await blockScanHistory.loadLatestPlantCounts(
-              [blockDoc.id],
-              currentUserId,
-            );
-            currentBlock.estimatedTotalPlantCount = latestCounts.get(blockDoc.id) || 0;
+            if (!currentBlock.hasCycleMetrics) {
+              const latestCounts = await blockScanHistory.loadLatestPlantCounts(
+                [blockDoc.id],
+                currentUserId,
+              );
+              currentBlock.estimatedTotalPlantCount = latestCounts.get(blockDoc.id) || 0;
+            }
           } catch (scanError) {
             console.error("❌ Error loading latest completed plant counts:", scanError);
           }
@@ -995,8 +1061,14 @@
         renderMetricCards(block);
         renderFieldInfo(block);
         renderConditionBreakdown(block);
-        cropCycleUI.mount(block.id, document.getElementById("crop-cycle-history"), block.blockName);
+        return cropCycleUI.mount(block.id, document.getElementById("crop-cycle-history"), block.blockName);
       }
+
+      window.refreshBlockCropInfo = async function () {
+        if (!currentBlock) return;
+        currentBlock.activeCycle = await cropCycleUI.prepare(currentBlock);
+        return renderPage(currentBlock);
+      };
 
       function renderMetricCards(block) {
         const hasDetectedData = block.plants > 0;
@@ -1004,7 +1076,8 @@
         const nonbearingPlants = hasDetectedData ? Math.round((block.nonbearing / 100) * block.plants) : 0;
         const nonViablePlants  = hasDetectedData ? Math.round((block.nonViable  / 100) * block.plants) : 0;
         const bearingAndNonbearingTotal = bearingPlants + nonbearingPlants;
-        const estimatedTotalPlants = block.estimatedTotalPlantCount || bearingAndNonbearingTotal;
+        const estimatedTotalPlants = block.estimatedTotalPlantCount == null
+          ? bearingAndNonbearingTotal : block.estimatedTotalPlantCount;
         const bearingPercent = bearingAndNonbearingTotal > 0
           ? (bearingPlants / bearingAndNonbearingTotal) * 100
           : 0;
@@ -1077,7 +1150,7 @@
                     </div>
                     <div class="stat-row">
                         <span class="stat-label">Growth Stage (DAF)</span>
-                        <span class="stat-value">${block.daf} days</span>
+                        <span class="stat-value">${block.daf ? block.daf + " days" : "Not yet recorded"}</span>
                     </div>
                 </div>
             </div>`;
@@ -1240,6 +1313,8 @@
         utils.setupModalClose("edit-block-modal");
         utils.setupModalClose("trend-modal");
         utils.setupModalClose("delete-block-modal");
+        utils.setupModalClose("update-block-modal");
+        utils.setupModalClose("crop-audit-modal");
       }
 
       // ── Edit modal ────────────────────────────────────────────────
@@ -1253,8 +1328,18 @@
       }
 
       function openUpdateBlock() {
-        const card = document.getElementById("crop-cycle-card");
-        if (card) { card.scrollIntoView({ behavior: "smooth", block: "center" }); card.querySelector("select")?.focus({ preventScroll: true }); }
+        cropCycleUI.openUpdateBlock();
+      }
+
+      function closeUpdateBlockModal() {
+        cropCycleUI.closeUpdateModal();
+      }
+
+      function openCropAuditModal() { cropCycleUI.openAuditHistory(); }
+
+      function closeCropAuditModal() {
+        utils.hideModal("crop-audit-modal");
+        document.querySelector("#crop-cycle-card button[onclick='openCropAuditModal()']")?.focus();
       }
 
       function closeEditModal() {

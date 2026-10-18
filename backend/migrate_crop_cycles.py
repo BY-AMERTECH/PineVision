@@ -26,12 +26,12 @@ def main():
     # Project only fields needed for the summary; avoid loading scan evidence
     # or unrelated block/account data into the migration process.
     blocks = list(db.collection('blocks').select(
-        ['activeCycleId', 'planted', 'forcingDate', 'userId']).stream())
-    scans = db.collection('scans').select(['cycleId']).stream()
+        ['activeCycleId', 'latestCycleId', 'planted', 'forcingDate', 'userId']).stream())
+    scans = db.collection('scans').select(['cropCycleId']).stream()
     eligible, already_linked, missing_dates = [], 0, 0
     for block in blocks:
         data = block.to_dict() or {}
-        if data.get('activeCycleId'):
+        if data.get('activeCycleId') or data.get('latestCycleId'):
             already_linked += 1
         elif data.get('planted'):
             eligible.append((block.id, data.get('planted'), data.get('forcingDate') or '', data.get('userId') or 'migration'))
@@ -47,7 +47,7 @@ def main():
     total_scans = 0
     for scan in scans:
         total_scans += 1
-        if not (scan.to_dict() or {}).get('cycleId'):
+        if not (scan.to_dict() or {}).get('cropCycleId'):
             unassigned_scans += 1
     print(f'Scans inspected: {total_scans}', flush=True)
     print(f'Historical scans left unassigned: {unassigned_scans}')

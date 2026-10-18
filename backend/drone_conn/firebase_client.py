@@ -11,6 +11,7 @@ initialize using serviceAccountKey.json as a fallback.
 import json
 import os
 import tempfile
+from datetime import date
 import firebase_admin
 from firebase_admin import credentials, firestore
 from typing import Optional
@@ -19,6 +20,76 @@ from typing import Optional
 _UPLOADS_DIR = os.path.join(tempfile.gettempdir(), 'pinevision_uploads')
 
 _db = None
+
+
+def create_crop_cycle(block_id: str, user_id: str, planting_date: str, forcing_date: str = '') -> str:
+    """Seed a legacy block's current cycle without changing its scan metrics.
+
+    Used by the explicit crop-cycle migration utility. The transaction makes
+    the cycle document and the block's active-cycle pointer visible together.
+    Existing scan documents are intentionally not assigned to this cycle.
+    """
+    try:
+        planting = date.fromisoformat(str(planting_date))
+    except (TypeError, ValueError):
+        raise ValueError('Planting date must be stored as an ISO date (YYYY-MM-DD).')
+    forcing_text = str(forcing_date or '')
+    if forcing_text:
+        try:
+            forcing = date.fromisoformat(forcing_text)
+        except ValueError:
+            raise ValueError('Forcing date must be stored as an ISO date (YYYY-MM-DD).')
+        if forcing < planting:
+            raise ValueError('Forcing date cannot be before planting date.')
+
+    db = get_firestore_client()
+    block_ref = db.collection('blocks').document(block_id)
+    cycle_ref = block_ref.collection('cycles').document()
+    transaction = db.transaction()
+
+    @firestore.transactional
+    def seed_cycle(txn):
+        block_snapshot = txn.get(block_ref)
+        if not block_snapshot.exists:
+            raise ValueError('Block not found.')
+        block_data = block_snapshot.to_dict() or {}
+        if user_id and block_data.get('userId') != user_id:
+            raise ValueError('Block owner changed; migration was skipped.')
+        existing_cycles = list(txn.get(block_ref.collection('cycles').limit(1)))
+        if block_data.get('activeCycleId') or block_data.get('latestCycleId') or existing_cycles:
+            raise ValueError('Block already has crop-cycle history.')
+
+        metrics = {
+            'bearingPercent': block_data.get('bearingPercent', 0) or 0,
+            'nonBearingPercent': block_data.get('nonBearingPercent', 0) or 0,
+            'nonViable': block_data.get('nonViable', 0) or 0,
+            'totalPlantEstimate': block_data.get('totalPineapples', 0) or 0,
+            'plantCount': block_data.get('totalPineapples', 0) or 0,
+            'estimatedBearing': block_data.get('estimatedBearing', 0) or 0,
+            'estimatedNonBearing': block_data.get('estimatedNonBearing', 0) or 0,
+            'detectionCoverage': block_data.get('detectionCoverage', 0) or 0,
+            'scanCount': 0,
+            'awaitingFirstScan': not bool(block_data.get('lastScanned')),
+        }
+        now = firestore.SERVER_TIMESTAMP
+        txn.set(cycle_ref, {
+            'plantingDate': str(planting_date),
+            'forcingDate': forcing_text,
+            'daf': block_data.get('daf', 0) or 0,
+            'status': 'active',
+            'legacy': True,
+            'migratedAt': now,
+            'updatedAt': now,
+            'metrics': metrics,
+        })
+        txn.update(block_ref, {
+            'activeCycleId': cycle_ref.id,
+            'latestCycleId': cycle_ref.id,
+            'cropCycleSchemaInitialized': True,
+        })
+
+    seed_cycle(transaction)
+    return cycle_ref.id
 
 
 def get_firestore_client():
@@ -160,7 +231,9 @@ def create_scan_session(block_id: str, user_id: str) -> Optional[str]:
     try:
         db = get_firestore_client()
         scan_ref = db.collection('scans').document()
-        scan_ref.set({
+        block_snapshot = db.collection('blocks').document(block_id).get()
+        block_data = block_snapshot.to_dict() if block_snapshot.exists else {}
+        scan_data = {
             'blockId':         block_id,
             'userId':          user_id,
             'status':          'active',
@@ -174,7 +247,12 @@ def create_scan_session(block_id: str, user_id: str) -> Optional[str]:
             'totalFrames':     0,
             'manifestReady':   False,
             'lastUpdate':      firestore.SERVER_TIMESTAMP,
-        })
+        }
+        # New scans are associated only with the current cycle at scan start;
+        # existing scans are never retroactively assigned.
+        if block_data.get('activeCycleId'):
+            scan_data['cropCycleId'] = block_data['activeCycleId']
+        scan_ref.set(scan_data)
         print(f"✅ Created scan session: {scan_ref.id}")
         return scan_ref.id
     except Exception as e:
@@ -275,7 +353,32 @@ def complete_scan_session(
             'estimatedBearing':      estimated_bearing,
             'estimatedNonBearing':   estimated_non_bearing,
             'detectionCoverage':     round(detection_coverage, 2),
+            'awaitingFirstScan':     False,
         })
+
+        scan_snapshot = scan_ref.get()
+        scan_data = scan_snapshot.to_dict() if scan_snapshot.exists else {}
+        cycle_id = (scan_data or {}).get('cropCycleId')
+        if cycle_id:
+            cycle_ref = block_ref.collection('cycles').document(cycle_id)
+            if cycle_ref.get().exists:
+                batch.update(cycle_ref, {
+                    'metrics.bearingPercent': round(bearing_pct, 1),
+                    'metrics.nonBearingPercent': round(non_bearing_pct, 1),
+                    'metrics.nonViable': round(non_viable_pct, 1),
+                    'metrics.bearingCount': bearing_count,
+                    'metrics.nonBearingCount': non_bearing_count,
+                    'metrics.nonViableCount': non_viable_count,
+                    'metrics.plantCount': total_count,
+                    'metrics.totalPlantEstimate': bearing_count + non_bearing_count,
+                    'metrics.estimatedBearing': estimated_bearing,
+                    'metrics.estimatedNonBearing': estimated_non_bearing,
+                    'metrics.detectionCoverage': round(detection_coverage, 2),
+                    'metrics.awaitingFirstScan': False,
+                    'metrics.scanCount': firestore.Increment(1),
+                    'metrics.lastScanned': firestore.SERVER_TIMESTAMP,
+                    'updatedAt': firestore.SERVER_TIMESTAMP,
+                })
 
         batch.commit()
         print(f"✅ Scan session completed: {scan_id}")

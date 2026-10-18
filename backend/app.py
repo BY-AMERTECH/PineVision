@@ -153,17 +153,46 @@ def block_cycles(block_id):
     block_ref = db.collection('blocks').document(block_id)
     if request.method == 'GET':
         cycles = []
-        for snap in block_ref.collection('cycles').order_by('createdAt').stream():
+        for snap in block_ref.collection('cycles').stream():
             item = snap.to_dict()
             item['id'] = snap.id
-            for key in ('createdAt', 'updatedAt', 'harvestedAt'):
+            for key in ('createdAt', 'updatedAt', 'harvestedAt', 'migratedAt'):
                 if item.get(key) and hasattr(item[key], 'isoformat'):
                     item[key] = item[key].isoformat()
+            if isinstance(item.get('metrics'), dict):
+                metrics = dict(item['metrics'])
+                for key, value in metrics.items():
+                    if value and hasattr(value, 'isoformat'):
+                        metrics[key] = value.isoformat()
+                item['metrics'] = metrics
             cycles.append(item)
+        cycles.sort(key=lambda item: (
+            0 if item.get('legacy') else 1,
+            str(item.get('createdAt') or item.get('migratedAt') or ''),
+        ))
         block_data = block.to_dict()
+        legacy_current = (not block_data.get('latestCycleId') and
+                          bool(block_data.get('planted') or block_data.get('forcingDate')))
+        legacy_cycle = None
+        if legacy_current and not cycles:
+            legacy_cycle = {
+                'plantingDate': block_data.get('planted') or '',
+                'forcingDate': block_data.get('forcingDate') or '',
+                'daf': block_data.get('daf', 0) or 0,
+                'status': 'legacy current details',
+                'legacy': True,
+                'metrics': {
+                    'bearingPercent': block_data.get('bearingPercent', 0) or 0,
+                    'nonBearingPercent': block_data.get('nonBearingPercent', 0) or 0,
+                    'nonViable': block_data.get('nonViable', 0) or 0,
+                    'totalPlantEstimate': block_data.get('totalPineapples', 0) or 0,
+                    'plantCount': block_data.get('totalPineapples', 0) or 0,
+                    'awaitingFirstScan': not bool(block_data.get('lastScanned')),
+                },
+            }
         return jsonify({'ok': True, 'cycles': cycles, 'activeCycleId': block_data.get('activeCycleId'),
                         'latestCycleId': block_data.get('latestCycleId'),
-                        'legacyCurrent': not block_data.get('latestCycleId') and bool(block_data.get('planted') or block_data.get('forcingDate'))}), 200
+                        'legacyCurrent': legacy_current, 'legacyCycle': legacy_cycle}), 200
 
     body = request.get_json(silent=True) or {}
     try:
@@ -173,43 +202,133 @@ def block_cycles(block_id):
             forcing = _valid_crop_date(forcing, 'Forcing date')
             if forcing < planting:
                 raise ValueError('Forcing date cannot be before planting date.')
+        has_daf = 'daf' in body
+        daf = body.get('daf', 0)
+        if isinstance(daf, bool) or not isinstance(daf, int) or daf < 0:
+            raise ValueError('Growth Stage (DAF) must be a whole number of 0 or more.')
     except ValueError as exc:
         return jsonify({'ok': False, 'message': str(exc)}), 400
     cycle_ref = block_ref.collection('cycles').document()
+    operation_id = body.get('operationId')
+    if not isinstance(operation_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]{16,80}', operation_id):
+        return jsonify({'ok': False, 'message': 'This cycle request is invalid. Please reopen the form and try again.'}), 400
+    active_scans = db.collection('scans').where('blockId', '==', block_id).where('status', '==', 'active').limit(1).stream()
+    if next(active_scans, None):
+        return jsonify({'ok': False, 'message': 'Wait for the current scan to finish before starting a new crop cycle.'}), 409
     transaction = db.transaction()
     @firestore.transactional
     def create_cycle(txn):
         latest = txn.get(block_ref)
         latest_data = latest.to_dict()
-        if latest_data.get('activeCycleId'):
-            raise ValueError('Complete the current crop cycle before starting another.')
+        active_id = latest_data.get('activeCycleId')
+        active_ref = block_ref.collection('cycles').document(active_id) if active_id else None
+        active = txn.get(active_ref) if active_ref else None
+        existing_cycles = list(txn.get(block_ref.collection('cycles').limit(1)))
+        if latest_data.get('lastCycleStartRequestId') == operation_id:
+            active_data = active.to_dict() if active and active.exists else {}
+            if (not active_data or active_data.get('startRequestId') != operation_id or
+                    active_data.get('plantingDate') != planting or
+                    (active_data.get('forcingDate') or '') != (forcing or '') or
+                    active_data.get('daf', 0) != daf):
+                raise ValueError('This request was already used with different cycle details. Reopen the form and try again.')
+            return active_id
+        if active_id and (not active.exists or active.to_dict().get('status') != 'active'):
+            raise ValueError('The current crop cycle could not be verified. Reload and try again.')
         now = firestore.SERVER_TIMESTAMP
+        # Preserve the live block metrics on the cycle being closed. Existing
+        # scan values are real legacy data; no old scan is reassigned here.
+        if active_id:
+            active_data = active.to_dict()
+            stored_metrics = active_data.get('metrics') or {}
+            scan_belongs_to_active_cycle = False
+            cycle_created = active_data.get('createdAt')
+            last_scanned = latest_data.get('lastScanned')
+            if cycle_created and last_scanned:
+                try:
+                    scan_belongs_to_active_cycle = last_scanned >= cycle_created
+                except TypeError:
+                    pass
+            if stored_metrics and not (stored_metrics.get('awaitingFirstScan') and scan_belongs_to_active_cycle):
+                cycle_metrics = stored_metrics
+            else:
+                cycle_metrics = {
+                    'bearingPercent': latest_data.get('bearingPercent', 0) or 0,
+                    'nonBearingPercent': latest_data.get('nonBearingPercent', 0) or 0,
+                    'nonViable': latest_data.get('nonViable', 0) or 0,
+                    'totalPlantEstimate': latest_data.get('totalPineapples', 0) or 0,
+                    'plantCount': latest_data.get('totalPineapples', 0) or 0,
+                    'detectionCoverage': latest_data.get('detectionCoverage', 0) or 0,
+                    'awaitingFirstScan': not bool(latest_data.get('lastScanned')),
+                    'lastScanned': latest_data.get('lastScanned'),
+                }
+            txn.update(active_ref, {'status': 'completed', 'harvestedAt': now,
+                                    'completedBy': _crop_actor(decoded), 'updatedAt': now,
+                                    'metrics': cycle_metrics})
+            txn.set(active_ref.collection('history').document(), {
+                'type': 'Crop Cycle Completed', 'field': 'status', 'previousValue': 'active',
+                'newValue': 'completed', 'updatedBy': _crop_actor(decoded),
+                'updatedAt': now, 'cropCycleId': active_id})
         # Preserve pre-cycle-schema dates before updating the legacy block fields.
-        if latest_data.get('planted') or latest_data.get('forcingDate'):
+        is_initial_cycle = (latest_data.get('initialCycleRequestId') == operation_id and not active_id and
+                            not latest_data.get('latestCycleId') and not existing_cycles)
+        if (not is_initial_cycle and not active_id and not latest_data.get('latestCycleId') and
+                not existing_cycles and (latest_data.get('planted') or latest_data.get('forcingDate'))):
             legacy_ref = block_ref.collection('cycles').document()
             txn.set(legacy_ref, {'plantingDate': latest_data.get('planted') or '',
                                  'forcingDate': latest_data.get('forcingDate') or '',
-                                 'status': 'completed', 'legacy': True, 'createdAt': now,
-                                 'updatedAt': now, 'createdBy': _crop_actor(decoded)})
-        txn.set(cycle_ref, {'plantingDate': planting, 'forcingDate': forcing or '', 'daf': 0, 'status': 'active',
-                            'createdAt': now, 'updatedAt': now, 'createdBy': _crop_actor(decoded)})
+                                 'status': 'completed', 'legacy': True, 'migratedAt': now,
+                                 'harvestedAt': now, 'completedBy': _crop_actor(decoded),
+                                 'metrics': {
+                                     'bearingPercent': latest_data.get('bearingPercent', 0) or 0,
+                                     'nonBearingPercent': latest_data.get('nonBearingPercent', 0) or 0,
+                                     'nonViable': latest_data.get('nonViable', 0) or 0,
+                                     'totalPlantEstimate': latest_data.get('totalPineapples', 0) or 0,
+                                     'plantCount': latest_data.get('totalPineapples', 0) or 0,
+                                     'estimatedBearing': latest_data.get('estimatedBearing', 0) or 0,
+                                     'estimatedNonBearing': latest_data.get('estimatedNonBearing', 0) or 0,
+                                     'detectionCoverage': latest_data.get('detectionCoverage', 0) or 0,
+                                     'awaitingFirstScan': not bool(latest_data.get('lastScanned')),
+                                     'lastScanned': latest_data.get('lastScanned'),
+                                 }})
+            txn.set(legacy_ref.collection('history').document(), {
+                'type': 'Crop Cycle Completed', 'field': 'status', 'previousValue': 'legacy current crop',
+                'newValue': 'completed', 'updatedBy': _crop_actor(decoded),
+                'updatedAt': now, 'cropCycleId': legacy_ref.id})
+        metrics = {'bearingPercent': 0, 'nonBearingPercent': 0, 'nonViable': 0,
+                   'totalPlantEstimate': 0, 'plantCount': 0, 'bearingCount': 0, 'nonBearingCount': 0,
+                   'nonViableCount': 0, 'estimatedBearing': 0, 'estimatedNonBearing': 0,
+                   'detectionCoverage': 0, 'scanCount': 0, 'awaitingFirstScan': True}
+        txn.set(cycle_ref, {'plantingDate': planting, 'forcingDate': forcing or '', 'daf': daf, 'status': 'active',
+                            'metrics': metrics, 'createdAt': now, 'updatedAt': now,
+                            'createdBy': _crop_actor(decoded), 'startRequestId': operation_id})
         txn.update(block_ref, {'activeCycleId': cycle_ref.id, 'latestCycleId': cycle_ref.id, 'planted': planting,
-                               'forcingDate': forcing or '', 'daf': 0})
+                               'forcingDate': forcing or '', 'daf': daf, 'bearingPercent': 0,
+                               'nonBearingPercent': 0, 'nonViable': 0, 'totalPineapples': 0,
+                               'estimatedBearing': 0, 'estimatedNonBearing': 0, 'detectionCoverage': 0,
+                               'awaitingFirstScan': True, 'cropCycleSchemaInitialized': True,
+                               'initialCycleRequestId': firestore.DELETE_FIELD,
+                               'lastCycleStartRequestId': operation_id})
         audit = cycle_ref.collection('history').document()
         txn.set(audit, {'type': 'Crop Cycle Started', 'field': 'plantingDate', 'previousValue': '',
                         'newValue': planting, 'updatedBy': _crop_actor(decoded), 'updatedAt': now,
                         'cropCycleId': cycle_ref.id})
         if forcing:
-            txn.set(cycle_ref.collection('history').document(), {'type': 'forcingDate Updated',
+            txn.set(cycle_ref.collection('history').document(), {'type': 'Forcing Date Set on New Cycle',
                     'field': 'forcingDate', 'previousValue': '', 'newValue': forcing,
                     'updatedBy': _crop_actor(decoded), 'updatedAt': now, 'cropCycleId': cycle_ref.id})
+        if has_daf:
+            txn.set(cycle_ref.collection('history').document(), {'type': 'Growth Stage Set on New Cycle', 'field': 'daf',
+                    'previousValue': '', 'newValue': daf, 'updatedBy': _crop_actor(decoded),
+                    'updatedAt': now, 'cropCycleId': cycle_ref.id})
+        return cycle_ref.id
     try:
-        create_cycle(transaction)
+        created_cycle_id = create_cycle(transaction)
     except ValueError as exc:
         return jsonify({'ok': False, 'message': str(exc)}), 409
     except Exception:
+        app.logger.exception('Failed to start crop cycle for block %s', block_id)
         return jsonify({'ok': False, 'message': 'Could not start crop cycle.'}), 500
-    return jsonify({'ok': True, 'cycleId': cycle_ref.id}), 201
+    return jsonify({'ok': True, 'cycleId': created_cycle_id}), 201
 
 
 @app.route('/api/blocks/<block_id>/cycles/<cycle_id>', methods=['PATCH'])
@@ -258,6 +377,7 @@ def update_block_cycle(block_id, cycle_id):
     except ValueError as exc:
         return jsonify({'ok': False, 'message': str(exc)}), 400
     except Exception:
+        app.logger.exception('Failed to update crop cycle %s for block %s', cycle_id, block_id)
         return jsonify({'ok': False, 'message': 'Could not update crop cycle.'}), 500
     return jsonify({'ok': True}), 200
 
@@ -299,8 +419,7 @@ def correct_legacy_block_cycle(block_id):
         now = firestore.SERVER_TIMESTAMP
         cycle_ref = block_ref.collection('cycles').document()
         cycle_data = {'plantingDate': planting, 'forcingDate': forcing, 'daf': data.get('daf', 0),
-                      'status': 'active', 'legacy': True, 'createdAt': now, 'updatedAt': now,
-                      'createdBy': _crop_actor(decoded)}
+                      'status': 'active', 'legacy': True, 'migratedAt': now, 'updatedAt': now}
         final_value = value
         cycle_data[field] = final_value
         txn.set(cycle_ref, cycle_data)
@@ -319,6 +438,7 @@ def correct_legacy_block_cycle(block_id):
     except ValueError as exc:
         return jsonify({'ok': False, 'message': str(exc)}), 409
     except Exception:
+        app.logger.exception('Failed to migrate legacy crop details for block %s', block_id)
         return jsonify({'ok': False, 'message': 'Could not update legacy crop information.'}), 500
     return jsonify({'ok': True}), 200
 

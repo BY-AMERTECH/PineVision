@@ -684,6 +684,8 @@
               // Metadata
               lastScanned: blockData.lastScanned,
               totalScans: blockData.totalScans || 0,
+              activeCycleId: blockData.activeCycleId || null,
+              awaitingFirstScan: !!blockData.awaitingFirstScan,
             });
           });
 
@@ -693,10 +695,37 @@
               currentUser.uid,
             );
             ALL_BLOCKS.forEach(function (block) {
-              block.estimatedTotalPlantCount = latestCounts.get(block.id) || 0;
+              block.estimatedTotalPlantCount = block.activeCycleId
+                ? (block.plants || 0) : (latestCounts.get(block.id) || 0);
             });
           } catch (scanError) {
             console.error("❌ Error loading latest completed plant counts:", scanError);
+          }
+
+          const currentCycleBlocks = ALL_BLOCKS.filter(function (block) { return block.activeCycleId; });
+          if (currentCycleBlocks.length) {
+            const idToken = await firebase.auth().currentUser.getIdToken();
+            await Promise.all(currentCycleBlocks.map(async function (block) {
+              try {
+                const response = await fetch("/api/blocks/" + encodeURIComponent(block.id) + "/cycles", {
+                  headers: { "Authorization": "Bearer " + idToken },
+                });
+                const result = await response.json();
+                if (!response.ok || !result.ok) return;
+                const cycle = (result.cycles || []).find(function (item) { return item.id === result.activeCycleId; });
+                if (!cycle || !cycle.metrics) return;
+                block.bearing = Number(cycle.metrics.bearingPercent) || 0;
+                block.nonbearing = Number(cycle.metrics.nonBearingPercent) || 0;
+                block.plants = cycle.metrics.plantCount == null
+                  ? (Number(cycle.metrics.totalPlantEstimate) || 0) : (Number(cycle.metrics.plantCount) || 0);
+                block.nonViable = Number(cycle.metrics.nonViable) || 0;
+                block.estimatedTotalPlantCount = Number(cycle.metrics.totalPlantEstimate) || 0;
+                block.awaitingFirstScan = !!cycle.metrics.awaitingFirstScan;
+                block.lastScanned = cycle.metrics.lastScanned || null;
+              } catch (cycleError) {
+                console.error("❌ Could not load the current crop-cycle metrics for", block.id, cycleError);
+              }
+            }));
           }
 
           console.log("✅ Loaded", ALL_BLOCKS.length, "blocks from Firestore");
@@ -773,6 +802,7 @@
                                       <div class="bcard-meta">
                                           ${block.section} &middot; ${formatArea(block.area)}
                                           <div>${utils.recentScanBadge(block.lastScanned)}</div>
+                                          ${block.awaitingFirstScan ? '<div class="form-hint">Awaiting first scan</div>' : ''}
                                       </div>
                                   </div>
                                   <div style="display:flex;flex-direction:column;align-items:flex-end;gap:var(--space-xs);">
@@ -884,12 +914,13 @@
 
         try {
           const currentUser = auth.getCurrentUser();
+          const operationId = (window.crypto && crypto.randomUUID)
+            ? crypto.randomUUID()
+            : Date.now().toString(36) + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
 
           // Create new block in Firestore
-          await firebase
-            .firestore()
-            .collection("blocks")
-            .add({
+          const blockRef = firebase.firestore().collection("blocks").doc();
+          await blockRef.set({
               blockId: formData.blockId,
               blockName: formData.blockId,
               userId: currentUser.uid,
@@ -899,17 +930,42 @@
               // Initial values - use parseFloat to force double type
               stage: formData.daf + " DAF",
               daf: parseInt(formData.daf),
-              bearingPercent: 0.01,
-              nonBearingPercent: 0.01,
+              bearingPercent: 0,
+              nonBearingPercent: 0,
               totalPineapples: 0,
-              nonViable: 0.01,
+              nonViable: 0,
+              estimatedBearing: 0,
+              estimatedNonBearing: 0,
+              detectionCoverage: 0,
+              awaitingFirstScan: true,
 
               // Metadata
               planted: formData.planted,
               forcingDate: formData.forcingDate,
               totalScans: 0,
+              initialCycleRequestId: operationId,
               createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             });
+
+          // Create the initial active crop-cycle record on the backend so its
+          // zeroed cycle metrics are persisted alongside the physical block.
+          const response = await fetch("/api/blocks/" + encodeURIComponent(blockRef.id) + "/cycles", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer " + await firebase.auth().currentUser.getIdToken(),
+            },
+            body: JSON.stringify({
+              plantingDate: formData.planted,
+              forcingDate: formData.forcingDate,
+              daf: parseInt(formData.daf),
+              operationId: operationId,
+            }),
+          });
+          const cycleResult = await response.json();
+          if (!response.ok || !cycleResult.ok) {
+            throw new Error("Block was created, but its initial crop cycle could not be saved. Open the block and retry from Update Block.");
+          }
 
           utils.showToast("Block added successfully!", "success");
           closeAddBlockModal();
