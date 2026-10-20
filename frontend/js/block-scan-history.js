@@ -71,7 +71,7 @@ window.blockScanHistory = (function () {
         return { date: date, count: bearing + nonBearing };
     }
 
-    async function loadLatestPlantCounts(blockIds, userId) {
+    async function loadLatestPlantCounts(blockIds, userId, cycleIdsByBlock) {
         const ids = new Set((blockIds || []).filter(Boolean).map(String));
         if (!ids.size) return new Map();
 
@@ -81,10 +81,10 @@ window.blockScanHistory = (function () {
             if (userId) query = query.where('userId', '==', userId);
             return query.get();
         }));
-        return latestPlantCountsFromSnapshots(Array.from(ids), snapshots, userId);
+        return latestPlantCountsFromSnapshots(Array.from(ids), snapshots, userId, cycleIdsByBlock);
     }
 
-    function latestPlantCountsFromSnapshots(blockIds, snapshots, userId) {
+    function latestPlantCountsFromSnapshots(blockIds, snapshots, userId, cycleIdsByBlock) {
         const ids = new Set((blockIds || []).filter(Boolean).map(String));
         const latest = new Map();
         if (!ids.size) return latest;
@@ -93,6 +93,10 @@ window.blockScanHistory = (function () {
                 const data = doc.data() || {};
                 const blockId = data.blockId == null ? '' : String(data.blockId);
                 if (!ids.has(blockId) || (userId && data.userId !== userId)) return;
+                const activeCycleId = cycleIdsByBlock instanceof Map
+                    ? cycleIdsByBlock.get(blockId)
+                    : cycleIdsByBlock && cycleIdsByBlock[blockId];
+                if (activeCycleId && data.cycleId !== activeCycleId) return;
                 const result = completedPlantCount(data);
                 if (!result) return;
                 const previous = latest.get(blockId);
@@ -196,6 +200,7 @@ window.blockScanHistory = (function () {
             `<div class="scan-history-total"><strong>${formatCount(total)}</strong><span>plants detected</span></div>`;
         return `<article class="scan-history-entry">
             <div class="scan-history-entry-head"><time datetime="${entry.date.toISOString()}">${escapeHtml(formatDateTime(entry.date))}</time><span class="scan-history-status ${complete ? 'is-complete' : status === 'Failed' ? 'is-failed' : ''}">${status}</span></div>
+            <div class="scan-history-cycle ${data.cycleId ? '' : 'is-unassigned'}">Crop cycle: ${data.cycleId ? escapeHtml(data.cycleId) : 'Unassigned (legacy scan)'}</div>
             ${latestCount}
             ${classes ? `<div class="scan-history-breakdown" aria-label="Plant classification counts">${classes}</div>` : ''}
             ${comparisonMarkup(entry, previous)}
@@ -203,7 +208,8 @@ window.blockScanHistory = (function () {
         </article>`;
     }
 
-    function render(history, container, block) {
+    function render(history, container, block, cycleId) {
+        if (cycleId) history = history.filter(function (entry) { return entry.data.cycleId === cycleId; });
         const ordered = history.slice().sort(function (a, b) { return b.date - a.date; });
         const latest = ordered[0];
         const blockLabel = block && (block.blockName || block.blockId || block.id);
@@ -217,7 +223,7 @@ window.blockScanHistory = (function () {
             </div>
         </section>`;
         if (!history.length) {
-            container.innerHTML = summary + '<div class="scan-history-empty">No scan history is available for this block yet.</div>';
+            container.innerHTML = summary + `<div class="scan-history-empty">${cycleId ? 'No scans are available for this crop cycle.' : 'No scan history is available for this block yet.'}</div>`;
             return;
         }
         const previousById = new Map();

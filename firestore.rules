@@ -1,30 +1,20 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function signedIn() {
-      return request.auth != null;
-    }
-
-    function isFarmManager() {
-      return signedIn() &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'farm_manager';
-    }
-
-    function isAdmin() {
-      return signedIn() &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-    }
-
-    function ownsBlock(blockData) {
-      return signedIn() && blockData.userId == request.auth.uid;
-    }
-
     // Users collection
     match /users/{userId} {
       allow read: if true;  // Anyone can read (for username lookup)
-      allow create, delete: if isAdmin();
-      allow update: if isAdmin() || (signedIn() && request.auth.uid == userId &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastLogin']));
+      allow create: if request.auth != null;  // Authenticated users can create
+      allow update: if request.auth != null;  // Authenticated users can update
+      allow delete: if request.auth != null;  // Authenticated users can delete
+    }
+
+    // Scheduled Scans
+    match /scheduled_scans/{docId} {
+      allow read, update: if request.auth != null &&
+    resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null &&
+    request.resource.data.userId == request.auth.uid;
     }
 
     // Activity logs collection
@@ -42,27 +32,17 @@ service cloud.firestore {
     }
     
     match /blocks/{blockId} {
-      allow read: if isFarmManager() || ownsBlock(resource.data);
-      allow create: if signedIn() && !isFarmManager() &&
-        request.resource.data.userId == request.auth.uid &&
-        !request.resource.data.keys().hasAny(['declaredPopulation']);
-      allow update: if (isFarmManager() || ownsBlock(resource.data)) &&
-        request.resource.data.userId == resource.data.userId &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'blockName', 'section', 'area', 'planted', 'forcingDate', 'daf'
-        ]);
-      allow delete: if ownsBlock(resource.data);
-    }
+      allow read: if request.auth != null;  // ← CHANGED: Allow all logged-in users to read
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+      allow delete: if request.auth != null;
+   }
 
+      // Scans collection - ADD THIS NEW SECTION
     match /scans/{scanId} {
-      allow read: if isFarmManager() || (
-        signedIn() && resource.data.userId == request.auth.uid &&
-        exists(/databases/$(database)/documents/blocks/$(resource.data.blockId)) &&
-        get(/databases/$(database)/documents/blocks/$(resource.data.blockId)).data.userId == request.auth.uid
-      );
-      // Scan evidence and calculated results are written by the trusted backend.
-      allow write: if false;
-    }
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+   }
    
     match /monitoring_alerts/{alertId} {
       allow read: if request.auth != null;
@@ -77,5 +57,25 @@ service cloud.firestore {
       allow update: if request.auth != null;
       allow delete: if request.auth != null;
     }
+
+    match /cropCycles/{cycleId} {
+       allow read: if request.auth != null
+              && resource.data.userId == request.auth.uid;
+
+       allow create: if request.auth != null
+              && request.resource.data.userId == request.auth.uid
+              && request.resource.data.blockId is string
+              && request.resource.data.status in ['active', 'completed']
+              && get(
+                   /databases/$(database)/documents/blocks/$(request.resource.data.blockId)
+                 ).data.userId == request.auth.uid;
+
+       allow update: if request.auth != null
+                && resource.data.userId == request.auth.uid
+                && request.resource.data.userId == resource.data.userId
+                && request.resource.data.blockId == resource.data.blockId;
+
+       allow delete: if false;
+     }
   }
 }

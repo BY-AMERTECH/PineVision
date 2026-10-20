@@ -1374,13 +1374,24 @@ tbody tr:hover {
 
 /* Scan History modal: fixed shell with a separately scrollable record list. */
 .scan-history-modal-content {
-    width: min(calc(100% - 2rem), 760px);
-    height: min(80vh, 760px);
-    max-height: 80vh;
+    width: min(calc(100% - 2rem), 1040px);
+    height: min(82vh, 820px);
+    max-height: 82vh;
     display: flex;
     flex-direction: column;
     overflow: hidden;
 }
+.crop-cycle-modal-content { width: min(calc(100% - 2rem), 820px); max-height: 88vh; overflow-y: auto; }
+.block-edit-icon { width: 40px; min-width: 40px; padding-inline: 0; justify-content: center; }
+.cycle-warning { padding: var(--space-md) var(--space-lg); margin-bottom: var(--space-lg); border-left: 4px solid #d97706; border-radius: var(--radius-md); background: #fff7ed; color: #7c2d12; font-size: var(--font-size-sm); }
+.cycle-warning p { margin: var(--space-xs) 0 0; }
+.scan-history-cycle { margin-top: var(--space-xs); color: var(--color-text-secondary); font-size: var(--font-size-xs); overflow-wrap: anywhere; }
+.scan-history-cycle.is-unassigned { color: var(--muted); }
+.cycle-history-list { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
+.cycle-history-card { padding: var(--space-lg) 0; border-bottom: 1px solid var(--border); }
+.cycle-history-card header { display:flex; justify-content:space-between; gap:var(--space-md); align-items:center; }
+.cycle-history-meta { display:flex; flex-wrap:wrap; gap:var(--space-md) var(--space-xl); margin:var(--space-md) 0; color:var(--color-text-secondary); font-size:var(--font-size-sm); }
+.cycle-active-badge { color:var(--green); font-size:var(--font-size-xs); font-weight:var(--font-weight-semibold); }
 .scan-history-modal-content > .modal-header,
 .scan-history-modal-content > .modal-footer { flex: 0 0 auto; }
 .scan-history-modal-content > .modal-body.scan-history-body {
@@ -1423,6 +1434,7 @@ tbody tr:hover {
     .scan-history-modal-content > .modal-body.scan-history-body { padding: var(--space-md) var(--space-lg); }
     .scan-history-modal-content > .modal-footer { padding: var(--space-md) var(--space-lg); }
     .scan-history-breakdown { grid-template-columns: 1fr; }
+    .trend-actions { flex-wrap: wrap; justify-content: flex-end; }
 }
 
 .modal-footer {

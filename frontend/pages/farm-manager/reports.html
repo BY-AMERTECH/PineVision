@@ -653,6 +653,7 @@
                 const d = doc.data();
                 BLOCKS_RAW.push({
                   id: doc.id,
+                  activeCycleId: d.activeCycleId || null,
                   blockName: d.blockName || d.blockId || doc.id,
                   userId: d.userId || "",
                   section: d.section || "—",
@@ -668,6 +669,8 @@
               try {
                 const latestCounts = await blockScanHistory.loadLatestPlantCounts(
                   BLOCKS_RAW.map((block) => block.id),
+                  null,
+                  Object.fromEntries(BLOCKS_RAW.map((block) => [block.id, block.activeCycleId])),
                 );
                 BLOCKS_RAW.forEach(function (block) {
                   block.plants = latestCounts.get(block.id) || 0;

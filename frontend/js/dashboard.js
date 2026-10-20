@@ -53,6 +53,7 @@
                 const data = doc.data();
                 blocksData.push({
                     id: doc.id,
+                    activeCycleId: data.activeCycleId || null,
                     name: data.blockName || data.blockId || `Block ${doc.id.substring(0, 6)}`,
                     section: data.section || 'N/A',
                     area: data.area || 0,
@@ -70,7 +71,8 @@
             try {
                 const latestCounts = await blockScanHistory.loadLatestPlantCounts(
                     blocksData.map(block => block.id),
-                    currentUser.uid
+                    currentUser.uid,
+                    Object.fromEntries(blocksData.map(block => [block.id, block.activeCycleId]))
                 );
                 blocksData.forEach(block => {
                     block.estimatedTotalPlantCount = latestCounts.get(block.id) || 0;

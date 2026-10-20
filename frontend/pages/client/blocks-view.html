@@ -606,7 +606,7 @@
             </div>
             <!-- Right: action buttons -->
             <div class="d-flex gap-2 block-header-buttons">
-              <button class="btn btn-secondary" onclick="openEditModal()">
+              <button type="button" class="btn btn-secondary block-edit-icon" onclick="openEditModal()" title="Edit Block" aria-label="Edit Block">
                 <svg
                   width="15"
                   height="15"
@@ -624,8 +624,8 @@
                     d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"
                   />
                 </svg>
-                Edit Block
               </button>
+              <button type="button" class="btn btn-secondary" onclick="openNewCycleModal()"><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M5.6 9A7 7 0 0 1 18 6l2 6M4 12l2 6a7 7 0 0 0 12.4-3"/></svg> New Cycle</button>
               <a
                 href="drone-view.html"
                 id="btn-new-scan"
@@ -669,6 +669,7 @@
                 <span class="trend-view-hint">View Scan History</span>
               </div>
               <div class="d-flex align-items-center gap-2 trend-actions">
+                <button type="button" class="btn btn-sm btn-secondary" onclick="openCropCycleHistory()">Crop Cycle History</button>
                 <button type="button" class="btn btn-sm btn-secondary" onclick="downloadTrendDetails(this)" title="Download scan details" aria-label="Download scan details"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg></button>
                 <button type="button" class="btn btn-sm btn-navigation" onclick="openTrendModal()"><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg> View <svg class="btn-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>
               </div>
@@ -679,6 +680,30 @@
           <div class="tcard mb-4" id="condition-breakdown"></div>
         </div>
       </main>
+    </div>
+
+    <!-- NEW CROP CYCLE MODAL -->
+    <div id="new-cycle-modal" class="modal">
+      <div class="modal-content crop-cycle-modal-content">
+        <div class="modal-header"><h2 class="modal-title">Start a New Crop Cycle</h2><button type="button" class="modal-close" aria-label="Close" onclick="closeNewCycleModal()">&times;</button></div>
+        <form id="new-cycle-form" onsubmit="handleNewCycle(event)">
+          <div class="modal-body">
+            <div class="cycle-warning"><strong>⚠ Starting a new crop cycle</strong><p>Starting a new crop cycle will save the current cycle and its scan history. Previous scan results will remain in Crop Cycle History. The new cycle starts with fresh monitoring metrics; previous dates and results are preserved.</p></div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-label" for="cycle-planted">Planting Date *</label><input class="form-input" type="date" id="cycle-planted" required></div>
+              <div class="form-group"><label class="form-label" for="cycle-forcing">Forcing Date *</label><input class="form-input" type="date" id="cycle-forcing" required></div>
+            </div>
+            <div class="form-group"><label class="form-label" for="cycle-daf">DAF (Days After Forcing)</label><input class="form-input" type="number" id="cycle-daf" min="0" step="1" value="0" required><small class="form-help">DAF is manually configured for this block.</small></div>
+            <div class="form-error" id="cycle-form-error"></div>
+          </div>
+          <div class="modal-footer"><button type="button" class="btn btn-secondary" onclick="closeNewCycleModal()">Cancel</button><button type="submit" id="cycle-submit" class="btn btn-primary">Confirm New Cycle</button></div>
+        </form>
+      </div>
+    </div>
+
+    <!-- CROP CYCLE HISTORY MODAL -->
+    <div id="cycle-history-modal" class="modal">
+      <div class="modal-content scan-history-modal-content"><div class="modal-header"><h2 class="modal-title">Crop Cycle History</h2><button type="button" class="modal-close" aria-label="Close crop cycle history" onclick="closeCycleHistory()">&times;</button></div><div class="modal-body scan-history-body" id="cycle-history-content"></div><div class="modal-footer"><button type="button" class="btn btn-secondary" onclick="closeCycleHistory()">Close</button></div></div>
     </div>
 
     <!-- EDIT BLOCK MODAL -->
@@ -944,6 +969,8 @@
           // Transform Firestore data to display format
           currentBlock = {
             id: blockDoc.id,
+            userId: blockData.userId,
+            activeCycleId: blockData.activeCycleId || null,
             blockId: blockData.blockId,
             blockName: blockData.blockName,
             section: blockData.section,
@@ -972,8 +999,20 @@
             const latestCounts = await blockScanHistory.loadLatestPlantCounts(
               [blockDoc.id],
               currentUserId,
+              { [blockDoc.id]: currentBlock.activeCycleId },
             );
             currentBlock.estimatedTotalPlantCount = latestCounts.get(blockDoc.id) || 0;
+            if (currentBlock.activeCycleId) {
+              const cycleScans = await blockScanHistory.load(blockDoc.id, currentUserId, true);
+              const latestCycleScan = cycleScans.filter(function (scan) {
+                return scan.data.cycleId === currentBlock.activeCycleId &&
+                  scan.data.status === "completed" && Number.isFinite(Number(scan.data.bearing)) &&
+                  Number.isFinite(Number(scan.data.nonBearing));
+              }).sort(function (a, b) { return b.date - a.date; })[0];
+              currentBlock.estimatedTotalPlantCount = latestCycleScan
+                ? Number(latestCycleScan.data.bearing) + Number(latestCycleScan.data.nonBearing)
+                : 0;
+            }
           } catch (scanError) {
             console.error("❌ Error loading latest completed plant counts:", scanError);
           }
@@ -1007,6 +1046,7 @@
           " · " +
           formatArea(block.area) +
           (block.daf ? " · " + block.daf + " DAF" : "") +
+          (block.activeCycleId ? " · Cycle " + block.activeCycleId : "") +
           (block.flightDuration
             ? " · Last Flight: " + block.flightDuration
             : "");
@@ -1226,8 +1266,11 @@
 
       // ── Trend Modal — live bearing-rate history from this block's scans ──
 
-      async function openTrendModal() {
+      async function openTrendModal(cycleId) {
         if (!currentBlock) return;
+        if (cycleId === undefined) selectedHistoryCycleId = null;
+        else selectedHistoryCycleId = cycleId;
+        document.querySelector("#trend-modal .modal-title").textContent = selectedHistoryCycleId ? "Cycle Scan History" : "Scan History";
         utils.showModal("trend-modal");
         document.getElementById("trend-modal-content").innerHTML =
           '<div style="padding:var(--space-xl);text-align:center;color:var(--color-text-secondary);">Loading scan history…</div>';
@@ -1241,13 +1284,16 @@
 
       function closeTrendModal() {
         utils.hideModal("trend-modal");
+        selectedHistoryCycleId = null;
       }
+
+      let selectedHistoryCycleId = null;
 
       async function renderTrendModal() {
         try {
           const history = await blockScanHistory.load(currentBlock.id, currentUserId, true);
 
-          blockScanHistory.render(history, document.getElementById("trend-modal-content"), currentBlock);
+          blockScanHistory.render(history, document.getElementById("trend-modal-content"), currentBlock, selectedHistoryCycleId);
         } catch (error) {
           console.error("❌ Error loading scan history:", error);
           document.getElementById("trend-modal-content").innerHTML =
@@ -1261,7 +1307,93 @@
         utils.setupModalClose("edit-block-modal");
         utils.setupModalClose("trend-modal");
         utils.setupModalClose("delete-block-modal");
+        utils.setupModalClose("new-cycle-modal");
+        utils.setupModalClose("cycle-history-modal");
+        document.getElementById("trend-modal").addEventListener("click", function (event) {
+          if (event.target === this) closeTrendModal();
+        });
       }
+
+      function cycleEscape(value) {
+        return String(value == null ? "" : value).replace(/[&<>"']/g, function (c) { return {"&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;"}[c]; });
+      }
+      function closeNewCycleModal() { utils.hideModal("new-cycle-modal"); }
+      function openNewCycleModal() {
+        document.getElementById("cycle-form-error").textContent = "";
+        document.getElementById("cycle-planted").value = "";
+        document.getElementById("cycle-forcing").value = "";
+        document.getElementById("cycle-daf").value = "0";
+        utils.showModal("new-cycle-modal");
+      }
+      async function handleNewCycle(event) {
+        event.preventDefault();
+        const submit = document.getElementById("cycle-submit"), error = document.getElementById("cycle-form-error");
+        if (submit.disabled) return;
+        const planted = document.getElementById("cycle-planted").value;
+        const forcingDate = document.getElementById("cycle-forcing").value;
+        const daf = Number(document.getElementById("cycle-daf").value);
+        if (!planted || !forcingDate || planted > forcingDate || !Number.isSafeInteger(daf) || daf < 0) {
+          error.textContent = "Enter valid dates (planting must be on or before forcing) and a non-negative whole-number DAF."; return;
+        }
+        submit.disabled = true; submit.textContent = "Starting…"; error.textContent = "";
+        try {
+          const db = firebase.firestore(), blockRef = db.collection("blocks").doc(currentBlock.id);
+          const initial = await blockRef.get();
+          if (!initial.exists || initial.data().userId !== currentUserId) throw new Error("Block ownership could not be verified.");
+          const expectedCycleId = initial.data().activeCycleId || null;
+          const existingScans = await blockScanHistory.load(currentBlock.id, currentUserId, true);
+          if (existingScans.some(function (scan) { return scan.data.status === "active"; })) throw new Error("A scan is still processing. Finish it before starting a new crop cycle.");
+          const oldCycleRef = expectedCycleId ? db.collection("cropCycles").doc(expectedCycleId) : null;
+          const newCycleRef = db.collection("cropCycles").doc();
+          const legacyCycleRef = expectedCycleId ? null : db.collection("cropCycles").doc();
+          await db.runTransaction(async function (tx) {
+            const blockDoc = await tx.get(blockRef);
+            if (!blockDoc.exists || blockDoc.data().userId !== currentUserId) throw new Error("Block ownership could not be verified.");
+            const data = blockDoc.data();
+            if ((data.activeCycleId || null) !== expectedCycleId) throw new Error("The active cycle changed. Refresh and try again.");
+            const now = firebase.firestore.FieldValue.serverTimestamp();
+            if (oldCycleRef) {
+              const prior = await tx.get(oldCycleRef);
+              if (!prior.exists) throw new Error("The active cycle record is missing. Refresh and try again.");
+              tx.update(oldCycleRef, {status:"completed", completedAt:now});
+            } else {
+              tx.set(legacyCycleRef, {blockId:currentBlock.id,userId:currentUserId,status:"completed",planted:data.planted || null,forcingDate:data.forcingDate || null,daf:Number.isSafeInteger(Number(data.daf)) ? Number(data.daf) : null,startDate:data.planted || null,completedAt:now,createdAt:now,legacy:true});
+            }
+            tx.set(newCycleRef, {blockId:currentBlock.id,userId:currentUserId,status:"active",planted:planted,forcingDate:forcingDate,daf:daf,startDate:planted,startedAt:now,createdAt:now});
+            tx.update(blockRef, {activeCycleId:newCycleRef.id,planted:planted,forcingDate:forcingDate,daf:daf,bearingPercent:0,nonBearingPercent:0,nonViable:0,totalPineapples:0,totalScans:0,estimatedBearing:0,estimatedNonBearing:0,detectionCoverage:0,lastScanned:firebase.firestore.FieldValue.delete(),lastUpdate:now});
+          });
+          closeNewCycleModal();
+          await loadBlockFromFirebase(currentBlock.id);
+          blockScanHistory.load(currentBlock.id,currentUserId,true).catch(function () {});
+          utils.showToast("New crop cycle started. Previous scans are preserved in history.", "success");
+        } catch (err) {
+          console.error("❌ Failed to start crop cycle:", err);
+          error.textContent = err.message || "Could not start the new crop cycle. No changes were saved.";
+          utils.showToast("Failed to start the new crop cycle.", "error");
+        } finally { submit.disabled = false; submit.textContent = "Confirm New Cycle"; }
+      }
+
+      async function openCropCycleHistory() {
+        utils.showModal("cycle-history-modal");
+        const container = document.getElementById("cycle-history-content");
+        container.innerHTML = '<div class="scan-history-empty">Loading crop cycles…</div>';
+        try {
+          const db = firebase.firestore();
+          const results = await Promise.all([db.collection("cropCycles").where("blockId","==",currentBlock.id).where("userId","==",currentUserId).get(),blockScanHistory.load(currentBlock.id,currentUserId,true)]);
+          const cycles = []; results[0].forEach(function (doc) { cycles.push(Object.assign({id:doc.id},doc.data())); });
+          cycles.sort(function (a,b) { return String(b.startDate || "").localeCompare(String(a.startDate || "")); });
+          if (!cycles.length) { container.innerHTML = '<div class="scan-history-empty">No crop cycle records are available yet. Starting a new cycle will preserve the current block details here.</div>'; return; }
+          container.innerHTML = '<div class="cycle-history-list">' + cycles.map(function (cycle) {
+            const scans = results[1].filter(function (scan) { return scan.data.cycleId === cycle.id; });
+            const latest = cycle.legacy ? "N/A (legacy scans unassigned)" : scans.length ? scans[scans.length-1].date.toLocaleDateString() : "N/A";
+            const completed = cycle.completedAt && cycle.completedAt.toDate ? cycle.completedAt.toDate().toLocaleDateString() : "N/A";
+            const active = cycle.id === currentBlock.activeCycleId;
+            return '<article class="cycle-history-card"><header><strong>Cycle ' + cycleEscape(cycle.id) + '</strong>' + (active ? '<span class="cycle-active-badge">Active</span>' : '<span>' + cycleEscape(cycle.status || "N/A") + '</span>') + '</header><div class="cycle-history-meta"><span>Planting: ' + cycleEscape(cycle.planted || "N/A") + '</span><span>Forcing: ' + cycleEscape(cycle.forcingDate || "N/A") + '</span><span>Started: ' + cycleEscape(cycle.startDate || "N/A") + '</span><span>Completed: ' + cycleEscape(completed) + '</span><span>Scans: ' + (cycle.legacy ? "N/A (unassigned legacy scans)" : scans.length) + '</span><span>Latest scan: ' + cycleEscape(latest) + '</span></div><button type="button" class="btn btn-sm btn-secondary" onclick="viewCycleScans(\'' + cycleEscape(cycle.id) + '\')">View scans</button></article>';
+          }).join("") + '</div>';
+        } catch (err) { console.error("❌ Failed to load crop cycles:",err); container.innerHTML = '<div class="scan-history-empty">Couldn’t load crop cycle history. Please try again.</div>'; }
+      }
+      function closeCycleHistory() { utils.hideModal("cycle-history-modal"); }
+      async function viewCycleScans(cycleId) { closeCycleHistory(); selectedHistoryCycleId=cycleId; await openTrendModal(cycleId); }
 
       // ── Edit modal ────────────────────────────────────────────────
 
@@ -1337,26 +1469,46 @@
           daf: daf,
         };
 
-        currentBlock.blockName = blockName;
-        currentBlock.section = section;
-        currentBlock.area = area;
-        currentBlock.planted = planted;
-        currentBlock.forcingDate = forcingDate;
-        currentBlock.daf = daf;
+        const db = firebase.firestore();
+        const blockRef = db.collection("blocks").doc(currentBlock.id);
+        const cycleRef = currentBlock.activeCycleId
+          ? db.collection("cropCycles").doc(currentBlock.activeCycleId)
+          : null;
 
-        firebase
-          .firestore()
-          .collection("blocks")
-          .doc(currentBlock.id)
-          .update({
+        db.runTransaction(async function (tx) {
+          const blockDoc = await tx.get(blockRef);
+          if (!blockDoc.exists || blockDoc.data().userId !== currentUserId) {
+            throw new Error("Block ownership could not be verified.");
+          }
+          if ((blockDoc.data().activeCycleId || null) !== (currentBlock.activeCycleId || null)) {
+            throw new Error("The active cycle changed. Refresh and try again.");
+          }
+
+          if (cycleRef) {
+            const cycleDoc = await tx.get(cycleRef);
+            const cycle = cycleDoc.exists ? cycleDoc.data() : {};
+            if (!cycleDoc.exists || cycle.blockId !== currentBlock.id || cycle.userId !== currentUserId || cycle.status !== "active") {
+              throw new Error("The active crop cycle could not be verified. Refresh and try again.");
+            }
+            tx.update(cycleRef, { planted: planted, forcingDate: forcingDate, daf: daf });
+          }
+
+          tx.update(blockRef, {
             blockName: blockName,
             section: section,
             area: area,
             planted: planted,
             forcingDate: forcingDate,
             daf: daf,
-          })
+          });
+        })
           .then(function () {
+            currentBlock.blockName = blockName;
+            currentBlock.section = section;
+            currentBlock.area = area;
+            currentBlock.planted = planted;
+            currentBlock.forcingDate = forcingDate;
+            currentBlock.daf = daf;
             logBlockUpdateActivity(previousValues, newValues, currentBlock.id);
             renderPage(currentBlock);
             document.title = currentBlock.blockName + " — PineVision";

@@ -938,6 +938,7 @@
 
             ALL_BLOCKS.push({
               id: doc.id,
+              activeCycleId: d.activeCycleId || null,
               blockId: d.blockId || doc.id,
               blockName: d.blockName || d.blockId || doc.id,
               userId: d.userId || "",
@@ -959,7 +960,11 @@
           });
 
           try {
-            const latestCounts = await blockScanHistory.loadLatestPlantCounts(ALL_BLOCKS.map((block) => block.id));
+            const latestCounts = await blockScanHistory.loadLatestPlantCounts(
+              ALL_BLOCKS.map((block) => block.id),
+              null,
+              Object.fromEntries(ALL_BLOCKS.map((block) => [block.id, block.activeCycleId])),
+            );
             ALL_BLOCKS.forEach(function (block) {
               block.estimatedTotalPlantCount = latestCounts.get(block.id) || 0;
             });

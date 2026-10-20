@@ -93,9 +93,6 @@ def update_detection_batch(
         non_bearing_pct = (non_bearing_count / total_count * 100) if total_count > 0 else 0.0
         non_viable_pct  = (non_viable_count  / total_count * 100) if total_count > 0 else 0.0
 
-        batch = db.batch()
-
-        # Write 1 — block aggregate stats (drives live stats panel)
         block_ref = db.collection('blocks').document(block_id)
         block_update = {
             'bearingPercent':    round(bearing_pct,     1),
@@ -106,9 +103,7 @@ def update_detection_batch(
         }
         if live_frame is not None:
             block_update['liveDetections'] = live_frame
-        batch.update(block_ref, block_update)
 
-        # Write 2 — scan progress for frontend progress bar only (no recentFrames)
         scan_ref = db.collection('scans').document(scan_id)
         scan_update = {
             'bearing':          bearing_count,
@@ -120,9 +115,28 @@ def update_detection_batch(
             'totalFrames':      total_frames,
             'lastUpdate':       firestore.SERVER_TIMESTAMP,
         }
-        batch.update(scan_ref, scan_update)
 
-        batch.commit()
+        # Keep scan progress even if a new cycle has become active, but only
+        # publish its metrics to the block when the scan still belongs to the
+        # block's active cycle. Transactional reads prevent a concurrent cycle
+        # switch from racing this check.
+        transaction = db.transaction()
+
+        @firestore.transactional
+        def _apply_progress(transaction):
+            scan_doc = scan_ref.get(transaction=transaction)
+            block_doc = block_ref.get(transaction=transaction)
+            transaction.update(scan_ref, scan_update)
+            if not scan_doc.exists or not block_doc.exists:
+                return
+            scan_data = scan_doc.to_dict() or {}
+            block_data = block_doc.to_dict() or {}
+            if scan_data.get('blockId') != block_id:
+                return
+            if scan_data.get('cycleId') == block_data.get('activeCycleId'):
+                transaction.update(block_ref, block_update)
+
+        _apply_progress(transaction)
         return True
 
     except Exception as e:
@@ -159,10 +173,13 @@ def create_scan_session(block_id: str, user_id: str) -> Optional[str]:
     """Create a new scan session document. Returns the generated scan ID."""
     try:
         db = get_firestore_client()
+        block_doc = db.collection('blocks').document(block_id).get()
+        active_cycle_id = block_doc.to_dict().get('activeCycleId') if block_doc.exists else None
         scan_ref = db.collection('scans').document()
         scan_ref.set({
             'blockId':         block_id,
             'userId':          user_id,
+            'cycleId':         active_cycle_id,
             'status':          'active',
             'startTime':       firestore.SERVER_TIMESTAMP,
             'bearing':         0,
@@ -243,10 +260,8 @@ def complete_scan_session(
         non_bearing_pct = (non_bearing_count / total_count * 100) if total_count > 0 else 0.0
         non_viable_pct  = (non_viable_count  / total_count * 100) if total_count > 0 else 0.0
 
-        batch = db.batch()
-
         scan_ref = db.collection('scans').document(scan_id)
-        batch.update(scan_ref, {
+        scan_update = {
             'status':                'completed',
             'endTime':               firestore.SERVER_TIMESTAMP,
             'bearing':               bearing_count,
@@ -262,10 +277,10 @@ def complete_scan_session(
             'estimatedNonBearing':   estimated_non_bearing,
             'detectionCoverage':     round(detection_coverage, 2),
             'manifestReady':         True,
-        })
+        }
 
         block_ref = db.collection('blocks').document(block_id)
-        batch.update(block_ref, {
+        block_update = {
             'totalScans':            firestore.Increment(1),
             'lastScanned':           firestore.SERVER_TIMESTAMP,
             'bearingPercent':        round(bearing_pct, 1),
@@ -275,9 +290,29 @@ def complete_scan_session(
             'estimatedBearing':      estimated_bearing,
             'estimatedNonBearing':   estimated_non_bearing,
             'detectionCoverage':     round(detection_coverage, 2),
-        })
+        }
 
-        batch.commit()
+        # Always finalize the scan record, preserving its historical results.
+        # Only update the block's current-cycle aggregates if the scan's
+        # captured cycle is still active. This avoids an in-flight old-cycle
+        # scan repopulating metrics after a cycle transition reset.
+        transaction = db.transaction()
+
+        @firestore.transactional
+        def _complete(transaction):
+            scan_doc = scan_ref.get(transaction=transaction)
+            block_doc = block_ref.get(transaction=transaction)
+            transaction.update(scan_ref, scan_update)
+            if not scan_doc.exists or not block_doc.exists:
+                return
+            scan_data = scan_doc.to_dict() or {}
+            block_data = block_doc.to_dict() or {}
+            if scan_data.get('blockId') != block_id:
+                return
+            if scan_data.get('cycleId') == block_data.get('activeCycleId'):
+                transaction.update(block_ref, block_update)
+
+        _complete(transaction)
         print(f"✅ Scan session completed: {scan_id}")
         return True
 

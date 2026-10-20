@@ -668,6 +668,7 @@
             const blockData = doc.data();
             ALL_BLOCKS.push({
               id: doc.id,
+              activeCycleId: blockData.activeCycleId || null,
               blockId: blockData.blockId,
               blockName: blockData.blockName,
               section: blockData.section,
@@ -691,6 +692,7 @@
             const latestCounts = await blockScanHistory.loadLatestPlantCounts(
               ALL_BLOCKS.map((block) => block.id),
               currentUser.uid,
+              Object.fromEntries(ALL_BLOCKS.map((block) => [block.id, block.activeCycleId])),
             );
             ALL_BLOCKS.forEach(function (block) {
               block.estimatedTotalPlantCount = latestCounts.get(block.id) || 0;

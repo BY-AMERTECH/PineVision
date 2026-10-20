@@ -565,6 +565,7 @@
           const d = blockDoc.data();
           currentBlock = {
             id: blockDoc.id,
+            activeCycleId: d.activeCycleId || null,
             blockId: d.blockId || blockDoc.id,
             blockName: d.blockName || d.blockId || blockDoc.id,
             userId: d.userId || "",
@@ -585,7 +586,11 @@
           };
 
           try {
-            const latestCounts = await blockScanHistory.loadLatestPlantCounts([blockDoc.id]);
+            const latestCounts = await blockScanHistory.loadLatestPlantCounts(
+              [blockDoc.id],
+              null,
+              { [blockDoc.id]: currentBlock.activeCycleId },
+            );
             currentBlock.estimatedTotalPlantCount = latestCounts.get(blockDoc.id) || 0;
           } catch (scanError) {
             console.error("❌ Error loading latest completed plant counts:", scanError);
