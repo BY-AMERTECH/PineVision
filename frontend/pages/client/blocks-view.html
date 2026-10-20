@@ -1342,7 +1342,13 @@
           if (!initial.exists || initial.data().userId !== currentUserId) throw new Error("Block ownership could not be verified.");
           const expectedCycleId = initial.data().activeCycleId || null;
           const existingScans = await blockScanHistory.load(currentBlock.id, currentUserId, true);
-          if (existingScans.some(function (scan) { return scan.data.status === "active"; })) throw new Error("A scan is still processing. Finish it before starting a new crop cycle.");
+          const activeScan = existingScans.find(function (scan) { return scan.data.status === "active"; });
+          if (activeScan) {
+            const started = activeScan.date && Number.isFinite(activeScan.date.getTime())
+              ? " (started " + activeScan.date.toLocaleString() + ")"
+              : "";
+            throw new Error("Scan " + activeScan.id + started + " is still marked as processing. Wait for it to finish, or verify its status in Scan History before starting a new crop cycle.");
+          }
           const oldCycleRef = expectedCycleId ? db.collection("cropCycles").doc(expectedCycleId) : null;
           const newCycleRef = db.collection("cropCycles").doc();
           const legacyCycleRef = expectedCycleId ? null : db.collection("cropCycles").doc();
