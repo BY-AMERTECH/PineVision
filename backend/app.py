@@ -74,6 +74,16 @@ def _verify_farm_manager_token():
         return None, (jsonify({'error': 'Farm Manager access required'}), 403)
 
     return decoded, None
+
+
+def _verify_history_viewer_token():
+    """Allow only authenticated Super Admins and Farm Managers to read shared history."""
+    decoded, error = _verify_admin_token()
+    if not error:
+        return decoded, None
+    if error[1] != 403:
+        return None, error
+    return _verify_farm_manager_token()
 PAGES = os.path.join(FRONTEND, 'pages')
 
 app = Flask(__name__, static_folder=None)
@@ -319,11 +329,54 @@ def toggle_status(user_id):
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# FARM MANAGER API ROUTES
-# These endpoints are accessible only to users with role == "farm_manager".
-# They enforce server-side filtering so Farm Managers can never read, create,
-# edit, toggle, or reset the password of Super Admin ("admin") accounts.
+# STAFF HISTORY AND FARM MANAGER API ROUTES
+# Shared block history is restricted to Super Admins and Farm Managers.
+# The /api/fm/* endpoints are Farm Manager-only and filter out Super Admins.
 # ═══════════════════════════════════════════════════════════════════════
+
+@app.route('/api/history/crop-cycles', methods=['GET'])
+def get_crop_cycle_history():
+    """Return cycle records for a block to authorized staff history views."""
+    _, err = _verify_history_viewer_token()
+    if err:
+        return err
+
+    block_id = (request.args.get('block_id') or '').strip()
+    if not block_id or len(block_id) > 128:
+        return jsonify({'error': 'A valid block_id is required'}), 400
+
+    try:
+        block_doc = db.collection('blocks').document(block_id).get()
+        if not block_doc.exists:
+            return jsonify({'error': 'Block not found'}), 404
+        owner_id = (block_doc.to_dict() or {}).get('userId')
+        if not owner_id:
+            return jsonify({'error': 'Block owner could not be resolved'}), 404
+
+        cycles = []
+        # Filter the owner after the block-only query to avoid requiring a new
+        # composite index for staff history reads.
+        query = db.collection('cropCycles').where('blockId', '==', block_id)
+        for cycle_doc in query.stream():
+            data = cycle_doc.to_dict() or {}
+            if data.get('userId') != owner_id:
+                continue
+            cycles.append({
+                'id': cycle_doc.id,
+                'status': data.get('status'),
+                'planted': data.get('planted'),
+                'forcingDate': data.get('forcingDate'),
+                'startDate': data.get('startDate'),
+                'daf': data.get('daf'),
+                'legacy': bool(data.get('legacy', False)),
+                'createdAtMs': int(data['createdAt'].timestamp() * 1000) if data.get('createdAt') else None,
+                'startedAtMs': int(data['startedAt'].timestamp() * 1000) if data.get('startedAt') else None,
+                'completedAtMs': int(data['completedAt'].timestamp() * 1000) if data.get('completedAt') else None,
+            })
+        return jsonify({'cycles': cycles}), 200
+    except Exception as exc:
+        print(f"❌ Failed to load crop cycle history for {block_id}: {exc}")
+        return jsonify({'error': 'Could not load crop cycle history'}), 500
 
 @app.route('/api/fm/users', methods=['GET'])
 def fm_get_users():

@@ -181,11 +181,13 @@ window.blockScanHistory = (function () {
         }).join('')}</dl></details>`;
     }
 
-    function scanMarkup(entry, previous) {
+    function scanMarkup(entry, previous, cycles) {
         const data = entry.data;
         const status = getStatus(data);
         const complete = status === 'Completed';
         const total = complete ? metric(data, 'total') : null;
+        const cycle = cycles ? assignedCycle(entry, cycles) : null;
+        const cycleLabel = cycle ? 'Cycle ' + cycle.displayNumber : cycles ? 'Unassigned' : data.cycleId ? 'Assigned crop cycle' : 'Unassigned (legacy scan)';
         const classes = [
             ['Bearing', 'bearing'],
             ['Non-bearing', 'nonBearing'],
@@ -200,7 +202,7 @@ window.blockScanHistory = (function () {
             `<div class="scan-history-total"><strong>${formatCount(total)}</strong><span>plants detected</span></div>`;
         return `<article class="scan-history-entry">
             <div class="scan-history-entry-head"><time datetime="${entry.date.toISOString()}">${escapeHtml(formatDateTime(entry.date))}</time><span class="scan-history-status ${complete ? 'is-complete' : status === 'Failed' ? 'is-failed' : ''}">${status}</span></div>
-            <div class="scan-history-cycle ${data.cycleId ? '' : 'is-unassigned'}">Crop cycle: ${data.cycleId ? escapeHtml(data.cycleId) : 'Unassigned (legacy scan)'}</div>
+            <div class="scan-history-cycle ${cycle || data.cycleId ? '' : 'is-unassigned'}">Crop cycle: ${escapeHtml(cycleLabel)}</div>
             ${latestCount}
             ${classes ? `<div class="scan-history-breakdown" aria-label="Plant classification counts">${classes}</div>` : ''}
             ${comparisonMarkup(entry, previous)}
@@ -208,7 +210,7 @@ window.blockScanHistory = (function () {
         </article>`;
     }
 
-    function render(history, container, block, cycleId, legacyCutoff) {
+    function render(history, container, block, cycleId, legacyCutoff, cycles) {
         if (cycleId) {
             history = history.filter(function (entry) {
                 if (entry.data.cycleId === cycleId) return true;
@@ -238,67 +240,273 @@ window.blockScanHistory = (function () {
             if (getStatus(entry.data) === 'Completed' && metric(entry.data, 'total') !== null) previousCompleted = entry;
         });
         container.innerHTML = summary + `<div class="scan-history-list" tabindex="0" aria-label="Individual scan records">` +
-            ordered.map(function (entry) { return scanMarkup(entry, previousById.get(entry.id)); }).join('') + '</div>';
+            ordered.map(function (entry) { return scanMarkup(entry, previousById.get(entry.id), cycles); }).join('') + '</div>';
     }
 
     function timestamp(value) {
+        if (typeof value === 'number' && Number.isFinite(value)) return new Date(value).toISOString();
+        if (value instanceof Date && Number.isFinite(value.getTime())) return value.toISOString();
         const date = value && typeof value.toDate === 'function' ? value.toDate() : null;
         return date && Number.isFinite(date.getTime()) ? date.toISOString() : '';
     }
 
-    function toCSV(history, block) {
-        const headings = [
-            'Scan ID', 'Block ID', 'Block name', 'Section', 'Account ID', 'Status',
+    function cycleCompletedAtMs(cycle) {
+        if (cycle && Number.isFinite(cycle.completedAtMs)) return cycle.completedAtMs;
+        const value = cycle && cycle.completedAt;
+        return value && typeof value.toDate === 'function' ? value.toDate().getTime() : null;
+    }
+
+    function cycleCreatedAtMs(cycle) {
+        if (cycle && Number.isFinite(cycle.createdAtMs)) return cycle.createdAtMs;
+        const value = cycle && (cycle.createdAt || cycle.startedAt);
+        if (value && typeof value.toDate === 'function') return value.toDate().getTime();
+        if (value && typeof value.toMillis === 'function') return value.toMillis();
+        return 0;
+    }
+
+    function assignCycleDisplayNumbers(cycles) {
+        cycles.sort(function (a, b) {
+            const byStartDate = String(a.startDate || '').localeCompare(String(b.startDate || ''));
+            return byStartDate || cycleCreatedAtMs(a) - cycleCreatedAtMs(b) || String(a.id).localeCompare(String(b.id));
+        });
+        cycles.forEach(function (cycle, index) { cycle.displayNumber = index + 1; });
+        return cycles;
+    }
+
+    function cycleDateLabel(value) {
+        const date = typeof value === 'number'
+            ? new Date(value)
+            : value && typeof value.toDate === 'function' ? value.toDate()
+                : value instanceof Date ? value : null;
+        return date && Number.isFinite(date.getTime()) ? date.toLocaleDateString() : value && typeof value === 'string' ? value : 'N/A';
+    }
+
+    function renderCycles(cycles, history, container, activeCycleId, onViewScans) {
+        if (!cycles.length) {
+            container.innerHTML = '<div class="scan-history-empty">No crop cycle records are available for this block yet.</div>';
+            return;
+        }
+        container.innerHTML = '<div class="cycle-history-list">' + cycles.map(function (cycle) {
+            const cutoff = cycleCompletedAtMs(cycle);
+            const scans = history.filter(function (entry) { return assignedCycle(entry, cycles) === cycle; });
+            const latest = scans.length ? scans[scans.length - 1].date.toLocaleDateString() : 'N/A';
+            const completed = cycleDateLabel(cycle.completedAtMs == null ? cycle.completedAt : cycle.completedAtMs);
+            const active = cycle.id === activeCycleId;
+            return '<article class="cycle-history-card"><header><strong>Cycle ' + cycle.displayNumber + '</strong>' +
+                (active ? '<span class="cycle-active-badge">Active</span>' : '<span>' + escapeHtml(cycle.status || 'Unknown') + '</span>') +
+                '</header><div class="cycle-history-meta"><span>Planting: ' + escapeHtml(cycle.planted || 'N/A') +
+                '</span><span>Forcing: ' + escapeHtml(cycle.forcingDate || 'N/A') +
+                '</span><span>Started: ' + escapeHtml(cycle.startDate || 'N/A') +
+                '</span><span>Completed: ' + escapeHtml(completed) +
+                '</span><span>Scans: ' + scans.length + (cycle.legacy ? ' (legacy/unassigned)' : '') +
+                '</span><span>Latest scan: ' + escapeHtml(latest) +
+                '</span></div><button type="button" class="btn btn-sm btn-secondary" data-cycle-id="' + escapeHtml(cycle.id) +
+                '" data-cycle-cutoff="' + (cutoff == null ? '' : cutoff) + '">View scans</button></article>';
+        }).join('') + '</div>';
+        if (typeof onViewScans === 'function') {
+            container.querySelectorAll('[data-cycle-id]').forEach(function (button) {
+                button.addEventListener('click', function () {
+                    onViewScans(button.getAttribute('data-cycle-id'), button.getAttribute('data-cycle-cutoff'));
+                });
+            });
+        }
+    }
+
+    function xmlEscape(value) {
+        return String(value == null ? '' : value)
+            .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+    }
+
+    function columnName(index) {
+        let name = '';
+        for (index++; index; index = Math.floor((index - 1) / 26)) {
+            name = String.fromCharCode(65 + (index - 1) % 26) + name;
+        }
+        return name;
+    }
+
+    function worksheetXml(rows) {
+        const xmlRows = rows.map(function (row, rowIndex) {
+            const cells = row.map(function (value, colIndex) {
+                if (value == null || value === '') return '';
+                const ref = columnName(colIndex) + (rowIndex + 1);
+                if (typeof value === 'number' && Number.isFinite(value)) {
+                    return '<c r="' + ref + '"><v>' + value + '</v></c>';
+                }
+                if (typeof value === 'boolean') return '<c r="' + ref + '" t="b"><v>' + (value ? '1' : '0') + '</v></c>';
+                return '<c r="' + ref + '" t="inlineStr"><is><t xml:space="preserve">' + xmlEscape(value) + '</t></is></c>';
+            }).join('');
+            return '<row r="' + (rowIndex + 1) + '">' + cells + '</row>';
+        }).join('');
+        return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>' + xmlRows + '</sheetData></worksheet>';
+    }
+
+    function crc32(bytes) {
+        let crc = 0xFFFFFFFF;
+        for (let i = 0; i < bytes.length; i++) {
+            crc = (crc >>> 8) ^ CRC32_TABLE[(crc ^ bytes[i]) & 0xFF];
+        }
+        return (crc ^ 0xFFFFFFFF) >>> 0;
+    }
+
+    const CRC32_TABLE = (function () {
+        const table = new Uint32Array(256);
+        for (let n = 0; n < 256; n++) {
+            let value = n;
+            for (let bit = 0; bit < 8; bit++) value = value & 1 ? 0xEDB88320 ^ (value >>> 1) : value >>> 1;
+            table[n] = value >>> 0;
+        }
+        return table;
+    })();
+
+    function storedZip(entries) {
+        const encoder = new TextEncoder();
+        const localParts = [];
+        const centralParts = [];
+        let offset = 0;
+        entries.forEach(function (entry) {
+            const name = encoder.encode(entry.name);
+            const data = encoder.encode(entry.content);
+            const checksum = crc32(data);
+            const local = new Uint8Array(30 + name.length);
+            const localView = new DataView(local.buffer);
+            localView.setUint32(0, 0x04034B50, true);
+            localView.setUint16(4, 20, true);
+            localView.setUint16(6, 0, true);
+            localView.setUint16(8, 0, true);
+            localView.setUint16(10, 0, true);
+            localView.setUint16(12, 0x21, true);
+            localView.setUint32(14, checksum, true);
+            localView.setUint32(18, data.length, true);
+            localView.setUint32(22, data.length, true);
+            localView.setUint16(26, name.length, true);
+            localView.setUint16(28, 0, true);
+            local.set(name, 30);
+            localParts.push(local, data);
+
+            const central = new Uint8Array(46 + name.length);
+            const centralView = new DataView(central.buffer);
+            centralView.setUint32(0, 0x02014B50, true);
+            centralView.setUint16(4, 20, true);
+            centralView.setUint16(6, 20, true);
+            centralView.setUint16(8, 0, true);
+            centralView.setUint16(10, 0, true);
+            centralView.setUint16(12, 0, true);
+            centralView.setUint16(14, 0x21, true);
+            centralView.setUint32(16, checksum, true);
+            centralView.setUint32(20, data.length, true);
+            centralView.setUint32(24, data.length, true);
+            centralView.setUint16(28, name.length, true);
+            centralView.setUint16(30, 0, true);
+            centralView.setUint16(32, 0, true);
+            centralView.setUint16(34, 0, true);
+            centralView.setUint16(36, 0, true);
+            centralView.setUint32(38, 0, true);
+            centralView.setUint32(42, offset, true);
+            central.set(name, 46);
+            centralParts.push(central);
+            offset += local.length + data.length;
+        });
+        const centralSize = centralParts.reduce(function (sum, part) { return sum + part.length; }, 0);
+        const end = new Uint8Array(22);
+        const endView = new DataView(end.buffer);
+        endView.setUint32(0, 0x06054B50, true);
+        endView.setUint16(4, 0, true);
+        endView.setUint16(6, 0, true);
+        endView.setUint16(8, entries.length, true);
+        endView.setUint16(10, entries.length, true);
+        endView.setUint32(12, centralSize, true);
+        endView.setUint32(16, offset, true);
+        endView.setUint16(20, 0, true);
+        return new Blob(localParts.concat(centralParts, [end]), { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    }
+
+    function assignedCycle(entry, cycles) {
+        if (entry.data.cycleId) {
+            return cycles.find(function (cycle) { return cycle.id === entry.data.cycleId; }) || null;
+        }
+        const legacyMatches = cycles.filter(function (cycle) {
+            const cutoff = cycle.legacy ? cycleCompletedAtMs(cycle) : null;
+            return cutoff !== null && entry.date.getTime() <= cutoff;
+        }).sort(function (a, b) {
+            return cycleCompletedAtMs(a) - cycleCompletedAtMs(b);
+        });
+        return legacyMatches[0] || null;
+    }
+
+    function workbookBlob(history, block, cycles) {
+        const scanRows = [[
+            'Scan ID', 'Crop Cycle', 'Block ID', 'Block name', 'Section', 'Account ID', 'Status',
             'Start time (UTC)', 'End time (UTC)', 'Duration (seconds)',
             'Bearing detections', 'Non-bearing detections', 'Non-viable detections',
             'Total detections', 'Bearing rate (%)', 'Registered population',
             'Estimated bearing', 'Estimated non-bearing', 'Detection coverage (%)',
             'Processed frames', 'Total frames', 'Manifest ready',
-        ];
-        const rows = history.map(function (entry) {
+        ]];
+        const orderedHistory = history.slice().sort(function (a, b) { return a.date - b.date; });
+        const scanCounts = new Map();
+        orderedHistory.forEach(function (entry) {
             const d = entry.data;
+            const cycle = assignedCycle(entry, cycles);
             const end = d.endTime && typeof d.endTime.toDate === 'function' ? d.endTime.toDate() : null;
-            return [
-                entry.id, d.blockId, block.blockName || block.blockId || block.id,
-                block.section, d.userId, d.status || 'completed (legacy)',
-                entry.date.toISOString(), timestamp(d.endTime),
-                end && end >= entry.date ? (end - entry.date) / 1000 : '',
-                Number(d.bearing) || 0, Number(d.nonBearing) || 0, Number(d.nonViable) || 0,
-                Number(d.total) || 0, entry.pct, d.registeredPopulation,
-                d.estimatedBearing, d.estimatedNonBearing, d.detectionCoverage,
-                d.processedFrames, d.totalFrames, d.manifestReady,
-            ];
+            if (cycle) scanCounts.set(cycle.id, (scanCounts.get(cycle.id) || 0) + 1);
+            scanRows.push([
+                entry.id, cycle ? 'Cycle ' + cycle.displayNumber : 'Unassigned', d.blockId,
+                block.blockName || block.blockId || 'Unnamed block', block.section, d.userId,
+                d.status || 'completed (legacy)', entry.date.toISOString(), timestamp(d.endTime),
+                end && end >= entry.date ? (end - entry.date) / 1000 : null,
+                metric(d, 'bearing'), metric(d, 'nonBearing'), metric(d, 'nonViable'),
+                metric(d, 'total'), entry.pct, metric(d, 'registeredPopulation'),
+                metric(d, 'estimatedBearing'), metric(d, 'estimatedNonBearing'), metric(d, 'detectionCoverage'),
+                metric(d, 'processedFrames'), metric(d, 'totalFrames'), d.manifestReady,
+            ]);
         });
-        return '\uFEFF' + [headings].concat(rows).map(function (row) {
-            return row.map(csvCell).join(',');
-        }).join('\r\n');
+
+        const cycleRows = [['Crop Cycle', 'Status', 'Planting Date', 'Forcing Date', 'Start Date', 'Completed Date', 'Scan Count', 'Latest Scan']];
+        cycles.slice().sort(function (a, b) { return a.displayNumber - b.displayNumber; }).forEach(function (cycle) {
+            const cycleScans = orderedHistory.filter(function (entry) { return assignedCycle(entry, cycles) === cycle; });
+            const latest = cycleScans.length ? cycleScans[cycleScans.length - 1].date.toISOString() : '';
+            cycleRows.push([
+                'Cycle ' + cycle.displayNumber, cycle.status || 'Unknown', cycle.planted, cycle.forcingDate,
+                cycle.startDate, timestamp(cycle.completedAtMs == null ? cycle.completedAt : cycle.completedAtMs), scanCounts.get(cycle.id) || 0, latest,
+            ]);
+        });
+
+        const entries = [
+            { name: '[Content_Types].xml', content: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>' },
+            { name: '_rels/.rels', content: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>' },
+            { name: 'xl/workbook.xml', content: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Scan Details" sheetId="1" r:id="rId1"/><sheet name="Crop Cycles" sheetId="2" r:id="rId2"/></sheets></workbook>' },
+            { name: 'xl/_rels/workbook.xml.rels', content: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/></Relationships>' },
+            { name: 'xl/worksheets/sheet1.xml', content: worksheetXml(scanRows) },
+            { name: 'xl/worksheets/sheet2.xml', content: worksheetXml(cycleRows) },
+        ];
+        return storedZip(entries);
     }
 
-    async function download(block, userId, button) {
+    async function download(block, userId, history, cycles, button) {
         if (!block) return;
         if (button) button.disabled = true;
         try {
-            const history = (await load(block.id, userId)).filter(function (entry) {
-                return getStatus(entry.data) === 'Completed' && metric(entry.data, 'total') !== null && metric(entry.data, 'total') > 0;
-            });
-            if (!history.length) {
-                utils.showToast('No completed scan details available for this block.', 'info');
+            if (!history.length && !cycles.length) {
+                utils.showToast('No scan or crop cycle records available for this block.', 'info');
                 return;
             }
-            const blob = new Blob([toCSV(history, block)], { type: 'text/csv;charset=utf-8;' });
+            const blob = workbookBlob(history, block, cycles);
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
-            const name = String(block.blockName || block.blockId || block.id)
+            const name = String(block.blockName || block.blockId || 'block')
                 .replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 80);
             link.href = url;
-            link.download = name + '_scan_details.csv';
+            link.download = name + '_history.xlsx';
             document.body.appendChild(link);
             link.click();
             link.remove();
             setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
         } catch (error) {
-            console.error('❌ Error downloading scan details:', error);
-            utils.showToast('Could not download scan details. Please try again.', 'error');
+            console.error('❌ Error downloading block history:', error);
+            utils.showToast('Could not download block history. Please try again.', 'error');
         } finally {
             if (button) button.disabled = false;
         }
@@ -309,7 +517,11 @@ window.blockScanHistory = (function () {
         loadLatestPlantCounts: loadLatestPlantCounts,
         latestPlantCountsFromSnapshots: latestPlantCountsFromSnapshots,
         render: render,
+        assignedCycle: assignedCycle,
+        cycleCompletedAtMs: cycleCompletedAtMs,
+        assignCycleDisplayNumbers: assignCycleDisplayNumbers,
+        renderCycles: renderCycles,
         download: download,
-        toCSV: toCSV,
+        workbookBlob: workbookBlob,
     };
 })();

@@ -665,13 +665,11 @@
               style="padding: var(--space-md) var(--space-xl)"
             >
               <div class="d-flex align-items-center gap-3">
-                <span class="thead-title">Scan History</span>
-                <span class="trend-view-hint">View Scan History</span>
+                <span class="thead-title">History</span>
+                <span class="trend-view-hint">View scans and crop cycles</span>
               </div>
               <div class="d-flex align-items-center gap-2 trend-actions">
-                <button type="button" class="btn btn-sm btn-secondary" onclick="openCropCycleHistory()">Crop Cycle History</button>
-                <button type="button" class="btn btn-sm btn-secondary" onclick="downloadTrendDetails(this)" title="Download scan details" aria-label="Download scan details"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg></button>
-                <button type="button" class="btn btn-sm btn-navigation" onclick="openTrendModal()"><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg> View <svg class="btn-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>
+                <button type="button" class="btn btn-sm btn-navigation" onclick="openTrendModal()"><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg> View History <svg class="btn-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>
               </div>
             </div>
           </div>
@@ -699,11 +697,6 @@
           <div class="modal-footer"><button type="button" class="btn btn-secondary" onclick="closeNewCycleModal()">Cancel</button><button type="submit" id="cycle-submit" class="btn btn-primary">Confirm New Cycle</button></div>
         </form>
       </div>
-    </div>
-
-    <!-- CROP CYCLE HISTORY MODAL -->
-    <div id="cycle-history-modal" class="modal">
-      <div class="modal-content scan-history-modal-content"><div class="modal-header"><h2 class="modal-title">Crop Cycle History</h2><button type="button" class="modal-close" aria-label="Close crop cycle history" onclick="closeCycleHistory()">&times;</button></div><div class="modal-body scan-history-body" id="cycle-history-content"></div><div class="modal-footer"><button type="button" class="btn btn-secondary" onclick="closeCycleHistory()">Close</button></div></div>
     </div>
 
     <!-- EDIT BLOCK MODAL -->
@@ -827,15 +820,19 @@
     <div id="trend-modal" class="modal">
       <div class="modal-content scan-history-modal-content">
         <div class="modal-header">
-          <h2 class="modal-title">Scan History</h2>
+          <h2 class="modal-title">Block History</h2>
           <div class="d-flex align-items-center gap-2">
-            <button type="button" class="btn btn-sm btn-secondary" onclick="downloadTrendDetails(this)" title="Download scan details" aria-label="Download scan details"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg></button>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="downloadTrendDetails(this)" title="Download Excel history workbook" aria-label="Download Excel history workbook"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg></button>
             <button type="button" class="modal-close" aria-label="Close scan history" onclick="closeTrendModal()">
               &times;
             </button>
           </div>
         </div>
-        <div class="modal-body scan-history-body" id="trend-modal-content">
+        <div class="history-tabs" role="tablist" aria-label="Block history views">
+          <button type="button" id="history-tab-scans" class="history-tab is-active" role="tab" aria-selected="true" aria-controls="trend-modal-content" onclick="selectHistoryTab('scans')">Scan History</button>
+          <button type="button" id="history-tab-cycles" class="history-tab" role="tab" aria-selected="false" aria-controls="trend-modal-content" onclick="selectHistoryTab('cycles')">Crop Cycle History</button>
+        </div>
+        <div class="modal-body scan-history-body" id="trend-modal-content" role="tabpanel" aria-labelledby="history-tab-scans">
           <!-- populated by renderTrendModal() -->
         </div>
         <div
@@ -843,7 +840,7 @@
           style="justify-content: space-between; align-items: center"
         >
           <span style="font-size: var(--font-size-xs); color: var(--muted)"
-            >Completed scans for this block</span
+            >Scan and crop cycle history for this block</span
           >
           <button
             type="button"
@@ -941,18 +938,6 @@
 
       // ── Load Block from Firebase ─────────────────────────────────
 
-      function assignCycleDisplayNumbers(cycles) {
-        cycles.sort(function (a, b) {
-          const byStartDate = String(a.startDate || "").localeCompare(String(b.startDate || ""));
-          if (byStartDate) return byStartDate;
-          const aCreated = a.createdAt && a.createdAt.toMillis ? a.createdAt.toMillis() : 0;
-          const bCreated = b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : 0;
-          return aCreated - bCreated || a.id.localeCompare(b.id);
-        });
-        cycles.forEach(function (cycle, index) { cycle.displayNumber = index + 1; });
-        return cycles;
-      }
-
       async function loadBlockFromFirebase(blockId) {
         try {
           console.log("📥 Loading block", blockId, "from Firestore...");
@@ -1015,7 +1000,7 @@
                 .get();
               const cycles = [];
               cycleSnapshot.forEach(function (doc) { cycles.push(Object.assign({ id: doc.id }, doc.data())); });
-              const activeCycle = assignCycleDisplayNumbers(cycles).find(function (cycle) {
+              const activeCycle = blockScanHistory.assignCycleDisplayNumbers(cycles).find(function (cycle) {
                 return cycle.id === currentBlock.activeCycleId;
               });
               currentBlock.activeCycleNumber = activeCycle ? activeCycle.displayNumber : null;
@@ -1296,21 +1281,69 @@
 
       // ── Trend Modal — live bearing-rate history from this block's scans ──
 
-      async function openTrendModal(cycleId, legacyCutoff) {
+      let selectedHistoryTab = "scans";
+      let selectedHistoryCycleId = null;
+      let selectedLegacyCycleCutoff = null;
+
+      async function openTrendModal() {
         if (!currentBlock) return;
-        if (cycleId === undefined) selectedHistoryCycleId = null;
-        else selectedHistoryCycleId = cycleId;
-        selectedLegacyCycleCutoff = legacyCutoff == null ? null : Number(legacyCutoff);
-        document.querySelector("#trend-modal .modal-title").textContent = selectedHistoryCycleId ? "Cycle Scan History" : "Scan History";
+        selectedHistoryTab = "scans";
+        selectedHistoryCycleId = null;
+        selectedLegacyCycleCutoff = null;
         utils.showModal("trend-modal");
-        document.getElementById("trend-modal-content").innerHTML =
-          '<div style="padding:var(--space-xl);text-align:center;color:var(--color-text-secondary);">Loading scan history…</div>';
         await renderTrendModal();
+      }
+
+      async function openCropCycleHistory() {
+        if (!currentBlock) return;
+        selectedHistoryTab = "cycles";
+        selectedHistoryCycleId = null;
+        selectedLegacyCycleCutoff = null;
+        utils.showModal("trend-modal");
+        await renderTrendModal();
+      }
+
+      function selectHistoryTab(tab) {
+        selectedHistoryTab = tab === "cycles" ? "cycles" : "scans";
+        selectedHistoryCycleId = null;
+        selectedLegacyCycleCutoff = null;
+        renderTrendModal();
+      }
+
+      function setHistoryTabState() {
+        ["scans", "cycles"].forEach(function (tab) {
+          const selected = selectedHistoryTab === tab;
+          const button = document.getElementById("history-tab-" + tab);
+          button.classList.toggle("is-active", selected);
+          button.setAttribute("aria-selected", String(selected));
+        });
+        document.getElementById("trend-modal-content").setAttribute(
+          "aria-labelledby", "history-tab-" + (selectedHistoryTab === "cycles" ? "cycles" : "scans")
+        );
+      }
+
+      async function loadCropCycleRecords() {
+        const snapshot = await firebase.firestore().collection("cropCycles")
+          .where("blockId", "==", currentBlock.id)
+          .where("userId", "==", currentUserId)
+          .get();
+        const cycles = [];
+        snapshot.forEach(function (doc) { cycles.push(Object.assign({ id: doc.id }, doc.data())); });
+        return blockScanHistory.assignCycleDisplayNumbers(cycles).reverse();
+      }
+
+      function renderCropCycleList(cycles, history, container) {
+        blockScanHistory.renderCycles(cycles, history, container, currentBlock.activeCycleId, viewCycleScans);
       }
 
       function downloadTrendDetails(button) {
         if (!currentBlock) return;
-        return blockScanHistory.download(currentBlock, currentUserId, button);
+        return Promise.all([blockScanHistory.load(currentBlock.id, currentUserId, true), loadCropCycleRecords()])
+          .then(function (results) { return blockScanHistory.download(currentBlock, currentUserId, results[0], results[1], button); })
+          .catch(function (error) {
+            console.error("❌ Error preparing history export:", error);
+            utils.showToast("Could not prepare history export. Please try again.", "error");
+          });
       }
 
       function closeTrendModal() {
@@ -1319,18 +1352,26 @@
         selectedLegacyCycleCutoff = null;
       }
 
-      let selectedHistoryCycleId = null;
-      let selectedLegacyCycleCutoff = null;
-
       async function renderTrendModal() {
+        const container = document.getElementById("trend-modal-content");
+        setHistoryTabState();
+        container.innerHTML = '<div class="scan-history-empty">Loading history…</div>';
         try {
-          const history = await blockScanHistory.load(currentBlock.id, currentUserId, true);
-
-          blockScanHistory.render(history, document.getElementById("trend-modal-content"), currentBlock, selectedHistoryCycleId, selectedLegacyCycleCutoff);
+          const results = await Promise.all([
+            blockScanHistory.load(currentBlock.id, currentUserId, true),
+            loadCropCycleRecords(),
+          ]);
+          if (selectedHistoryTab === "cycles") {
+            renderCropCycleList(results[1], results[0], container);
+            return;
+          }
+          blockScanHistory.render(results[0], container, currentBlock, selectedHistoryCycleId, selectedLegacyCycleCutoff, results[1]);
+          if (selectedHistoryCycleId) {
+            container.insertAdjacentHTML("afterbegin", '<button type="button" class="btn btn-sm btn-secondary history-back-button" onclick="selectHistoryTab(\'cycles\')">← All crop cycles</button>');
+          }
         } catch (error) {
-          console.error("❌ Error loading scan history:", error);
-          document.getElementById("trend-modal-content").innerHTML =
-            '<div style="padding:var(--space-xl);text-align:center;color:var(--color-text-secondary);">Couldn\'t load scan history. Please try again.</div>';
+          console.error("❌ Error loading block history:", error);
+          container.innerHTML = '<div class="scan-history-empty">Couldn\'t load history. Please try again.</div>';
         }
       }
 
@@ -1341,15 +1382,11 @@
         utils.setupModalClose("trend-modal");
         utils.setupModalClose("delete-block-modal");
         utils.setupModalClose("new-cycle-modal");
-        utils.setupModalClose("cycle-history-modal");
         document.getElementById("trend-modal").addEventListener("click", function (event) {
           if (event.target === this) closeTrendModal();
         });
       }
 
-      function cycleEscape(value) {
-        return String(value == null ? "" : value).replace(/[&<>"']/g, function (c) { return {"&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;"}[c]; });
-      }
       function closeNewCycleModal() { utils.hideModal("new-cycle-modal"); }
       function openNewCycleModal() {
         document.getElementById("cycle-form-error").textContent = "";
@@ -1412,30 +1449,12 @@
         } finally { submit.disabled = false; submit.textContent = "Confirm New Cycle"; }
       }
 
-      async function openCropCycleHistory() {
-        utils.showModal("cycle-history-modal");
-        const container = document.getElementById("cycle-history-content");
-        container.innerHTML = '<div class="scan-history-empty">Loading crop cycles…</div>';
-        try {
-          const db = firebase.firestore();
-          const results = await Promise.all([db.collection("cropCycles").where("blockId","==",currentBlock.id).where("userId","==",currentUserId).get(),blockScanHistory.load(currentBlock.id,currentUserId,true)]);
-          const cycles = []; results[0].forEach(function (doc) { cycles.push(Object.assign({id:doc.id},doc.data())); });
-          assignCycleDisplayNumbers(cycles).reverse();
-          if (!cycles.length) { container.innerHTML = '<div class="scan-history-empty">No crop cycle records are available yet. Starting a new cycle will preserve the current block details here.</div>'; return; }
-          container.innerHTML = '<div class="cycle-history-list">' + cycles.map(function (cycle) {
-            const legacyCutoff = cycle.legacy && cycle.completedAt && cycle.completedAt.toDate ? cycle.completedAt.toDate().getTime() : null;
-            const scans = results[1].filter(function (scan) {
-              return scan.data.cycleId === cycle.id || (legacyCutoff !== null && !scan.data.cycleId && scan.date.getTime() <= legacyCutoff);
-            });
-            const latest = scans.length ? scans[scans.length-1].date.toLocaleDateString() : "N/A";
-            const completed = cycle.completedAt && cycle.completedAt.toDate ? cycle.completedAt.toDate().toLocaleDateString() : "N/A";
-            const active = cycle.id === currentBlock.activeCycleId;
-            return '<article class="cycle-history-card"><header><strong>Cycle ' + cycle.displayNumber + '</strong>' + (active ? '<span class="cycle-active-badge">Active</span>' : '<span>' + cycleEscape(cycle.status || "N/A") + '</span>') + '</header><div class="cycle-history-meta"><span>Planting: ' + cycleEscape(cycle.planted || "N/A") + '</span><span>Forcing: ' + cycleEscape(cycle.forcingDate || "N/A") + '</span><span>Started: ' + cycleEscape(cycle.startDate || "N/A") + '</span><span>Completed: ' + cycleEscape(completed) + '</span><span>Scans: ' + scans.length + (cycle.legacy ? " (legacy/unassigned)" : "") + '</span><span>Latest scan: ' + cycleEscape(latest) + '</span></div><button type="button" class="btn btn-sm btn-secondary" onclick="viewCycleScans(\'' + cycleEscape(cycle.id) + '\',' + (legacyCutoff === null ? "null" : legacyCutoff) + ')">View scans</button></article>';
-          }).join("") + '</div>';
-        } catch (err) { console.error("❌ Failed to load crop cycles:",err); container.innerHTML = '<div class="scan-history-empty">Couldn’t load crop cycle history. Please try again.</div>'; }
+      async function viewCycleScans(cycleId, legacyCutoff) {
+        selectedHistoryCycleId = cycleId;
+        selectedLegacyCycleCutoff = legacyCutoff == null ? null : Number(legacyCutoff);
+        selectedHistoryTab = "scans";
+        await renderTrendModal();
       }
-      function closeCycleHistory() { utils.hideModal("cycle-history-modal"); }
-      async function viewCycleScans(cycleId, legacyCutoff) { closeCycleHistory(); await openTrendModal(cycleId, legacyCutoff); }
 
       // ── Edit modal ────────────────────────────────────────────────
 

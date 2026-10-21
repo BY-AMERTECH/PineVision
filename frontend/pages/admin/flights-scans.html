@@ -96,6 +96,7 @@
       .fs-table col.c-duration { width: 100px; }
       .fs-table col.c-status { width: 130px; }
       .fs-table col.c-bearing { width: 110px; }
+      .fs-table col.c-history { width: 110px; }
     </style>
   </head>
   <body>
@@ -379,6 +380,26 @@
       </main>
     </div>
 
+    <div id="admin-block-history-modal" class="modal">
+      <div class="modal-content scan-history-modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title" id="admin-history-title">Block History</h2>
+          <div class="d-flex align-items-center gap-2">
+            <button type="button" class="btn btn-sm btn-secondary" onclick="downloadAdminBlockHistory(this)" title="Download Excel history workbook" aria-label="Download Excel history workbook">Download Excel</button>
+            <button type="button" class="modal-close" aria-label="Close block history" onclick="closeAdminBlockHistory()">&times;</button>
+          </div>
+        </div>
+        <div class="history-tabs" role="tablist" aria-label="Block history views">
+          <button type="button" id="admin-history-tab-scans" class="history-tab is-active" role="tab" aria-selected="true" aria-controls="admin-history-content" onclick="selectAdminHistoryTab('scans')">Scan History</button>
+          <button type="button" id="admin-history-tab-cycles" class="history-tab" role="tab" aria-selected="false" aria-controls="admin-history-content" onclick="selectAdminHistoryTab('cycles')">Crop Cycle History</button>
+        </div>
+        <div class="modal-body scan-history-body" id="admin-history-content" role="tabpanel" aria-labelledby="admin-history-tab-scans"></div>
+        <div class="modal-footer" style="justify-content:flex-end">
+          <button type="button" class="btn btn-secondary" onclick="closeAdminBlockHistory()">Close</button>
+        </div>
+      </div>
+    </div>
+
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
@@ -386,6 +407,7 @@
     <script src="../../js/auth.js"></script>
     <script src="../../js/data.js"></script>
     <script src="../../js/utils.js"></script>
+    <script src="../../js/block-scan-history.js"></script>
     <script src="../../js/app.js"></script>
     <script>
       if (!auth.requireSuperAdmin()) {
@@ -415,8 +437,16 @@
       let SCANS_RAW = [];       // [{id, ...doc data}]
       let BLOCKS_BY_ID = {};    // blockId -> { blockName, section }
       let USERS_BY_ID = {};     // userId -> fullName
+      let selectedAdminBlock = null;
+      let selectedAdminHistoryTab = "scans";
+      let selectedAdminCycleId = null;
+      let selectedAdminLegacyCutoff = null;
 
       window.initPage = function () {
+        utils.setupModalClose("admin-block-history-modal");
+        document.getElementById("admin-block-history-modal").addEventListener("click", function (event) {
+          if (event.target === this) closeAdminBlockHistory();
+        });
         attachListeners();
         window.addEventListener("pagehide", detachListeners);
         window.addEventListener("beforeunload", detachListeners);
@@ -439,8 +469,11 @@
               snap.forEach(function (doc) {
                 const d = doc.data();
                 BLOCKS_BY_ID[doc.id] = {
+                  id: doc.id,
                   blockName: d.blockName || d.blockId || doc.id,
                   section: d.section || "",
+                  userId: d.userId || "",
+                  activeCycleId: d.activeCycleId || null,
                 };
               });
               renderAll();
@@ -644,10 +677,10 @@
           rows.length + " session" + (rows.length !== 1 ? "s" : "") + "</span></div>" +
           '<div class="twrap"><table class="fs-table">' +
           "<colgroup>" +
-          '<col class="c-date"><col class="c-block"><col class="c-operator"><col class="c-duration"><col class="c-status"><col class="c-bearing">' +
+          '<col class="c-date"><col class="c-block"><col class="c-operator"><col class="c-duration"><col class="c-status"><col class="c-bearing"><col class="c-history">' +
           "</colgroup>" +
           "<thead><tr>" +
-          "<th>Date</th><th>Block</th><th>User</th><th>Duration</th><th>Status</th><th>Bearing</th>" +
+          "<th>Date</th><th>Block</th><th>User</th><th>Duration</th><th>Status</th><th>Bearing</th><th>History</th>" +
           "</tr></thead><tbody>";
 
         rows.forEach(function (r) {
@@ -672,11 +705,105 @@
             "<td>" + scanStatusBadge(r.status) + "</td>" +
             '<td style="font-family:var(--font-mono);font-size:var(--font-size-sm);color:' + bearColor + ';font-weight:var(--font-weight-medium);">' +
             (r.hasData ? r.bearingPercent.toFixed(1) + "%" : "—") + "</td>" +
+            '<td><button type="button" class="btn btn-sm btn-secondary fs-history-button" data-block-id="' + escapeHtml(r.blockId) + '">History</button></td>' +
             "</tr>";
         });
 
         html += "</tbody></table></div></div>";
         document.getElementById("fs-content").innerHTML = html;
+        document.querySelectorAll(".fs-history-button").forEach(function (button) {
+          button.addEventListener("click", function () { openAdminBlockHistory(button.getAttribute("data-block-id")); });
+        });
+      }
+
+      async function fetchAdminCropCycles(blockId) {
+        const user = firebase.auth().currentUser;
+        if (!user) throw new Error("Not authenticated");
+        const token = await user.getIdToken();
+        const response = await fetch("/api/history/crop-cycles?block_id=" + encodeURIComponent(blockId), {
+          headers: { Authorization: "Bearer " + token },
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || "Could not load crop cycles");
+        return blockScanHistory.assignCycleDisplayNumbers(payload.cycles || []).reverse();
+      }
+
+      function openAdminBlockHistory(blockId) {
+        const block = BLOCKS_BY_ID[blockId];
+        if (!block || !block.userId) {
+          utils.showToast("Block details are unavailable for this history view.", "error");
+          return;
+        }
+        selectedAdminBlock = block;
+        selectedAdminHistoryTab = "scans";
+        selectedAdminCycleId = null;
+        selectedAdminLegacyCutoff = null;
+        document.getElementById("admin-history-title").textContent = block.blockName + " — History";
+        utils.showModal("admin-block-history-modal");
+        renderAdminBlockHistory();
+      }
+
+      function selectAdminHistoryTab(tab) {
+        selectedAdminHistoryTab = tab === "cycles" ? "cycles" : "scans";
+        selectedAdminCycleId = null;
+        selectedAdminLegacyCutoff = null;
+        renderAdminBlockHistory();
+      }
+
+      async function renderAdminBlockHistory() {
+        const container = document.getElementById("admin-history-content");
+        ["scans", "cycles"].forEach(function (tab) {
+          const selected = selectedAdminHistoryTab === tab;
+          const button = document.getElementById("admin-history-tab-" + tab);
+          button.classList.toggle("is-active", selected);
+          button.setAttribute("aria-selected", String(selected));
+        });
+        container.setAttribute("aria-labelledby", "admin-history-tab-" + selectedAdminHistoryTab);
+        container.innerHTML = '<div class="scan-history-empty">Loading history…</div>';
+        try {
+          const results = await Promise.all([
+            blockScanHistory.load(selectedAdminBlock.id, selectedAdminBlock.userId, true),
+            fetchAdminCropCycles(selectedAdminBlock.id),
+          ]);
+          if (selectedAdminHistoryTab === "cycles") {
+            blockScanHistory.renderCycles(results[1], results[0], container, selectedAdminBlock.activeCycleId, viewAdminCycleScans);
+            return;
+          }
+          blockScanHistory.render(results[0], container, selectedAdminBlock, selectedAdminCycleId, selectedAdminLegacyCutoff, results[1]);
+          if (selectedAdminCycleId) {
+            container.insertAdjacentHTML("afterbegin", '<button type="button" class="btn btn-sm btn-secondary history-back-button" onclick="selectAdminHistoryTab(\'cycles\')">← All crop cycles</button>');
+          }
+        } catch (error) {
+          console.error("❌ Error loading admin block history:", error);
+          container.innerHTML = '<div class="scan-history-empty">Couldn\'t load history. Please try again.</div>';
+        }
+      }
+
+      function viewAdminCycleScans(cycleId, cutoff) {
+        selectedAdminCycleId = cycleId;
+        selectedAdminLegacyCutoff = cutoff === "" || cutoff == null ? null : Number(cutoff);
+        selectedAdminHistoryTab = "scans";
+        renderAdminBlockHistory();
+      }
+
+      function closeAdminBlockHistory() {
+        utils.hideModal("admin-block-history-modal");
+        selectedAdminBlock = null;
+        selectedAdminCycleId = null;
+        selectedAdminLegacyCutoff = null;
+      }
+
+      function downloadAdminBlockHistory(button) {
+        if (!selectedAdminBlock) return;
+        return Promise.all([
+          blockScanHistory.load(selectedAdminBlock.id, selectedAdminBlock.userId, true),
+          fetchAdminCropCycles(selectedAdminBlock.id),
+        ]).then(function (results) {
+          return blockScanHistory.download(selectedAdminBlock, selectedAdminBlock.userId, results[0], results[1], button);
+        }).catch(function (error) {
+          console.error("❌ Error preparing admin history export:", error);
+          utils.showToast("Could not prepare history export. Please try again.", "error");
+        });
       }
 
       function renderError() {

@@ -857,13 +857,17 @@
     <div id="trend-modal" class="modal">
       <div class="modal-content scan-history-modal-content">
         <div class="modal-header">
-          <h2 class="modal-title" id="trend-modal-title">Scan History</h2>
+          <h2 class="modal-title" id="trend-modal-title">Block History</h2>
           <div class="d-flex align-items-center gap-2">
-            <button type="button" class="btn btn-sm btn-secondary" onclick="downloadTrendDetails(this)" title="Download scan details" aria-label="Download scan details"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg></button>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="downloadTrendDetails(this)" title="Download Excel history workbook" aria-label="Download Excel history workbook"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg></button>
             <button class="modal-close" aria-label="Close scan history" onclick="closeTrendModal()">&times;</button>
           </div>
         </div>
-        <div class="modal-body scan-history-body" id="trend-modal-content"></div>
+        <div class="history-tabs" role="tablist" aria-label="Block history views">
+          <button type="button" id="blocks-history-tab-scans" class="history-tab is-active" role="tab" aria-selected="true" aria-controls="trend-modal-content" onclick="selectBlockHistoryTab('scans')">Scan History</button>
+          <button type="button" id="blocks-history-tab-cycles" class="history-tab" role="tab" aria-selected="false" aria-controls="trend-modal-content" onclick="selectBlockHistoryTab('cycles')">Crop Cycle History</button>
+        </div>
+        <div class="modal-body scan-history-body" id="trend-modal-content" role="tabpanel" aria-labelledby="blocks-history-tab-scans"></div>
         <div class="modal-footer" style="justify-content: flex-end">
           <button type="button" class="btn btn-secondary" onclick="closeTrendModal()"><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m18 6-12 12M6 6l12 12"/></svg> Close</button>
         </div>
@@ -1381,17 +1385,39 @@
 
       // ── Scan History modal (read-only) ────────────────────────────
 
+      let selectedBlockHistoryTab = "scans";
+      let selectedBlockCycleId = null;
+      let selectedLegacyCycleCutoff = null;
+
       async function openTrendModal(id) {
         const block = findBlock(id);
         if (!block) return;
         currentActionBlockId = id;
-
-        document.getElementById("trend-modal-title").textContent =
-          "Scan History — " + block.blockName;
-        document.getElementById("trend-modal-content").innerHTML =
-          '<div class="scan-history-empty">Loading scan history…</div>';
+        selectedBlockHistoryTab = "scans";
+        selectedBlockCycleId = null;
+        selectedLegacyCycleCutoff = null;
+        document.getElementById("trend-modal-title").textContent = block.blockName + " — History";
         utils.showModal("trend-modal");
         await renderTrendModal(block);
+      }
+
+      function selectBlockHistoryTab(tab) {
+        selectedBlockHistoryTab = tab === "cycles" ? "cycles" : "scans";
+        selectedBlockCycleId = null;
+        selectedLegacyCycleCutoff = null;
+        renderTrendModal(findBlock(currentActionBlockId));
+      }
+
+      async function loadCropCycleRecords(block) {
+        const user = firebase.auth().currentUser;
+        if (!user) throw new Error("Not authenticated");
+        const token = await user.getIdToken();
+        const response = await fetch("/api/history/crop-cycles?block_id=" + encodeURIComponent(block.id), {
+          headers: { Authorization: "Bearer " + token },
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || "Could not load crop cycles");
+        return blockScanHistory.assignCycleDisplayNumbers(payload.cycles || []).reverse();
       }
 
       function closeTrendModal() {
@@ -1399,20 +1425,54 @@
       }
 
       async function renderTrendModal(block) {
+        if (!block) return;
         const content = document.getElementById("trend-modal-content");
+        ["scans", "cycles"].forEach(function (tab) {
+          const selected = selectedBlockHistoryTab === tab;
+          const button = document.getElementById("blocks-history-tab-" + tab);
+          button.classList.toggle("is-active", selected);
+          button.setAttribute("aria-selected", String(selected));
+        });
+        content.setAttribute("aria-labelledby", "blocks-history-tab-" + selectedBlockHistoryTab);
+        content.innerHTML = '<div class="scan-history-empty">Loading history…</div>';
         try {
-          const history = await blockScanHistory.load(block.id, block.userId, true);
-          blockScanHistory.render(history, content, block);
+          const results = await Promise.all([
+            blockScanHistory.load(block.id, block.userId, true),
+            loadCropCycleRecords(block),
+          ]);
+          if (selectedBlockHistoryTab === "cycles") {
+            blockScanHistory.renderCycles(results[1], results[0], content, block.activeCycleId, viewBlockCycleScans);
+            return;
+          }
+          blockScanHistory.render(results[0], content, block, selectedBlockCycleId, selectedLegacyCycleCutoff, results[1]);
+          if (selectedBlockCycleId) {
+            content.insertAdjacentHTML("afterbegin", '<button type="button" class="btn btn-sm btn-secondary history-back-button" onclick="selectBlockHistoryTab(\'cycles\')">← All crop cycles</button>');
+          }
         } catch (error) {
-          console.error("❌ Error loading scan history:", error);
-          content.innerHTML = '<div class="scan-history-empty">Couldn’t load scan history. Please try again.</div>';
+          console.error("❌ Error loading block history:", error);
+          content.innerHTML = '<div class="scan-history-empty">Couldn’t load history. Please try again.</div>';
         }
+      }
+
+      function viewBlockCycleScans(cycleId, cutoff) {
+        selectedBlockCycleId = cycleId;
+        selectedLegacyCycleCutoff = cutoff === "" || cutoff == null ? null : Number(cutoff);
+        selectedBlockHistoryTab = "scans";
+        renderTrendModal(findBlock(currentActionBlockId));
       }
 
       function downloadTrendDetails(button) {
         const block = findBlock(currentActionBlockId);
         if (!block) return;
-        return blockScanHistory.download(block, block.userId, button);
+        return Promise.all([
+          blockScanHistory.load(block.id, block.userId, true),
+          loadCropCycleRecords(block),
+        ]).then(function (results) {
+          return blockScanHistory.download(block, block.userId, results[0], results[1], button);
+        }).catch(function (error) {
+          console.error("❌ Error preparing history export:", error);
+          utils.showToast("Could not prepare history export. Please try again.", "error");
+        });
       }
 
     </script>
