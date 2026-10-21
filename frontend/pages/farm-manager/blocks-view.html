@@ -658,7 +658,7 @@
           </div>
 
           <div class="row row-cols-2 row-cols-md-4 g-3 mb-4">
-            ${buildMetricCard("Estimated Total Plant Count", block.estimatedTotalPlantCount === null ? "Unavailable" : formatNumber(block.estimatedTotalPlantCount), "Estimated Count of all Pineapple plants", "")}
+            ${buildMetricCard("Estimated Plant Count", block.estimatedTotalPlantCount === null ? "Unavailable" : formatNumber(block.estimatedTotalPlantCount), "Estimated total pineapple plants", "")}
             ${buildMetricCard("Bearing", formatPercent(bearingPercent), plantSub(bearingCount), "green")}
             ${buildMetricCard("Non-Bearing", formatPercent(nonbearingPercent), plantSub(nonbearingCount), "amber")}
             ${buildMetricCard("Non-Viable", formatPercent(nonViablePercent), plantSub(nonViableCount), "red")}

@@ -208,8 +208,13 @@ window.blockScanHistory = (function () {
         </article>`;
     }
 
-    function render(history, container, block, cycleId) {
-        if (cycleId) history = history.filter(function (entry) { return entry.data.cycleId === cycleId; });
+    function render(history, container, block, cycleId, legacyCutoff) {
+        if (cycleId) {
+            history = history.filter(function (entry) {
+                if (entry.data.cycleId === cycleId) return true;
+                return legacyCutoff != null && !entry.data.cycleId && entry.date.getTime() <= legacyCutoff;
+            });
+        }
         const ordered = history.slice().sort(function (a, b) { return b.date - a.date; });
         const latest = ordered[0];
         const blockLabel = block && (block.blockName || block.blockId || block.id);

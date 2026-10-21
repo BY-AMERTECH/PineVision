@@ -210,9 +210,9 @@
 
         const metricsHTML = `
             ${buildMetricCard(
-            'Estimated Total Plant Count',
+            'Estimated Plant Count',
             formatNumber(totals.totalPlants),
-            'Estimated Count of all Pineapple plants',
+            'Estimated total pineapple plants',
             ''
         )}
             ${buildMetricCard(

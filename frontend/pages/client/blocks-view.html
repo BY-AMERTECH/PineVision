@@ -941,6 +941,18 @@
 
       // ── Load Block from Firebase ─────────────────────────────────
 
+      function assignCycleDisplayNumbers(cycles) {
+        cycles.sort(function (a, b) {
+          const byStartDate = String(a.startDate || "").localeCompare(String(b.startDate || ""));
+          if (byStartDate) return byStartDate;
+          const aCreated = a.createdAt && a.createdAt.toMillis ? a.createdAt.toMillis() : 0;
+          const bCreated = b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : 0;
+          return aCreated - bCreated || a.id.localeCompare(b.id);
+        });
+        cycles.forEach(function (cycle, index) { cycle.displayNumber = index + 1; });
+        return cycles;
+      }
+
       async function loadBlockFromFirebase(blockId) {
         try {
           console.log("📥 Loading block", blockId, "from Firestore...");
@@ -995,6 +1007,24 @@
             lastScanned: blockData.lastScanned,
           };
 
+          if (currentBlock.activeCycleId) {
+            try {
+              const cycleSnapshot = await firebase.firestore().collection("cropCycles")
+                .where("blockId", "==", blockDoc.id)
+                .where("userId", "==", currentUserId)
+                .get();
+              const cycles = [];
+              cycleSnapshot.forEach(function (doc) { cycles.push(Object.assign({ id: doc.id }, doc.data())); });
+              const activeCycle = assignCycleDisplayNumbers(cycles).find(function (cycle) {
+                return cycle.id === currentBlock.activeCycleId;
+              });
+              currentBlock.activeCycleNumber = activeCycle ? activeCycle.displayNumber : null;
+            } catch (cycleError) {
+              console.error("❌ Error loading crop cycle label:", cycleError);
+              currentBlock.activeCycleNumber = null;
+            }
+          }
+
           try {
             const latestCounts = await blockScanHistory.loadLatestPlantCounts(
               [blockDoc.id],
@@ -1046,7 +1076,7 @@
           " · " +
           formatArea(block.area) +
           (block.daf ? " · " + block.daf + " DAF" : "") +
-          (block.activeCycleId ? " · Cycle " + block.activeCycleId : "") +
+          (block.activeCycleId ? " · Cycle " + (block.activeCycleNumber || "Active") : "") +
           (block.flightDuration
             ? " · Last Flight: " + block.flightDuration
             : "");
@@ -1080,9 +1110,9 @@
 
         document.getElementById("metric-cards-row").innerHTML =
           buildMetricCard(
-            "Estimated Total Plant Count",
+            "Estimated Plant Count",
             block.estimatedTotalPlantCount === null ? "Unavailable" : formatNumber(block.estimatedTotalPlantCount),
-            "Estimated Count of all Pineapple plants",
+            "Estimated total pineapple plants",
             "",
           ) +
           buildMetricCard(
@@ -1266,10 +1296,11 @@
 
       // ── Trend Modal — live bearing-rate history from this block's scans ──
 
-      async function openTrendModal(cycleId) {
+      async function openTrendModal(cycleId, legacyCutoff) {
         if (!currentBlock) return;
         if (cycleId === undefined) selectedHistoryCycleId = null;
         else selectedHistoryCycleId = cycleId;
+        selectedLegacyCycleCutoff = legacyCutoff == null ? null : Number(legacyCutoff);
         document.querySelector("#trend-modal .modal-title").textContent = selectedHistoryCycleId ? "Cycle Scan History" : "Scan History";
         utils.showModal("trend-modal");
         document.getElementById("trend-modal-content").innerHTML =
@@ -1285,15 +1316,17 @@
       function closeTrendModal() {
         utils.hideModal("trend-modal");
         selectedHistoryCycleId = null;
+        selectedLegacyCycleCutoff = null;
       }
 
       let selectedHistoryCycleId = null;
+      let selectedLegacyCycleCutoff = null;
 
       async function renderTrendModal() {
         try {
           const history = await blockScanHistory.load(currentBlock.id, currentUserId, true);
 
-          blockScanHistory.render(history, document.getElementById("trend-modal-content"), currentBlock, selectedHistoryCycleId);
+          blockScanHistory.render(history, document.getElementById("trend-modal-content"), currentBlock, selectedHistoryCycleId, selectedLegacyCycleCutoff);
         } catch (error) {
           console.error("❌ Error loading scan history:", error);
           document.getElementById("trend-modal-content").innerHTML =
@@ -1387,19 +1420,22 @@
           const db = firebase.firestore();
           const results = await Promise.all([db.collection("cropCycles").where("blockId","==",currentBlock.id).where("userId","==",currentUserId).get(),blockScanHistory.load(currentBlock.id,currentUserId,true)]);
           const cycles = []; results[0].forEach(function (doc) { cycles.push(Object.assign({id:doc.id},doc.data())); });
-          cycles.sort(function (a,b) { return String(b.startDate || "").localeCompare(String(a.startDate || "")); });
+          assignCycleDisplayNumbers(cycles).reverse();
           if (!cycles.length) { container.innerHTML = '<div class="scan-history-empty">No crop cycle records are available yet. Starting a new cycle will preserve the current block details here.</div>'; return; }
           container.innerHTML = '<div class="cycle-history-list">' + cycles.map(function (cycle) {
-            const scans = results[1].filter(function (scan) { return scan.data.cycleId === cycle.id; });
-            const latest = cycle.legacy ? "N/A (legacy scans unassigned)" : scans.length ? scans[scans.length-1].date.toLocaleDateString() : "N/A";
+            const legacyCutoff = cycle.legacy && cycle.completedAt && cycle.completedAt.toDate ? cycle.completedAt.toDate().getTime() : null;
+            const scans = results[1].filter(function (scan) {
+              return scan.data.cycleId === cycle.id || (legacyCutoff !== null && !scan.data.cycleId && scan.date.getTime() <= legacyCutoff);
+            });
+            const latest = scans.length ? scans[scans.length-1].date.toLocaleDateString() : "N/A";
             const completed = cycle.completedAt && cycle.completedAt.toDate ? cycle.completedAt.toDate().toLocaleDateString() : "N/A";
             const active = cycle.id === currentBlock.activeCycleId;
-            return '<article class="cycle-history-card"><header><strong>Cycle ' + cycleEscape(cycle.id) + '</strong>' + (active ? '<span class="cycle-active-badge">Active</span>' : '<span>' + cycleEscape(cycle.status || "N/A") + '</span>') + '</header><div class="cycle-history-meta"><span>Planting: ' + cycleEscape(cycle.planted || "N/A") + '</span><span>Forcing: ' + cycleEscape(cycle.forcingDate || "N/A") + '</span><span>Started: ' + cycleEscape(cycle.startDate || "N/A") + '</span><span>Completed: ' + cycleEscape(completed) + '</span><span>Scans: ' + (cycle.legacy ? "N/A (unassigned legacy scans)" : scans.length) + '</span><span>Latest scan: ' + cycleEscape(latest) + '</span></div><button type="button" class="btn btn-sm btn-secondary" onclick="viewCycleScans(\'' + cycleEscape(cycle.id) + '\')">View scans</button></article>';
+            return '<article class="cycle-history-card"><header><strong>Cycle ' + cycle.displayNumber + '</strong>' + (active ? '<span class="cycle-active-badge">Active</span>' : '<span>' + cycleEscape(cycle.status || "N/A") + '</span>') + '</header><div class="cycle-history-meta"><span>Planting: ' + cycleEscape(cycle.planted || "N/A") + '</span><span>Forcing: ' + cycleEscape(cycle.forcingDate || "N/A") + '</span><span>Started: ' + cycleEscape(cycle.startDate || "N/A") + '</span><span>Completed: ' + cycleEscape(completed) + '</span><span>Scans: ' + scans.length + (cycle.legacy ? " (legacy/unassigned)" : "") + '</span><span>Latest scan: ' + cycleEscape(latest) + '</span></div><button type="button" class="btn btn-sm btn-secondary" onclick="viewCycleScans(\'' + cycleEscape(cycle.id) + '\',' + (legacyCutoff === null ? "null" : legacyCutoff) + ')">View scans</button></article>';
           }).join("") + '</div>';
         } catch (err) { console.error("❌ Failed to load crop cycles:",err); container.innerHTML = '<div class="scan-history-empty">Couldn’t load crop cycle history. Please try again.</div>'; }
       }
       function closeCycleHistory() { utils.hideModal("cycle-history-modal"); }
-      async function viewCycleScans(cycleId) { closeCycleHistory(); selectedHistoryCycleId=cycleId; await openTrendModal(cycleId); }
+      async function viewCycleScans(cycleId, legacyCutoff) { closeCycleHistory(); await openTrendModal(cycleId, legacyCutoff); }
 
       // ── Edit modal ────────────────────────────────────────────────
 

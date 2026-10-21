@@ -904,7 +904,7 @@
         document.getElementById("rp-metrics").innerHTML =
           utils.buildMetricCard("Blocks in Report", blocks.length, blocks.length + " of " + BLOCKS_RAW.length + " total", "") +
           utils.buildMetricCard("Scans in Range", scansInRange.length, "Linked scan sessions", "green") +
-          utils.buildMetricCard("Estimated Total Plant Count", plantsAvailable ? utils.formatNumber(totalPlants) : "Unavailable", "Estimated Count of all Pineapple plants", "") +
+          utils.buildMetricCard("Estimated Plant Count", plantsAvailable ? utils.formatNumber(totalPlants) : "Unavailable", "Estimated total pineapple plants", "") +
           utils.buildMetricCard("Avg Bearing Rate", utils.formatPercent(avgBearing), "of selected blocks", "green") +
           utils.buildMetricCard("Avg Non-Bearing", utils.formatPercent(avgNonbearing), "of selected blocks", "amber") +
           utils.buildMetricCard("Avg Non-Viable", utils.formatPercent(avgNonViable), "of selected blocks", "yellow") +

@@ -788,7 +788,7 @@
                               </div>
 
                               <div class="bcard-foot">
-                                  <span class="bcard-foot-stat">Estimated Total Plant Count: ${block.estimatedTotalPlantCount === null ? "Unavailable" : formatNumber(block.estimatedTotalPlantCount)}</span>
+                                  <span class="bcard-foot-stat">Estimated Plant Count: ${block.estimatedTotalPlantCount === null ? "Unavailable" : formatNumber(block.estimatedTotalPlantCount)}</span>
                                   <span class="bcard-foot-stat" style="color: ${nonViableColor};">${formatPercent(block.nonViable)} non-viable</span>
                                   <span class="bcard-foot-stat" style="color: var(--amber);">${formatPercent(block.nonbearing)} non-bearing</span>
                               </div>
@@ -888,7 +888,7 @@
           const currentUser = auth.getCurrentUser();
 
           // Create new block in Firestore
-          await firebase
+          const newBlock = await firebase
             .firestore()
             .collection("blocks")
             .add({
@@ -915,7 +915,7 @@
 
           utils.showToast("Block added successfully!", "success");
           closeAddBlockModal();
-          await loadBlocksFromFirebase();
+          showBlockDetail(newBlock.id);
         } catch (error) {
           console.error("Error adding block:", error);
           utils.showFormError(
