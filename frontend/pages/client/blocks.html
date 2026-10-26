@@ -559,14 +559,13 @@
 
             <div class="form-row">
               <div class="form-group">
-                <label class="form-label" for="section">Section *</label>
+                <label class="form-label" for="section">Section</label>
                 <input
                   type="text"
                   id="section"
                   name="section"
                   class="form-input"
                   placeholder="e.g., North A"
-                  required
                 />
               </div>
               <div class="form-group">
@@ -576,7 +575,8 @@
                   id="area"
                   name="area"
                   class="form-input"
-                  step="0.1"
+                  min="0"
+                  step="any"
                   placeholder="e.g., 2.5"
                   required
                 />
@@ -872,7 +872,6 @@
         if (
           !formData.blockId ||
           !formData.daf ||
-          !formData.section ||
           !formData.area ||
           !formData.planted ||
           !formData.forcingDate
@@ -884,38 +883,63 @@
           return;
         }
 
+        const area = Number(formData.area);
+        if (!Number.isFinite(area) || area <= 0) {
+          utils.showFormError(
+            "add-block-form",
+            "Area must be a number greater than 0 hectares",
+          );
+          return;
+        }
+
         try {
           const currentUser = auth.getCurrentUser();
+          const db = firebase.firestore();
+          const blockRef = db.collection("blocks").doc();
+          const cycleRef = db.collection("cropCycles").doc();
+          const batch = db.batch();
+          const now = firebase.firestore.FieldValue.serverTimestamp();
 
-          // Create new block in Firestore
-          const newBlock = await firebase
-            .firestore()
-            .collection("blocks")
-            .add({
-              blockId: formData.blockId,
-              blockName: formData.blockId,
-              userId: currentUser.uid,
-              section: formData.section,
-              area: parseFloat(formData.area),
+          // Save the block and its initial active crop cycle together so scans
+          // can use activeCycleId from their first session.
+          batch.set(blockRef, {
+            blockId: formData.blockId,
+            blockName: formData.blockId,
+            userId: currentUser.uid,
+            section: formData.section,
+            area: area,
+            activeCycleId: cycleRef.id,
 
-              // Initial values - use parseFloat to force double type
-              stage: formData.daf + " DAF",
-              daf: parseInt(formData.daf),
-              bearingPercent: 0.01,
-              nonBearingPercent: 0.01,
-              totalPineapples: 0,
-              nonViable: 0.01,
+            // Initial values
+            stage: formData.daf + " DAF",
+            daf: parseInt(formData.daf),
+            bearingPercent: 0.01,
+            nonBearingPercent: 0.01,
+            totalPineapples: 0,
+            nonViable: 0.01,
 
-              // Metadata
-              planted: formData.planted,
-              forcingDate: formData.forcingDate,
-              totalScans: 0,
-              createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            });
+            // Metadata
+            planted: formData.planted,
+            forcingDate: formData.forcingDate,
+            totalScans: 0,
+            createdAt: now,
+          });
+          batch.set(cycleRef, {
+            blockId: blockRef.id,
+            userId: currentUser.uid,
+            status: "active",
+            planted: formData.planted,
+            forcingDate: formData.forcingDate,
+            daf: parseInt(formData.daf),
+            startDate: formData.planted,
+            startedAt: now,
+            createdAt: now,
+          });
+          await batch.commit();
 
           utils.showToast("Block added successfully!", "success");
           closeAddBlockModal();
-          showBlockDetail(newBlock.id);
+          showBlockDetail(blockRef.id);
         } catch (error) {
           console.error("Error adding block:", error);
           utils.showFormError(

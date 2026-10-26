@@ -66,7 +66,10 @@ service cloud.firestore {
               && request.resource.data.userId == request.auth.uid
               && request.resource.data.blockId is string
               && request.resource.data.status in ['active', 'completed']
-              && get(
+              && existsAfter(
+                   /databases/$(database)/documents/blocks/$(request.resource.data.blockId)
+                 )
+              && getAfter(
                    /databases/$(database)/documents/blocks/$(request.resource.data.blockId)
                  ).data.userId == request.auth.uid;
 

@@ -31,6 +31,7 @@
 
     let alertsData = [];
     let currentUserId = null;
+    let activeAlertFilter = 'crit';
     let thresholds = {
         bearing:    { watch: 75, critical: 60 },
         nonbearing: { watch: 18, critical: 25 },
@@ -47,6 +48,13 @@
         document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
         const alertsLink = document.querySelector('a[href="alerts.html"]');
         if (alertsLink) alertsLink.classList.add('active');
+
+        document.querySelectorAll('[data-alert-filter]').forEach(button => {
+            button.addEventListener('click', () => {
+                activeAlertFilter = button.dataset.alertFilter;
+                renderAlerts();
+            });
+        });
 
         const currentUser = auth.getCurrentUser();
         if (!currentUser) {
@@ -199,6 +207,13 @@
         document.getElementById('count-crit').textContent = critAlerts.length;
         document.getElementById('count-warn').textContent = warnAlerts.length;
         document.getElementById('count-ok').textContent   = okAlerts.length;
+
+        document.querySelectorAll('[data-alert-filter]').forEach(button => {
+            button.setAttribute('aria-pressed', String(button.dataset.alertFilter === activeAlertFilter));
+        });
+        document.getElementById('alert-panel-crit').hidden = activeAlertFilter !== 'crit';
+        document.getElementById('alert-panel-warn').hidden = activeAlertFilter !== 'warn';
+        document.getElementById('alert-panel-resolved').hidden = activeAlertFilter !== 'resolved';
 
         const emptyCard = msg => `<div class="no-alerts-card">${msg}</div>`;
 

@@ -34,16 +34,42 @@
         margin-bottom: var(--space-2xl);
       }
 
-      .alerts-section-label {
+      .alert-filters {
         display: flex;
+        gap: var(--space-sm);
+        overflow-x: auto;
+        margin: 0 0 var(--space-lg);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .alert-filter {
+        display: inline-flex;
         align-items: center;
         gap: var(--space-sm);
-        font-size: var(--font-size-sm);
-        font-weight: var(--font-weight-semibold);
+        padding: var(--space-sm) var(--space-md);
+        border: 0;
+        border-bottom: 2px solid transparent;
+        background: transparent;
         color: var(--muted);
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        margin-bottom: var(--space-md);
+        font: inherit;
+        font-weight: var(--font-weight-semibold);
+        white-space: nowrap;
+        cursor: pointer;
+      }
+
+      .alert-thresholds-button {
+        margin-left: auto;
+        flex: 0 0 auto;
+      }
+
+      .alert-filter[aria-pressed="true"] {
+        color: var(--color-text-primary);
+        border-bottom-color: var(--green);
+      }
+
+      .alert-filter:focus-visible {
+        outline: 2px solid var(--green);
+        outline-offset: 2px;
       }
 
       .alert-count {
@@ -378,66 +404,55 @@
         </header>
 
         <div class="container-fluid py-4 px-4 page-container">
-          <!-- Page Header -->
-          <div class="mb-4">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-              <div>
-              </div>
-              <button class="btn btn-secondary" onclick="openThresholdModal()">
-                <svg
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                 aria-hidden="true" focusable="false">
-                  <line x1="4" y1="21" x2="4" y2="14" />
-                  <line x1="4" y1="10" x2="4" y2="3" />
-                  <line x1="12" y1="21" x2="12" y2="12" />
-                  <line x1="12" y1="8" x2="12" y2="3" />
-                  <line x1="20" y1="21" x2="20" y2="16" />
-                  <line x1="20" y1="12" x2="20" y2="3" />
-                  <line x1="1" y1="14" x2="7" y2="14" />
-                  <line x1="9" y1="8" x2="15" y2="8" />
-                  <line x1="17" y1="16" x2="23" y2="16" />
-                </svg>
-                <span>Alert Thresholds</span>
-              </button>
-            </div>
-          </div>
-
           <!-- Summary Metric Cards -->
           <div class="row row-cols-2 row-cols-md-4 g-3 mb-4" id="alert-metrics">
             <!-- Populated by JavaScript -->
           </div>
 
-          <!-- Critical Alerts -->
-          <div class="alerts-section">
-            <div class="alerts-section-label">
-              Critical
-              <span class="alert-count crit" id="count-crit">0</span>
-            </div>
+          <div class="alert-filters" role="group" aria-label="Filter alerts by status">
+            <button class="alert-filter" type="button" data-alert-filter="crit" aria-pressed="true">
+              Critical <span class="alert-count crit" id="count-crit">0</span>
+            </button>
+            <button class="alert-filter" type="button" data-alert-filter="warn" aria-pressed="false">
+              Watch <span class="alert-count warn" id="count-warn">0</span>
+            </button>
+            <button class="alert-filter" type="button" data-alert-filter="resolved" aria-pressed="false">
+              Resolved <span class="alert-count ok" id="count-ok">0</span>
+            </button>
+            <button class="btn btn-secondary alert-thresholds-button" type="button" onclick="openThresholdModal()">
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true" focusable="false">
+                <line x1="4" y1="21" x2="4" y2="14" />
+                <line x1="4" y1="10" x2="4" y2="3" />
+                <line x1="12" y1="21" x2="12" y2="12" />
+                <line x1="12" y1="8" x2="12" y2="3" />
+                <line x1="20" y1="21" x2="20" y2="16" />
+                <line x1="20" y1="12" x2="20" y2="3" />
+                <line x1="1" y1="14" x2="7" y2="14" />
+                <line x1="9" y1="8" x2="15" y2="8" />
+                <line x1="17" y1="16" x2="23" y2="16" />
+              </svg>
+              <span>Alert Thresholds</span>
+            </button>
+          </div>
+
+          <div class="alerts-section" id="alert-panel-crit">
             <div id="alerts-crit"></div>
           </div>
 
-          <!-- Watch Alerts -->
-          <div class="alerts-section">
-            <div class="alerts-section-label">
-              Watch
-              <span class="alert-count warn" id="count-warn">0</span>
-            </div>
+          <div class="alerts-section" id="alert-panel-warn" hidden>
             <div id="alerts-warn"></div>
           </div>
 
-          <!-- Resolved Alerts -->
-          <div class="alerts-section">
-            <div class="alerts-section-label">
-              Resolved
-              <span class="alert-count ok" id="count-ok">0</span>
-            </div>
+          <div class="alerts-section" id="alert-panel-resolved" hidden>
             <div id="alerts-ok"></div>
           </div>
 

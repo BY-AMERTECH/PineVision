@@ -146,42 +146,18 @@ window.blockScanHistory = (function () {
         return 'Unknown';
     }
 
-    function comparisonMarkup(entry, previous) {
-        if (!previous || getStatus(entry.data) !== 'Completed') return '';
-        const currentTotal = metric(entry.data, 'total');
-        const previousTotal = metric(previous.data, 'total');
-        if (currentTotal === null || previousTotal === null) return '';
-        const difference = Math.round(currentTotal - previousTotal);
-        const direction = difference > 0 ? '+' : '';
-        const elapsedDays = Math.max(0, Math.floor((entry.date - previous.date) / 86400000));
-        return `<p class="scan-history-comparison">${direction}${difference.toLocaleString('en-US')} detections vs previous completed scan (${escapeHtml(formatDateTime(previous.date))}) · ${elapsedDays} days between scans</p>`;
-    }
-
     function detailMarkup(entry) {
         const data = entry.data;
         const end = data.endTime && typeof data.endTime.toDate === 'function' ? data.endTime.toDate() : null;
-        const details = [['Scan ID', entry.id]];
+        const details = [['Scan date', formatDateTime(entry.date)]];
         const elapsed = formatElapsed(entry.date, end);
         if (elapsed) details.push(['Elapsed scan time', elapsed]);
-        const coverage = metric(data, 'detectionCoverage');
-        if (coverage !== null) details.push(['Detection coverage', coverage.toFixed(2) + '%']);
-        const registered = metric(data, 'registeredPopulation');
-        if (registered !== null) details.push(['Registered population', formatCount(registered)]);
-        const processed = metric(data, 'processedFrames');
-        const frames = metric(data, 'totalFrames');
-        if (processed !== null || frames !== null) {
-            details.push(['Frames processed', (processed === null ? 'Unavailable' : formatCount(processed)) + ' / ' + (frames === null ? 'Unavailable' : formatCount(frames))]);
-        }
-        const estimatedBearing = metric(data, 'estimatedBearing');
-        const estimatedNonBearing = metric(data, 'estimatedNonBearing');
-        if (estimatedBearing !== null) details.push(['Estimated bearing plants', formatCount(estimatedBearing)]);
-        if (estimatedNonBearing !== null) details.push(['Estimated non-bearing plants', formatCount(estimatedNonBearing)]);
         return `<details class="scan-history-details"><summary>View scan details</summary><dl>${details.map(function (item) {
             return `<div><dt>${escapeHtml(item[0])}</dt><dd>${escapeHtml(item[1])}</dd></div>`;
         }).join('')}</dl></details>`;
     }
 
-    function scanMarkup(entry, previous, cycles) {
+    function scanMarkup(entry, cycles) {
         const data = entry.data;
         const status = getStatus(data);
         const complete = status === 'Completed';
@@ -205,7 +181,6 @@ window.blockScanHistory = (function () {
             <div class="scan-history-cycle ${cycle || data.cycleId ? '' : 'is-unassigned'}">Crop cycle: ${escapeHtml(cycleLabel)}</div>
             ${latestCount}
             ${classes ? `<div class="scan-history-breakdown" aria-label="Plant classification counts">${classes}</div>` : ''}
-            ${comparisonMarkup(entry, previous)}
             ${detailMarkup(entry)}
         </article>`;
     }
@@ -233,14 +208,8 @@ window.blockScanHistory = (function () {
             container.innerHTML = summary + `<div class="scan-history-empty">${cycleId ? 'No scans are available for this crop cycle.' : 'No scan history is available for this block yet.'}</div>`;
             return;
         }
-        const previousById = new Map();
-        let previousCompleted = null;
-        history.slice().sort(function (a, b) { return a.date - b.date; }).forEach(function (entry) {
-            previousById.set(entry.id, previousCompleted);
-            if (getStatus(entry.data) === 'Completed' && metric(entry.data, 'total') !== null) previousCompleted = entry;
-        });
         container.innerHTML = summary + `<div class="scan-history-list" tabindex="0" aria-label="Individual scan records">` +
-            ordered.map(function (entry) { return scanMarkup(entry, previousById.get(entry.id), cycles); }).join('') + '</div>';
+            ordered.map(function (entry) { return scanMarkup(entry, cycles); }).join('') + '</div>';
     }
 
     function timestamp(value) {
