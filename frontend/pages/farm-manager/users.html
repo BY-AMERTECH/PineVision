@@ -1055,6 +1055,32 @@
                       </svg>
                       Disable
                     </button>
+                    <button
+                      class="btn btn-sm"
+                      style="
+                        background: var(--red-bg);
+                        color: var(--red);
+                        border: 1px solid rgba(139, 32, 32, 0.2);
+                      "
+                      onclick="bulkAction('delete')"
+                    >
+                      <svg
+                        width="11"
+                        height="11"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2.5"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                       aria-hidden="true" focusable="false">
+                        <polyline points="3 6 5 6 21 6" />
+                        <path
+                          d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"
+                        />
+                      </svg>
+                      Delete
+                    </button>
                   </div>
                   <button
                     class="btn btn-secondary btn-sm"
@@ -2146,7 +2172,7 @@
       }
 
       function toggleRow(el) {
-        var id = parseInt(el.getAttribute("data-id"));
+        var id = el.getAttribute("data-id");
         var idx = selectedIds.indexOf(id);
         if (el.checked && idx === -1) selectedIds.push(id);
         if (!el.checked && idx !== -1) selectedIds.splice(idx, 1);
@@ -2190,6 +2216,19 @@
         var count = ids.length;
         if (count === 0) return;
 
+        if (
+          action === "delete" &&
+          !confirm(
+            "Permanently delete " +
+              count +
+              " user" +
+              (count !== 1 ? "s" : "") +
+              "? This cannot be undone.",
+          )
+        ) {
+          return;
+        }
+
         var results = { ok: 0, fail: 0 };
 
         for (var i = 0; i < ids.length; i++) {
@@ -2199,11 +2238,13 @@
 
           try {
             if (action === "activate" || action === "disable") {
-              // Only call API if the status needs to change
               var targetStatus = action === "activate" ? "active" : "disabled";
-              if (u.status !== targetStatus) {
-                await apiCall("POST", "/api/fm/users/" + id + "/toggle-status");
-              }
+              await apiCall("POST", "/api/fm/users/" + id + "/toggle-status", {
+                status: targetStatus,
+              });
+              results.ok++;
+            } else if (action === "delete") {
+              await apiCall("DELETE", "/api/fm/users/" + encodeURIComponent(id));
               results.ok++;
             }
           } catch (e) {
@@ -2216,7 +2257,12 @@
         await loadUsersFromBackend();
         renderTable();
 
-        var label = action === "activate" ? "enabled" : "disabled";
+        var label =
+          action === "activate"
+            ? "enabled"
+            : action === "disable"
+              ? "disabled"
+              : "deleted";
         var msg = results.ok + " user" + (results.ok !== 1 ? "s" : "") + " " + label;
         if (results.fail > 0) msg += " (" + results.fail + " failed)";
         utils.showToast(msg, results.fail > 0 ? "error" : "success");

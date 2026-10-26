@@ -1586,112 +1586,6 @@
               </div>
             </div>
 
-            <!-- Permissions -->
-            <div>
-              <label class="cf-label" style="margin-bottom: var(--space-md)"
-                >Assigned Permissions</label
-              >
-              <div style="display: flex; flex-wrap: wrap; gap: var(--space-md)">
-                <label
-                  style="
-                    display: flex;
-                    align-items: center;
-                    gap: 6px;
-                    font-size: var(--font-size-sm);
-                    cursor: pointer;
-                  "
-                  ><input
-                    type="checkbox"
-                    id="p-dashboard"
-                    checked
-                    style="
-                      accent-color: var(--green);
-                      width: 14px;
-                      height: 14px;
-                    "
-                  />
-                  Dashboard</label
-                >
-                <label
-                  style="
-                    display: flex;
-                    align-items: center;
-                    gap: 6px;
-                    font-size: var(--font-size-sm);
-                    cursor: pointer;
-                  "
-                  ><input
-                    type="checkbox"
-                    id="p-blocks"
-                    checked
-                    style="
-                      accent-color: var(--green);
-                      width: 14px;
-                      height: 14px;
-                    "
-                  />
-                  View Blocks</label
-                >
-                <label
-                  style="
-                    display: flex;
-                    align-items: center;
-                    gap: 6px;
-                    font-size: var(--font-size-sm);
-                    cursor: pointer;
-                  "
-                  ><input
-                    type="checkbox"
-                    id="p-scans"
-                    checked
-                    style="
-                      accent-color: var(--green);
-                      width: 14px;
-                      height: 14px;
-                    "
-                  />
-                  View Scans</label
-                >
-                <label
-                  style="
-                    display: flex;
-                    align-items: center;
-                    gap: 6px;
-                    font-size: var(--font-size-sm);
-                    cursor: pointer;
-                  "
-                  ><input
-                    type="checkbox"
-                    id="p-alerts"
-                    style="
-                      accent-color: var(--green);
-                      width: 14px;
-                      height: 14px;
-                    "
-                  />
-                  Manage Alerts</label
-                >
-                <label
-                  style="
-                    display: flex;
-                    align-items: center;
-                    gap: 6px;
-                    font-size: var(--font-size-sm);
-                    cursor: pointer;
-                  "
-                  ><input
-                    type="checkbox"
-                    id="p-reports"
-                    style="
-                      accent-color: var(--green);
-                      width: 14px;
-                      height: 14px;
-                    "
-                  />
-                  Generate Reports</label
-                >
-              </div>
-            </div>
           </div>
           <div
             class="modal-footer"
@@ -2415,9 +2309,20 @@
 
         try {
           if (action === "delete") {
+            var currentUser = firebase.auth().currentUser;
+            if (!currentUser) throw new Error("You must be signed in to delete users");
+            var token = await currentUser.getIdToken();
             await Promise.all(
               ids.map(function (id) {
-                return firebase.firestore().collection("users").doc(id).delete();
+                return fetch("/api/users/" + encodeURIComponent(id), {
+                  method: "DELETE",
+                  headers: { Authorization: "Bearer " + token },
+                }).then(async function (response) {
+                  if (!response.ok) {
+                    var result = await response.json();
+                    throw new Error(result.error || "Failed to delete user");
+                  }
+                });
               }),
             );
           } else {
@@ -2794,12 +2699,6 @@
           "Minimum 6 characters";
         document.getElementById("f-password").placeholder = "Enter password";
         document.getElementById("f-lastlogin-row").style.display = "none";
-        ["p-dashboard", "p-blocks", "p-scans"].forEach(function (id) {
-          document.getElementById(id).checked = true;
-        });
-        ["p-alerts", "p-reports"].forEach(function (id) {
-          document.getElementById(id).checked = false;
-        });
         document.getElementById("add-form-error").style.display = "none";
         new bootstrap.Modal(document.getElementById("addUserModal")).show();
       }
@@ -2857,19 +2756,6 @@
             document.getElementById("f-lastlogin-row").style.display = "none";
           }
 
-          var perms = u.permissions || [];
-          var all = perms[0] === "all";
-          document.getElementById("p-dashboard").checked =
-            all || perms.indexOf("view_dashboard") !== -1;
-          document.getElementById("p-blocks").checked =
-            all || perms.indexOf("view_blocks") !== -1;
-          document.getElementById("p-scans").checked =
-            all || perms.indexOf("view_scans") !== -1;
-          document.getElementById("p-alerts").checked =
-            all || perms.indexOf("view_alerts") !== -1;
-          document.getElementById("p-reports").checked =
-            all || perms.indexOf("generate_report") !== -1;
-
           new bootstrap.Modal(document.getElementById("addUserModal")).show();
         } catch (error) {
           console.error("Error loading user for edit:", error);
@@ -2915,19 +2801,6 @@
         }
         err.style.display = "none";
 
-        // Collect permissions
-        var perms = [];
-        if (document.getElementById("p-dashboard").checked)
-          perms.push("view_dashboard");
-        if (document.getElementById("p-blocks").checked)
-          perms.push("view_blocks");
-        if (document.getElementById("p-scans").checked)
-          perms.push("view_scans");
-        if (document.getElementById("p-alerts").checked)
-          perms.push("view_alerts");
-        if (document.getElementById("p-reports").checked)
-          perms.push("generate_report");
-
         try {
           if (editingId) {
             // EDIT EXISTING USER
@@ -2937,7 +2810,6 @@
               email: em,
               role: rl,
               status: st,
-              permissions: perms,
             };
 
             // Update in Firestore
@@ -3023,7 +2895,7 @@
                 email: em,
                 role: rl,
                 status: st,
-                permissions: perms,
+                permissions: ["view_dashboard", "view_blocks", "view_scans"],
                 createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                 lastLogin: null,
               });

@@ -15,7 +15,7 @@
           if (s.theme === "dark")
             document.documentElement.classList.add("dark-mode");
         } catch (e) {}
-      })();
+      })(); 
     </script>
     <title>Audit Logs - PineVision</title>
     <link rel="icon" type="image/x-icon" href="/frontend/assets/images/pinevision-favicon.ico" />
@@ -32,10 +32,20 @@
       .ph {
         display: flex;
         justify-content: space-between;
-        align-items: flex-end;
+        align-items: center;
         flex-wrap: wrap;
         gap: var(--space-md);
-        margin-bottom: var(--space-2xl);
+        margin-bottom: var(--space-xl);
+      }
+
+      #log-stats,
+      #charts-row {
+        --bs-gutter-y: var(--space-lg);
+      }
+
+      #log-stats .mc {
+        width: 100%;
+        min-height: 166px;
       }
 
       /* ─── Metric Cards ────────────────────────────────────────── */
@@ -81,7 +91,8 @@
         background: var(--color-background-primary);
         border: 1px solid var(--color-border-secondary);
         border-radius: var(--radius-lg);
-        padding: var(--space-lg);
+        padding: var(--space-xl);
+        min-height: 232px;
         box-shadow: var(--shadow-sm);
         display: flex;
         flex-direction: column;
@@ -638,6 +649,16 @@
         .ph {
           flex-direction: column;
           align-items: flex-start;
+        }
+        .ph > div:last-child {
+          width: 100%;
+          justify-content: flex-start !important;
+        }
+        #log-stats .mc {
+          min-height: 150px;
+        }
+        .chart-panel {
+          min-height: 210px;
         }
       }
       @media (max-width: 576px) {
@@ -1273,15 +1294,6 @@
             icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>',
           },
           {
-            label: "Critical Events",
-            value: criticals,
-            sub: "High severity alerts",
-            color: criticals > 0 ? "red" : "green",
-            trend: criticals > 0 ? "dn" : "up",
-            trendTxt: criticals > 0 ? "Needs review" : "All clear",
-            icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
-          },
-          {
             label: "Failed Actions",
             value: failed,
             sub: "Error status events",
@@ -1308,15 +1320,6 @@
             trendTxt: "Tracked",
             icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
           },
-          {
-            label: "System Changes",
-            value: sysChanges,
-            sub: "User & config updates",
-            color: "amber",
-            trend: "fl",
-            trendTxt: "Monitored",
-            icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>',
-          },
         ];
 
         var html = "";
@@ -1324,7 +1327,7 @@
           var cm = colorMap[c.color] || colorMap[""];
           var arrow = c.trend === "up" ? "↑" : c.trend === "dn" ? "↓" : "→";
           html +=
-            '<div class="col-xl-2 col-lg-4 col-md-4 col-sm-6 d-flex">' +
+            '<div class="col-xl-3 col-lg-3 col-md-6 col-sm-6 d-flex">' +
             '<div class="mc h-100 w-100 ' +
             c.color +
             '">' +
@@ -1375,35 +1378,27 @@
         var actionTypes = [
           "login",
           "logout",
-          "view",
           "update",
           "upload",
-          "generate",
           "error",
         ];
         var actionLabels = [
           "Login",
           "Logout",
-          "View",
           "Update",
           "Upload",
-          "Report",
           "Error",
         ];
         var actionColors = [
           "#4caf78",
           "#999",
-          "#3a5fc8",
           "#e6a817",
           "#f0c430",
-          "#9b59b6",
           "#d94f4f",
         ];
         var actionCounts = actionTypes.map(function (a) {
           return allLogs.filter(function (l) {
-            if (a === "view") return l.action.startsWith("view");
             if (a === "update") return l.action.startsWith("update");
-            if (a === "generate") return l.action.startsWith("generate");
             if (a === "error") return l.status === "error";
             return l.action === a;
           }).length;
@@ -1444,21 +1439,7 @@
 
         var html = "";
         html +=
-          '<div class="col-lg-4 col-md-12 d-flex">' +
-          '<div class="chart-panel h-100 w-100"><div class="chart-panel-title">Event Volume (7 days)</div>' +
-          '<div class="chart-panel-value">' +
-          totalThisWeek +
-          "</div>" +
-          '<div class="chart-panel-sub"><span class="up">↑ ' +
-          dayVolume[6] +
-          " today</span></div>" +
-          '<div class="sparkline-wrap">' +
-          buildSparkSVG(dayVolume, "#4caf78") +
-          "</div>" +
-          "</div></div>";
-
-        html +=
-          '<div class="col-lg-4 col-md-12 d-flex">' +
+          '<div class="col-xl-6 col-lg-6 col-md-12 d-flex">' +
           '<div class="chart-panel h-100 w-100"><div class="chart-panel-title">Action Breakdown</div>' +
           '<div class="chart-panel-value">' +
           actionTypes.length +
@@ -1468,7 +1449,7 @@
           "</div></div>";
 
         html +=
-          '<div class="col-lg-4 col-md-12 d-flex">' +
+          '<div class="col-xl-6 col-lg-6 col-md-12 d-flex">' +
           '<div class="chart-panel h-100 w-100"><div class="chart-panel-title">Success Rate</div>' +
           '<div class="chart-panel-value">' +
           successRate +

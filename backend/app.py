@@ -283,6 +283,25 @@ def update_user(user_id):
         return jsonify({'error': str(e)}), 400
 
 
+@app.route('/api/users/<user_id>', methods=['DELETE'])
+def delete_user(user_id):
+    """Delete a user from Firebase Authentication and Firestore."""
+    _, err = _verify_admin_token()
+    if err:
+        return err
+
+    try:
+        try:
+            auth.delete_user(user_id)
+        except auth.UserNotFoundError:
+            pass
+
+        db.collection('users').document(user_id).delete()
+        return jsonify({'message': 'User deleted successfully'}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+
 @app.route('/api/users/<user_id>/reset-password', methods=['POST'])
 def reset_password(user_id):
     """Reset user password"""
@@ -492,6 +511,31 @@ def fm_update_user(user_id):
         return jsonify({'error': str(e)}), 400
 
 
+@app.route('/api/fm/users/<user_id>', methods=['DELETE'])
+def fm_delete_user(user_id):
+    """Farm Manager: delete a user — cannot delete Super Admin accounts."""
+    _, err = _verify_farm_manager_token()
+    if err:
+        return err
+
+    try:
+        target = db.collection('users').document(user_id).get()
+        if not target.exists:
+            return jsonify({'error': 'User not found'}), 404
+        if target.to_dict().get('role') == 'admin':
+            return jsonify({'error': 'Farm Managers cannot delete Super Admin accounts'}), 403
+
+        try:
+            auth.delete_user(user_id)
+        except auth.UserNotFoundError:
+            pass
+
+        db.collection('users').document(user_id).delete()
+        return jsonify({'message': 'User deleted successfully'}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+
 @app.route('/api/fm/users/<user_id>/reset-password', methods=['POST'])
 def fm_reset_password(user_id):
     """Farm Manager: reset password — cannot reset Super Admin passwords."""
@@ -527,8 +571,16 @@ def fm_toggle_status(user_id):
         if user_doc.to_dict().get('role') == 'admin':
             return jsonify({'error': 'Farm Managers cannot modify Super Admin account status'}), 403
 
-        current_status = user_doc.to_dict().get('status', 'active')
-        new_status = 'disabled' if current_status == 'active' else 'active'
+        data = request.get_json(silent=True) or {}
+        requested_status = data.get('status')
+        if requested_status is not None and requested_status not in ('active', 'disabled'):
+            return jsonify({'error': 'Status must be active or disabled'}), 400
+
+        if requested_status:
+            new_status = requested_status
+        else:
+            current_status = user_doc.to_dict().get('status', 'active')
+            new_status = 'disabled' if current_status == 'active' else 'active'
 
         auth.update_user(user_id, disabled=(new_status == 'disabled'))
         db.collection('users').document(user_id).update({
