@@ -1011,22 +1011,29 @@
           }
 
           try {
-            const latestCounts = await blockScanHistory.loadLatestPlantCounts(
-              [blockDoc.id],
-              currentUserId,
-              { [blockDoc.id]: currentBlock.activeCycleId },
-            );
-            currentBlock.estimatedTotalPlantCount = latestCounts.get(blockDoc.id) || 0;
             if (currentBlock.activeCycleId) {
               const cycleScans = await blockScanHistory.load(blockDoc.id, currentUserId, true);
-              const latestCycleScan = cycleScans.filter(function (scan) {
-                return scan.data.cycleId === currentBlock.activeCycleId &&
-                  scan.data.status === "completed" && Number.isFinite(Number(scan.data.bearing)) &&
-                  Number.isFinite(Number(scan.data.nonBearing));
-              }).sort(function (a, b) { return b.date - a.date; })[0];
-              currentBlock.estimatedTotalPlantCount = latestCycleScan
-                ? Number(latestCycleScan.data.bearing) + Number(latestCycleScan.data.nonBearing)
+              const currentCycleScans = cycleScans.filter(function (scan) {
+                return scan.data.cycleId === currentBlock.activeCycleId;
+              });
+              currentBlock.hasCycleScans = currentCycleScans.length > 0;
+              currentBlock.hasActiveCycleScan = currentCycleScans.some(function (scan) {
+                return scan.data.status === "active";
+              });
+              currentBlock.latestCycleResult = blockScanHistory.latestCompletedResult(
+                currentCycleScans,
+                currentBlock.activeCycleId,
+              );
+              currentBlock.estimatedTotalPlantCount = currentBlock.latestCycleResult
+                ? currentBlock.latestCycleResult.bearing + currentBlock.latestCycleResult.nonBearing
                 : 0;
+            } else {
+              const latestCounts = await blockScanHistory.loadLatestPlantCounts(
+                [blockDoc.id],
+                currentUserId,
+                { [blockDoc.id]: null },
+              );
+              currentBlock.estimatedTotalPlantCount = latestCounts.get(blockDoc.id) || 0;
             }
           } catch (scanError) {
             console.error("❌ Error loading latest completed plant counts:", scanError);
@@ -1074,11 +1081,36 @@
         renderConditionBreakdown(block);
       }
 
+      function getDisplayedResultCounts(block) {
+        if (block.activeCycleId && !block.hasActiveCycleScan) {
+          if (block.latestCycleResult) {
+            const result = block.latestCycleResult;
+            return {
+              bearing: result.bearing,
+              nonBearing: result.nonBearing,
+              nonViable: result.nonViable,
+              hasData: true,
+            };
+          }
+          if (block.hasCycleScans) {
+            return { bearing: 0, nonBearing: 0, nonViable: 0, hasData: false };
+          }
+        }
+        const hasData = block.plants > 0;
+        return {
+          bearing: hasData ? Math.round((block.bearing / 100) * block.plants) : 0,
+          nonBearing: hasData ? Math.round((block.nonbearing / 100) * block.plants) : 0,
+          nonViable: hasData ? Math.round((block.nonViable / 100) * block.plants) : 0,
+          hasData: hasData,
+        };
+      }
+
       function renderMetricCards(block) {
-        const hasDetectedData = block.plants > 0;
-        const bearingPlants    = hasDetectedData ? Math.round((block.bearing    / 100) * block.plants) : 0;
-        const nonbearingPlants = hasDetectedData ? Math.round((block.nonbearing / 100) * block.plants) : 0;
-        const nonViablePlants  = hasDetectedData ? Math.round((block.nonViable  / 100) * block.plants) : 0;
+        const counts = getDisplayedResultCounts(block);
+        const hasDetectedData = counts.hasData;
+        const bearingPlants    = counts.bearing;
+        const nonbearingPlants = counts.nonBearing;
+        const nonViablePlants  = counts.nonViable;
         const bearingAndNonbearingTotal = bearingPlants + nonbearingPlants;
         const estimatedTotalPlants = block.estimatedTotalPlantCount || bearingAndNonbearingTotal;
         const bearingPercent = bearingAndNonbearingTotal > 0
@@ -1160,10 +1192,11 @@
       }
 
       function renderConditionBreakdown(block) {
-        const hasDetectedData  = block.plants > 0;
-        const bearingPlants    = hasDetectedData ? Math.round((block.bearing    / 100) * block.plants) : 0;
-        const nonbearingPlants = hasDetectedData ? Math.round((block.nonbearing / 100) * block.plants) : 0;
-        const nonViablePlants  = hasDetectedData ? Math.round((block.nonViable  / 100) * block.plants) : 0;
+        const counts = getDisplayedResultCounts(block);
+        const hasDetectedData  = counts.hasData;
+        const bearingPlants    = counts.bearing;
+        const nonbearingPlants = counts.nonBearing;
+        const nonViablePlants  = counts.nonViable;
         const totalPlants      = bearingPlants + nonbearingPlants;
         const bearingPercent   = totalPlants > 0 ? (bearingPlants / totalPlants) * 100 : 0;
         const nonbearingPercent = totalPlants > 0 ? (nonbearingPlants / totalPlants) * 100 : 0;

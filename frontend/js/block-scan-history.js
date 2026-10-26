@@ -146,6 +146,24 @@ window.blockScanHistory = (function () {
         return 'Unknown';
     }
 
+    function latestCompletedResult(history, cycleId) {
+        const ordered = history.filter(function (entry) {
+            return (cycleId == null || entry.data.cycleId === cycleId) && getStatus(entry.data) === 'Completed';
+        }).sort(function (a, b) { return b.date - a.date; });
+        for (const entry of ordered) {
+            const result = {
+                date: entry.date,
+                bearing: metric(entry.data, 'bearing'),
+                nonBearing: metric(entry.data, 'nonBearing'),
+                nonViable: metric(entry.data, 'nonViable'),
+                total: metric(entry.data, 'total'),
+            };
+            if (result.bearing !== null && result.nonBearing !== null &&
+                result.nonViable !== null && result.total !== null) return result;
+        }
+        return null;
+    }
+
     function detailMarkup(entry) {
         const data = entry.data;
         const end = data.endTime && typeof data.endTime.toDate === 'function' ? data.endTime.toDate() : null;
@@ -162,6 +180,10 @@ window.blockScanHistory = (function () {
         const status = getStatus(data);
         const complete = status === 'Completed';
         const total = complete ? metric(data, 'total') : null;
+        const bearing = complete ? metric(data, 'bearing') : null;
+        const nonBearing = complete ? metric(data, 'nonBearing') : null;
+        const estimatedPlants = bearing !== null && nonBearing !== null ? bearing + nonBearing : null;
+        const percentDenominator = bearing !== null && nonBearing !== null ? bearing + nonBearing : null;
         const cycle = cycles ? assignedCycle(entry, cycles) : null;
         const cycleLabel = cycle ? 'Cycle ' + cycle.displayNumber : cycles ? 'Unassigned' : data.cycleId ? 'Assigned crop cycle' : 'Unassigned (legacy scan)';
         const classes = [
@@ -171,11 +193,12 @@ window.blockScanHistory = (function () {
         ].map(function (item) {
             const count = complete ? metric(data, item[1]) : null;
             if (count === null) return '';
-            const percent = formatPercent(count, total);
+            const percent = formatPercent(count, percentDenominator);
             return `<div class="scan-history-class"><span>${item[0]}</span><strong>${formatCount(count)}</strong><small>${percent || 'Percentage unavailable'}</small></div>`;
         }).join('');
-        const latestCount = total === null ? '<span class="scan-history-total-unavailable">Final counts unavailable</span>' :
-            `<div class="scan-history-total"><strong>${formatCount(total)}</strong><span>plants detected</span></div>`;
+        const latestCount = estimatedPlants === null
+            ? '<span class="scan-history-total-unavailable">Estimated plant count unavailable</span>'
+            : `<div class="scan-history-total"><strong>${formatCount(estimatedPlants)}</strong><span>estimated plants${total === null ? '' : ' · ' + formatCount(total) + ' total detections'}</span></div>`;
         return `<article class="scan-history-entry">
             <div class="scan-history-entry-head"><time datetime="${entry.date.toISOString()}">${escapeHtml(formatDateTime(entry.date))}</time><span class="scan-history-status ${complete ? 'is-complete' : status === 'Failed' ? 'is-failed' : ''}">${status}</span></div>
             <div class="scan-history-cycle ${cycle || data.cycleId ? '' : 'is-unassigned'}">Crop cycle: ${escapeHtml(cycleLabel)}</div>
@@ -259,8 +282,16 @@ window.blockScanHistory = (function () {
             const cutoff = cycleCompletedAtMs(cycle);
             const scans = history.filter(function (entry) { return assignedCycle(entry, cycles) === cycle; });
             const latest = scans.length ? scans[scans.length - 1].date.toLocaleDateString() : 'N/A';
+            const result = latestCompletedResult(scans, null);
             const completed = cycleDateLabel(cycle.completedAtMs == null ? cycle.completedAt : cycle.completedAtMs);
             const active = cycle.id === activeCycleId;
+            const resultSummary = result
+                ? 'Latest completed results: Estimated plants ' + formatCount(result.bearing + result.nonBearing) +
+                    ', Total detections ' + formatCount(result.total) +
+                    ' (Bearing ' + formatCount(result.bearing) +
+                    ', Non-bearing ' + formatCount(result.nonBearing) +
+                    ', Non-viable ' + formatCount(result.nonViable) + ')'
+                : 'Latest completed results: N/A';
             return '<article class="cycle-history-card"><header><strong>Cycle ' + cycle.displayNumber + '</strong>' +
                 (active ? '<span class="cycle-active-badge">Active</span>' : '<span>' + escapeHtml(cycle.status || 'Unknown') + '</span>') +
                 '</header><div class="cycle-history-meta"><span>Planting: ' + escapeHtml(cycle.planted || 'N/A') +
@@ -269,6 +300,7 @@ window.blockScanHistory = (function () {
                 '</span><span>Completed: ' + escapeHtml(completed) +
                 '</span><span>Scans: ' + scans.length + (cycle.legacy ? ' (legacy/unassigned)' : '') +
                 '</span><span>Latest scan: ' + escapeHtml(latest) +
+                '</span><span>' + escapeHtml(resultSummary) +
                 '</span></div><button type="button" class="btn btn-sm btn-secondary" data-cycle-id="' + escapeHtml(cycle.id) +
                 '" data-cycle-cutoff="' + (cutoff == null ? '' : cutoff) + '">View scans</button></article>';
         }).join('') + '</div>';
@@ -487,6 +519,7 @@ window.blockScanHistory = (function () {
         latestPlantCountsFromSnapshots: latestPlantCountsFromSnapshots,
         render: render,
         assignedCycle: assignedCycle,
+        latestCompletedResult: latestCompletedResult,
         cycleCompletedAtMs: cycleCompletedAtMs,
         assignCycleDisplayNumbers: assignCycleDisplayNumbers,
         renderCycles: renderCycles,
