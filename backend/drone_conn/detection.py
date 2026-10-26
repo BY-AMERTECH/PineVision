@@ -22,6 +22,7 @@ from .firebase_client import (
     complete_scan_session,
     get_scan_status,
 )
+from .live_socket import clear_live_scan, emit_live_detections
 
 
 class ScanInProgressError(Exception):
@@ -36,6 +37,15 @@ class ScanInProgressError(Exception):
     Callers (routes.py) should catch this and return a 409 to the frontend.
     """
     pass
+
+
+def _derive_non_bearing_count(
+    total_count: int,
+    bearing_count: int,
+    non_viable_count: int,
+) -> int:
+    """Derive non-bearing from the all-class total, preserving other classes."""
+    return max(0, total_count - bearing_count - non_viable_count)
 
 
 def _compute_population_estimates(
@@ -231,11 +241,7 @@ class PineappleDetector:
         
         # Initialize DeepSORT tracker
         print(f"🔄 Initializing DeepSORT tracker...")
-        self.tracker = DeepSort(
-            max_age=30,           # Keep track for 30 frames without detection
-            n_init=3,             # Confirm track after 3 consecutive detections
-            max_iou_distance=0.7  # IoU threshold for matching
-        )
+        self.tracker = self._create_tracker()
         print(f"✅ DeepSORT tracker initialized")
         
         # Track unique pineapple IDs (prevents duplicates!)
@@ -262,6 +268,8 @@ class PineappleDetector:
         # concurrent start requests both passing the "no scan active" check
         # before either has set detection_active = True (see Issue D).
         self._scan_lock = threading.Lock()
+        self._stop_lock = threading.Lock()
+        self._finalizing_scan_id: Optional[str] = None
 
         # Time-sync state — retained as stubs for API backwards-compatibility
         self._current_scan_id: Optional[str] = None
@@ -278,12 +286,18 @@ class PineappleDetector:
         # Re-initialize the tracker so Kalman filter state and track-ID counters
         # from a previous scan don't influence the new one.  Without this, the
         # same video produces different unique-ID assignments on every run.
-        self.tracker = DeepSort(
-            max_age=30,
-            n_init=3,
-            max_iou_distance=0.7,
-        )
+        self.tracker = self._create_tracker()
         print("🔄 Tracking data reset")
+
+    def _create_tracker(self):
+        """Create DeepSORT with its appearance embedder on CUDA when available."""
+        return DeepSort(
+            max_age=30,
+            n_init=2,
+            max_iou_distance=0.7,
+            embedder_gpu=self.device == 'cuda',
+            half=self.device == 'cuda',
+        )
 
     def push_video_time(self, scan_id: str, video_time: float, is_ended: bool = False):
         """
@@ -326,8 +340,19 @@ class PineappleDetector:
         else:
             inference_frame = frame
 
-        # Run YOLO detection on the (possibly resized) frame
-        results = self.model(inference_frame, verbose=False)
+        # Ultralytics can use FP16 on CUDA. This reduces inference time and
+        # VRAM use on supported NVIDIA GPUs; keep the torch.hub fallback's
+        # existing call path unchanged.
+        if self.use_ultralytics:
+            results = self.model.predict(
+                source=inference_frame,
+                verbose=False,
+                device=self.device,
+                half=self.device == 'cuda',
+                imgsz=self._INFERENCE_SIZE,
+            )
+        else:
+            results = self.model(inference_frame, verbose=False)
 
         # Prepare detections for DeepSORT
         detections_list = []
@@ -336,14 +361,17 @@ class PineappleDetector:
             # Ultralytics YOLO format
             for result in results:
                 boxes = result.boxes
-                for box in boxes:
-                    # Get bounding box coordinates
-                    x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
+                # Transfer all detections from GPU once per frame. Reading
+                # xyxy/conf/class one box at a time synchronizes CUDA for
+                # every plant and can add substantial overhead on dense video.
+                box_rows = boxes.data.detach().cpu().numpy()
+                for row in box_rows:
+                    x1, y1, x2, y2, confidence, class_id = row[:6]
                     bbox = [float(x1), float(y1), float(x2 - x1), float(y2 - y1)]  # [x, y, width, height]
-                    
+
                     # Get confidence and class
-                    confidence = float(box.conf[0])
-                    class_id = int(box.cls[0])
+                    confidence = float(confidence)
+                    class_id = int(class_id)
                     class_name = result.names[class_id]
                     
                     detections_list.append((bbox, confidence, class_name))
@@ -405,9 +433,15 @@ class PineappleDetector:
 
         # Calculate current counts
         bearing_count = len(self.unique_ids['bearing'])
-        non_bearing_count = len(self.unique_ids['non_bearing'])
+        total_count = sum(len(ids) for ids in self.unique_ids.values())
         non_viable_count = len(self.unique_ids['non_viable'])
-        total_count = bearing_count + non_bearing_count + non_viable_count
+        # Total includes all three classes; derive non-bearing while keeping
+        # bearing and non-viable counts unchanged.
+        non_bearing_count = _derive_non_bearing_count(
+            total_count,
+            len(self.unique_ids['bearing']),
+            non_viable_count,
+        )
 
         self.total_frames_processed += 1
 
@@ -485,7 +519,7 @@ class PineappleDetector:
                 on this detector (see Issue D).
         """
         with self._scan_lock:
-            if self.detection_active:
+            if self.detection_active or self._finalizing_scan_id:
                 print(f"⚠️ start_detection rejected — a scan is already active "
                       f"(scan_id={self._current_scan_id})")
                 raise ScanInProgressError(
@@ -564,6 +598,14 @@ class PineappleDetector:
                 # Run detection on frame
                 results = self.detect_frame(frame)
 
+                # Push boxes as soon as inference completes. Firestore remains
+                # the fallback transport and the source for persisted counts.
+                emit_live_detections(scan_id, {
+                    'frame': results['frame_number'],
+                    'processedAt': int(time.time() * 1000),
+                    'd': results.get('bbox_detections', []),
+                })
+
                 # Check if it's time to update Firebase
                 current_time = time.time()
                 if current_time - last_update_time >= update_interval:
@@ -614,6 +656,7 @@ class PineappleDetector:
 
         finally:
             stream.stop()
+            clear_live_scan(scan_id)
             print("🛑 Detection loop stopped")
             if not completed_normally:
                 try:
@@ -627,6 +670,21 @@ class PineappleDetector:
                     pass
     
     def stop_detection(self, block_id: str, scan_id: str, user_id: str = '') -> bool:
+        """Serialize stop requests so retries cannot finalize the same scan twice."""
+        with self._stop_lock:
+            with self._scan_lock:
+                if self._current_scan_id == scan_id:
+                    self._finalizing_scan_id = scan_id
+            try:
+                return self._stop_detection_locked(block_id, scan_id, user_id)
+            finally:
+                final_status = get_scan_status(scan_id)
+                if final_status in ('completed', 'failed', 'cancelled'):
+                    with self._scan_lock:
+                        if self._finalizing_scan_id == scan_id:
+                            self._finalizing_scan_id = None
+
+    def _stop_detection_locked(self, block_id: str, scan_id: str, user_id: str = '') -> bool:
         """
         Stop detection and finalize scan session.
 
@@ -639,16 +697,30 @@ class PineappleDetector:
         Returns:
             True if stopped successfully, False otherwise
         """
-        if not self.detection_active:
-            print("⚠️ Detection is not active")
-            return False
-        
-        print("🛑 Stopping detection...")
-        self.detection_active = False
+        current_status = get_scan_status(scan_id)
+        if current_status in ('completed', 'failed', 'cancelled'):
+            print(f"ℹ️ Scan {scan_id} already reached terminal status "
+                  f"'{current_status}' — not overwriting it.")
+            return current_status == 'completed'
 
-        # Wait for detection thread to finish
+        if self._current_scan_id and self._current_scan_id != scan_id:
+            print(f"⚠️ Refusing to stop scan {scan_id}; active scan is {self._current_scan_id}")
+            return False
+
+        if self.detection_active:
+            print("🛑 Stopping detection...")
+            self.detection_active = False
+        elif not self.detection_thread:
+            print("⚠️ Detection thread is unavailable")
+            return False
+
+        # Do not finalize while a frame is still being inferred/tracked. A
+        # timed-out request can be retried; this stop lock serializes retries.
         if self.detection_thread:
-            self.detection_thread.join(timeout=5.0)
+            self.detection_thread.join(timeout=45.0)
+            if self.detection_thread.is_alive():
+                print("⚠️ Detection is still finishing; final save can be retried")
+                return False
 
         # The background loop (_detection_loop for live streams,
         # _video_scan_loop_sequential for uploaded video) may have already
@@ -669,8 +741,11 @@ class PineappleDetector:
 
         # Get final counts
         bearing_count = len(self.unique_ids['bearing'])
-        non_bearing_count = len(self.unique_ids['non_bearing'])
         non_viable_count = len(self.unique_ids['non_viable'])
+        total_count = sum(len(ids) for ids in self.unique_ids.values())
+        non_bearing_count = _derive_non_bearing_count(
+            total_count, bearing_count, non_viable_count
+        )
         total_count = bearing_count + non_bearing_count + non_viable_count
         
         # Calculate percentages
@@ -763,7 +838,7 @@ class PineappleDetector:
             return None
 
         with self._scan_lock:
-            if self.detection_active:
+            if self.detection_active or self._finalizing_scan_id:
                 print(f"⚠️ start_video_scan rejected — a scan is already active "
                       f"(scan_id={self._current_scan_id})")
                 raise ScanInProgressError(
@@ -873,8 +948,11 @@ class PineappleDetector:
 
         # ── Final counts ─────────────────────────────────────────────
         bearing_count     = len(self.unique_ids['bearing'])
-        non_bearing_count = len(self.unique_ids['non_bearing'])
         non_viable_count  = len(self.unique_ids['non_viable'])
+        total_count       = sum(len(ids) for ids in self.unique_ids.values())
+        non_bearing_count = _derive_non_bearing_count(
+            total_count, bearing_count, non_viable_count
+        )
         total_count       = bearing_count + non_bearing_count + non_viable_count
 
         if total_count > 0:
@@ -1106,8 +1184,11 @@ class PineappleDetector:
 
         # ── Final counts ──────────────────────────────────────────────
         bearing_count     = len(self.unique_ids['bearing'])
-        non_bearing_count = len(self.unique_ids['non_bearing'])
         non_viable_count  = len(self.unique_ids['non_viable'])
+        total_count       = sum(len(ids) for ids in self.unique_ids.values())
+        non_bearing_count = _derive_non_bearing_count(
+            total_count, bearing_count, non_viable_count
+        )
         total_count       = bearing_count + non_bearing_count + non_viable_count
 
         if total_count > 0:
@@ -1298,8 +1379,11 @@ class PineappleDetector:
 
         # ── Final counts ─────────────────────────────────────────────────
         bearing_count     = len(self.unique_ids['bearing'])
-        non_bearing_count = len(self.unique_ids['non_bearing'])
         non_viable_count  = len(self.unique_ids['non_viable'])
+        total_count       = sum(len(ids) for ids in self.unique_ids.values())
+        non_bearing_count = _derive_non_bearing_count(
+            total_count, bearing_count, non_viable_count
+        )
         total_count       = bearing_count + non_bearing_count + non_viable_count
 
         if total_count > 0:

@@ -304,7 +304,7 @@
                             </div>
                             <div class="col-6">
                                 <div class="dv-summary-item">
-                                    <span class="dv-summary-label">Total Detected</span>
+                                    <span class="dv-summary-label">Estimated Plants Detected</span>
                                     <span class="dv-summary-val" id="summary-total">—</span>
                                 </div>
                             </div>
@@ -329,15 +329,17 @@
                         </div>
                     </div>
 
+                    <div id="scan-finalize-status" class="small mb-3 d-none" role="status" aria-live="polite"></div>
+
                     <p class="dv-confirm-text">
-                        End this scan session? The drone stream will disconnect and all
-                        statistics will be saved to the session log.
+                        End this scan session? The system will finish any current detection,
+                        save the final results, and then let you review them before leaving.
                     </p>
 
                 </div>
 
                 <div class="modal-footer dv-modal-footer">
-                    <button type="button" class="btn dv-btn-cancel"
+                    <button type="button" id="btn-cancel-end-scan" class="btn dv-btn-cancel"
                             data-bs-dismiss="modal"><i class="ti ti-x" aria-hidden="true"></i> Cancel</button>
                     <button type="button" id="btn-confirm-end-scan"
                             class="btn dv-btn-danger">
@@ -376,7 +378,7 @@
                             </div>
                             <div class="col-6">
                                 <div class="dv-summary-item">
-                                    <span class="dv-summary-label">Total Detected</span>
+                                    <span class="dv-summary-label">Estimated Plants Detected</span>
                                     <span class="dv-summary-val" id="sf-total">—</span>
                                 </div>
                             </div>
@@ -429,6 +431,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
 
     <!-- PineVision JS -->
     <script src="../../js/utils.js"></script>

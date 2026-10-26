@@ -21,6 +21,7 @@ from firebase_admin import credentials, firestore, auth
 import requests
 
 from drone_conn.routes import drone_bp
+from drone_conn.live_socket import init_live_socket, socketio
 
 # Absolute path to the frontend folder (one level up from backend/)
 FRONTEND = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'frontend'))
@@ -78,6 +79,7 @@ PAGES = os.path.join(FRONTEND, 'pages')
 
 app = Flask(__name__, static_folder=None)
 CORS(app)
+init_live_socket(app)
 
 # Register drone blueprint
 app.register_blueprint(drone_bp)
@@ -569,4 +571,4 @@ if __name__ == '__main__':
             print(f"⚠️  Detector pre-initialization failed: {_exc}")
             print("   Upload requests will return a proper JSON error if the model cannot load.")
 
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    socketio.run(app, host='0.0.0.0', port=5000, debug=True)
