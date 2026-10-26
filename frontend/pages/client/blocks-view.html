@@ -1163,7 +1163,7 @@
                     </div>
                     <div class="stat-row">
                         <span class="stat-label">Section</span>
-                        <span class="stat-value">${block.section}</span>
+                        <span class="stat-value">${block.section && block.section.trim() ? block.section : "N/A"}</span>
                     </div>
                     <div class="stat-row">
                         <span class="stat-label">Area</span>
