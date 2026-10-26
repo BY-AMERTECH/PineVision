@@ -3,6 +3,8 @@ setuptools>=70,<80
 
 flask==2.3.0
 flask-cors==4.0.0
+Flask-SocketIO==5.7.0
+simple-websocket>=1.0.0
 firebase-admin==6.2.0
 opencv-python
 numpy
