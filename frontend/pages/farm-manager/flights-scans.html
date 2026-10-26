@@ -97,6 +97,21 @@
       .fs-table col.c-duration { width: 100px; }
       .fs-table col.c-status { width: 130px; }
       .fs-table col.c-bearing { width: 110px; }
+      .fs-table-controls {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: var(--space-md);
+        min-width: 0;
+      }
+      .fs-search {
+        width: min(260px, 42vw);
+        min-width: 150px;
+      }
+      @media (max-width: 480px) {
+        .fs-table-controls { flex-wrap: wrap; }
+        .fs-search { width: 100%; }
+      }
     </style>
   </head>
   <body>
@@ -425,6 +440,7 @@
 
       const SCANS_LIMIT = 300;
       let currentScansPage = 1;
+      let currentFlightSearch = "";
 
       let scansUnsub = null;
       let blocksUnsub = null;
@@ -657,17 +673,42 @@
           return;
         }
 
+        const query = currentFlightSearch.trim().toLowerCase();
+        const filteredRows = query ? rows.filter(function (row) {
+          return [
+            row.blockLabel,
+            row.operatorName,
+            row.status,
+            row.startTime ? row.startTime.toLocaleString() : "",
+            row.duration,
+            row.bearingPercent,
+            row.blockId,
+            row.userId,
+          ].join(" ").toLowerCase().includes(query);
+        }) : rows;
+
+        const tableHeader =
+          '<div class="thead-row"><h3 class="thead-title">All Flights</h3>' +
+          '<div class="fs-table-controls"><input id="flight-search" class="form-control form-control-sm fs-search" type="search" placeholder="Search flights…" aria-label="Search all flights" value="' + escapeHtml(currentFlightSearch) + '" oninput="setFlightSearch(this.value)">' +
+          '<span style="font-size:11px;color:var(--color-text-secondary);font-family:var(--font-mono);">' +
+          (query ? filteredRows.length + " of " : "") + rows.length + " session" + (rows.length !== 1 ? "s" : "") + "</span></div></div>";
+
+        if (!filteredRows.length) {
+          document.getElementById("fs-content").innerHTML =
+            '<div class="tcard">' + tableHeader +
+            '<div class="empty-state"><div class="empty-state-title">No flights match your search</div><div class="empty-state-text">Try another block, user, date, status, or bearing value.</div></div></div>';
+          return;
+        }
+
         const pageData = window.TablePagination.paginate(
-          rows,
+          filteredRows,
           currentScansPage,
         );
         currentScansPage = pageData.currentPage;
 
         let html =
           '<div class="tcard">' +
-          '<div class="thead-row"><h3 class="thead-title">All Flights</h3>' +
-          '<span style="font-size:11px;color:var(--color-text-secondary);font-family:var(--font-mono);">' +
-          rows.length + " session" + (rows.length !== 1 ? "s" : "") + "</span></div>" +
+          tableHeader +
           '<div class="twrap card-scroll-region" tabindex="0" role="region" aria-label="All flights"><table class="fs-table">' +
           "<colgroup>" +
           '<col class="c-date"><col class="c-block"><col class="c-operator"><col class="c-duration"><col class="c-status"><col class="c-bearing">' +
@@ -713,6 +754,20 @@
             renderScans(rows);
           },
         );
+      }
+
+      function setFlightSearch(value) {
+        const previousInput = document.getElementById("flight-search");
+        const selectionStart = previousInput ? previousInput.selectionStart : value.length;
+        const selectionEnd = previousInput ? previousInput.selectionEnd : value.length;
+        currentFlightSearch = value;
+        currentScansPage = 1;
+        renderScans(SCANS_RAW.map(buildScanRow));
+        const nextInput = document.getElementById("flight-search");
+        if (nextInput) {
+          nextInput.focus();
+          nextInput.setSelectionRange(selectionStart, selectionEnd);
+        }
       }
 
       function renderError() {

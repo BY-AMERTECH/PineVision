@@ -170,17 +170,27 @@
         white-space: nowrap;
       }
 
+      .rp-table {
+        width: 100%;
+        table-layout: fixed;
+      }
+      .rp-table th,
+      .rp-table td {
+        white-space: normal;
+        overflow-wrap: anywhere;
+      }
       .rp-table col.c-block { width: 14%; }
       .rp-table col.c-section { width: 12%; }
-      .rp-table col.c-operator { width: 16%; }
-      .rp-table col.c-daf { width: 80px; }
-      .rp-table col.c-area { width: 80px; }
-      .rp-table col.c-bearing { width: 15%; }
-      .rp-table col.c-nonviable { width: 15%; }
-      .rp-table col.c-status { width: 120px; }
+      .rp-table col.c-operator { width: 20%; }
+      .rp-table col.c-daf { width: 8%; }
+      .rp-table col.c-area { width: 8%; }
+      .rp-table col.c-bearing { width: 13%; }
+      .rp-table col.c-nonviable { width: 13%; }
+      .rp-table col.c-status { width: 12%; }
 
       @media (max-width: 580px) {
         .filter-panel { padding: var(--space-lg); }
+        .rp-table { min-width: 720px; }
       }
     </style>
   </head>

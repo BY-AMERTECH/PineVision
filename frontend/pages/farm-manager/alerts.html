@@ -708,7 +708,16 @@
                 "
               ></span>
               <button
+                class="btn btn-secondary btn-sm"
+                type="button"
+                id="clear-notifications-btn"
+                onclick="clearNotifications()"
+              >
+                Clear notifications
+              </button>
+              <button
                 class="btn btn-navigation btn-sm"
+                type="button"
                 onclick="refreshAlerts()"
                 id="refresh-btn"
               >
@@ -985,9 +994,47 @@
       var monitoringAlertsUnsub = null;
       var SECURITY_ALERTS = [];
       var MONITORING_ALERTS = [];
+      var dismissedNotificationIds = new Set();
+
+      function dismissedNotificationStorageKey() {
+        var user = firebase.auth().currentUser;
+        return "pinevision_fm_dismissed_notifications_" + (user ? user.uid : "unknown");
+      }
+
+      function restoreDismissedNotifications() {
+        try {
+          var saved = JSON.parse(localStorage.getItem(dismissedNotificationStorageKey()) || "[]");
+          dismissedNotificationIds = new Set(Array.isArray(saved) ? saved : []);
+        } catch (error) {
+          dismissedNotificationIds = new Set();
+          console.warn("Could not restore dismissed notifications:", error);
+        }
+      }
+
+      function clearNotifications() {
+        if (!ACCOUNT_ALERTS.length) return;
+        var count = ACCOUNT_ALERTS.length;
+        if (!window.confirm("Clear " + count + " notification" + (count === 1 ? "" : "s") + " from this browser? Alert records will remain saved.")) return;
+
+        var updated = new Set(dismissedNotificationIds);
+        ACCOUNT_ALERTS.forEach(function (alert) {
+          updated.add(alert.source + ":" + alert.id);
+        });
+        try {
+          localStorage.setItem(dismissedNotificationStorageKey(), JSON.stringify(Array.from(updated)));
+          dismissedNotificationIds = updated;
+          mergeAndRenderAlerts();
+          utils.showToast("Notifications cleared from this browser.", "success");
+        } catch (error) {
+          console.error("Could not clear notifications:", error);
+          utils.showToast("Could not clear notifications. Please try again.", "error");
+        }
+      }
 
       function mergeAndRenderAlerts() {
-        ACCOUNT_ALERTS = SECURITY_ALERTS.concat(MONITORING_ALERTS).sort(
+        ACCOUNT_ALERTS = SECURITY_ALERTS.concat(MONITORING_ALERTS).filter(function (alert) {
+          return !dismissedNotificationIds.has(alert.source + ":" + alert.id);
+        }).sort(
           function (a, b) {
             return new Date(b.timestamp) - new Date(a.timestamp);
           },
@@ -1073,6 +1120,7 @@
 
       /* ── Init ────────────────────────────────────────────────────────────── */
       window.initPage = function () {
+        restoreDismissedNotifications();
         loadAlerts(); // replaces the old renderMetrics() / applyFilters() calls
         window.addEventListener("pagehide", detachAlertsListener);
         window.addEventListener("beforeunload", detachAlertsListener);
