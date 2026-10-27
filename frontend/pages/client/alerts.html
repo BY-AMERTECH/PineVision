@@ -103,6 +103,11 @@
         gap: var(--space-lg);
       }
 
+      .alert-box { padding: var(--space-md) var(--space-lg); }
+      .alert-box .alert-top { margin-bottom: var(--space-xs); }
+      .alert-box .alert-body { margin-bottom: var(--space-sm); }
+      .alert-box .alert-foot { display: flex; align-items: center; justify-content: flex-end; padding-top: var(--space-sm); }
+
       .alert-foot-item {
         display: flex;
         gap: var(--space-xs);
@@ -409,6 +414,23 @@
             <!-- Populated by JavaScript -->
           </div>
 
+          <!-- Threshold Reference Table -->
+          <div class="tcard mb-4">
+            <div class="thead-row">
+              <h3 class="thead-title">Threshold Reference</h3>
+            </div>
+            <div class="twrap">
+              <table>
+                <colgroup>
+                  <col style="width: 28%" /><col style="width: 24%" />
+                  <col style="width: 24%" /><col style="width: 24%" />
+                </colgroup>
+                <thead><tr><th>Metric</th><th>Watch threshold</th><th>Critical threshold</th><th>Farm average</th></tr></thead>
+                <tbody id="threshold-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+
           <div class="alert-filters" role="group" aria-label="Filter alerts by status">
             <button class="alert-filter" type="button" data-alert-filter="crit" aria-pressed="true">
               Critical <span class="alert-count crit" id="count-crit">0</span>
@@ -456,31 +478,6 @@
             <div id="alerts-ok"></div>
           </div>
 
-          <!-- Threshold Reference Table -->
-          <div class="tcard mb-5">
-            <div class="thead-row">
-              <h3 class="thead-title">Threshold Reference</h3>
-            </div>
-            <div class="twrap">
-              <table>
-                <colgroup>
-                  <col style="width: 28%" />
-                  <col style="width: 24%" />
-                  <col style="width: 24%" />
-                  <col style="width: 24%" />
-                </colgroup>
-                <thead>
-                  <tr>
-                    <th>Metric</th>
-                    <th>Watch threshold</th>
-                    <th>Critical threshold</th>
-                    <th>Farm average</th>
-                  </tr>
-                </thead>
-                <tbody id="threshold-tbody"></tbody>
-              </table>
-            </div>
-          </div>
         </div>
       </main>
     </div>

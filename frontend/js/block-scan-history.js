@@ -122,6 +122,34 @@ window.blockScanHistory = (function () {
         return value == null || total == null || total <= 0 ? null : ((value / total) * 100).toFixed(1) + '%';
     }
 
+    function stableShortHash(value) {
+        const text = String(value);
+        let hash = 2166136261;
+        for (let i = 0; i < text.length; i++) {
+            hash ^= text.charCodeAt(i);
+            hash = Math.imul(hash, 16777619);
+        }
+        return (hash >>> 0).toString(16).toUpperCase().padStart(8, '0');
+    }
+
+    function scanReference(entry) {
+        const date = entry.date;
+        if (!(date instanceof Date) || !Number.isFinite(date.getTime())) return 'Scan-' + stableShortHash(entry.id);
+        return 'SCAN-' + date.toISOString().replace(/[-:T.Z]/g, '').slice(0, 14) + '-' + stableShortHash(entry.id);
+    }
+
+    function readableBlockReference(block) {
+        const value = block && (block.blockName || block.blockId || block.id);
+        if (!value) return 'Unavailable';
+        return block.id && String(value) === String(block.id)
+            ? 'Block-' + stableShortHash(block.id)
+            : value;
+    }
+
+    function sectionValue(value) {
+        return value == null || String(value).trim() === '' ? 'N/A' : value;
+    }
+
     function formatDateTime(date) {
         return date.toLocaleString('en-US', {
             year: 'numeric', month: 'short', day: 'numeric',
@@ -439,12 +467,11 @@ window.blockScanHistory = (function () {
 
     function workbookBlob(history, block, cycles) {
         const scanRows = [[
-            'Scan ID', 'Crop Cycle', 'Block ID', 'Block name', 'Section', 'Account ID', 'Status',
+            'Scan reference', 'Crop Cycle', 'Block ID', 'Block name', 'Section', 'Account',
             'Start time (UTC)', 'End time (UTC)', 'Duration (seconds)',
             'Bearing detections', 'Non-bearing detections', 'Non-viable detections',
-            'Total detections', 'Bearing rate (%)', 'Registered population',
-            'Estimated bearing', 'Estimated non-bearing', 'Detection coverage (%)',
-            'Processed frames', 'Total frames', 'Manifest ready',
+            'Estimated plant count', 'Bearing share (%)',
+            'Total frames', 'Manifest ready',
         ]];
         const orderedHistory = history.slice().sort(function (a, b) { return a.date - b.date; });
         const scanCounts = new Map();
@@ -452,26 +479,29 @@ window.blockScanHistory = (function () {
             const d = entry.data;
             const cycle = assignedCycle(entry, cycles);
             const end = d.endTime && typeof d.endTime.toDate === 'function' ? d.endTime.toDate() : null;
+            const bearing = metric(d, 'bearing');
+            const nonBearing = metric(d, 'nonBearing');
+            const blockReference = readableBlockReference(block);
             if (cycle) scanCounts.set(cycle.id, (scanCounts.get(cycle.id) || 0) + 1);
             scanRows.push([
-                entry.id, cycle ? 'Cycle ' + cycle.displayNumber : 'Unassigned', d.blockId,
-                block.blockName || block.blockId || 'Unnamed block', block.section, d.userId,
-                d.status || 'completed (legacy)', entry.date.toISOString(), timestamp(d.endTime),
-                end && end >= entry.date ? (end - entry.date) / 1000 : null,
-                metric(d, 'bearing'), metric(d, 'nonBearing'), metric(d, 'nonViable'),
-                metric(d, 'total'), entry.pct, metric(d, 'registeredPopulation'),
-                metric(d, 'estimatedBearing'), metric(d, 'estimatedNonBearing'), metric(d, 'detectionCoverage'),
-                metric(d, 'processedFrames'), metric(d, 'totalFrames'), d.manifestReady,
+                scanReference(entry), cycle ? 'Cycle ' + cycle.displayNumber : 'Unassigned', blockReference,
+                block.blockName || blockReference, sectionValue(block.section), block.accountName || block.registeredBy || 'Unavailable',
+                entry.date.toISOString(), timestamp(d.endTime) || 'Unavailable',
+                end && end >= entry.date ? Math.round((end - entry.date) / 1000) : 'Unavailable',
+                bearing ?? 'Unavailable', nonBearing ?? 'Unavailable', metric(d, 'nonViable') ?? 'Unavailable',
+                bearing !== null && nonBearing !== null ? bearing + nonBearing : 'Unavailable',
+                formatPercent(bearing, bearing !== null && nonBearing !== null ? bearing + nonBearing : null) || 'Unavailable',
+                metric(d, 'totalFrames') ?? 'Unavailable', d.manifestReady == null ? 'Unavailable' : d.manifestReady,
             ]);
         });
 
-        const cycleRows = [['Crop Cycle', 'Status', 'Planting Date', 'Forcing Date', 'Start Date', 'Completed Date', 'Scan Count', 'Latest Scan']];
+        const cycleRows = [['Crop Cycle', 'Section', 'Planting Date', 'Forcing Date', 'Start Date', 'Completed Date', 'Scan Count', 'Latest Scan']];
         cycles.slice().sort(function (a, b) { return a.displayNumber - b.displayNumber; }).forEach(function (cycle) {
             const cycleScans = orderedHistory.filter(function (entry) { return assignedCycle(entry, cycles) === cycle; });
             const latest = cycleScans.length ? cycleScans[cycleScans.length - 1].date.toISOString() : '';
             cycleRows.push([
-                'Cycle ' + cycle.displayNumber, cycle.status || 'Unknown', cycle.planted, cycle.forcingDate,
-                cycle.startDate, timestamp(cycle.completedAtMs == null ? cycle.completedAt : cycle.completedAtMs), scanCounts.get(cycle.id) || 0, latest,
+                'Cycle ' + cycle.displayNumber, sectionValue(block.section), cycle.planted || 'Unavailable', cycle.forcingDate || 'Unavailable',
+                cycle.startDate || 'Unavailable', timestamp(cycle.completedAtMs == null ? cycle.completedAt : cycle.completedAtMs) || 'Unavailable', scanCounts.get(cycle.id) || 0, latest || 'Unavailable',
             ]);
         });
 
@@ -494,7 +524,14 @@ window.blockScanHistory = (function () {
                 utils.showToast('No scan or crop cycle records available for this block.', 'info');
                 return;
             }
-            const blob = workbookBlob(history, block, cycles);
+            const accountLabel = block.registeredBy || block.accountName;
+            const accountIsRawId = accountLabel && (accountLabel === userId || accountLabel === block.userId);
+            const exportBlock = Object.assign({}, block, {
+                accountName: accountLabel && !accountIsRawId
+                    ? accountLabel
+                    : userId || block.userId ? 'Account-' + stableShortHash(userId || block.userId) : 'Unavailable',
+            });
+            const blob = workbookBlob(history, exportBlock, cycles);
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             const name = String(block.blockName || block.blockId || 'block')

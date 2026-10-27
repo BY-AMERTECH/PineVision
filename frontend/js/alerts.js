@@ -158,8 +158,6 @@
                     detectedDate: formatDate(detectedDate),
                     title:       data.title       || 'Alert',
                     description: data.description || '',
-                    method:      data.method      || 'Automated Threshold Check',
-                    operator:    data.operator    || 'System Auto-Flag',
                     resolved:    data.resolved    || false,
                     resolvedDate: resolvedDate ? formatDate(resolvedDate) : null,
                 };
@@ -235,10 +233,7 @@
         const badgeClass = cls === 'ok' ? 'good' : cls;
         const badgeLabel = cls === 'ok' ? 'Resolved' : cls === 'crit' ? 'Critical' : 'Watch';
 
-        const footParts = [
-            `<span class="alert-foot-item"><span>Method:</span> <strong>${alert.method}</strong></span>`,
-            `<span class="alert-foot-item"><span>By:</span> <strong>${alert.operator}</strong></span>`,
-        ];
+        const footParts = [];
         if (alert.resolvedDate) {
             footParts.push(`<span class="alert-foot-item"><span>Resolved:</span> <strong>${alert.resolvedDate}</strong></span>`);
         }
@@ -261,10 +256,10 @@
                 <span class="badge ${badgeClass}"><span class="bdot"></span>${badgeLabel}</span>
             </div>
             <div class="alert-body">${alert.description}</div>
-            <div class="alert-foot" style="display:flex;align-items:center;justify-content:space-between;">
+            ${(footParts.length || resolveButton) ? `<div class="alert-foot">
                 <div class="alert-foot-items">${footParts.join('')}</div>
                 ${resolveButton}
-            </div>
+            </div>` : ''}
         </div>`;
     }
 

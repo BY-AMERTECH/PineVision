@@ -124,6 +124,13 @@
 
       .btn-export { position: relative; }
 
+      .rp-table { width: 100%; table-layout: fixed; }
+      .rp-table th, .rp-table td { white-space: normal; overflow-wrap: anywhere; }
+      .rp-table .ibar { gap: var(--space-xs); }
+      .rp-table .it { flex: 0 1 48px; min-width: 24px; }
+      .rp-table .ip { min-width: 38px; }
+      @media (max-width: 700px) { .rp-table { min-width: 820px; } }
+
 
       .btn-export-label {
         position: absolute;
@@ -438,8 +445,6 @@
                 <div class="report-subtitle" id="report-subtitle-text"></div>
               </div>
               <div class="export-actions">
-                <button class="btn-export btn btn-secondary" title="PDF export coming soon" disabled><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg> <span>Export PDF</span>
-                  <span class="btn-export-label">Soon</span></button>
                 <button class="btn-export btn btn-primary" title="Download this report as CSV" onclick="exportReportCSV()"><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg> <span>Export CSV</span></button>
               </div>
             </div>
@@ -462,25 +467,21 @@
                 ></span>
               </div>
               <div class="twrap">
-                <table>
+                <table class="rp-table">
                   <colgroup>
-                    <col style="width: 90px" />
-                    <col style="width: 100px" />
-                    <col style="width: 110px" />
-                    <col style="width: 80px" />
-                    <col style="width: 80px" />
-                    <col />
-                    <col />
-                    <col style="width: 100px" />
+                    <col style="width: 13%" /><col style="width: 12%" />
+                    <col style="width: 8%" /><col style="width: 9%" />
+                    <col style="width: 15%" /><col style="width: 15%" />
+                    <col style="width: 15%" /><col style="width: 13%" />
                   </colgroup>
                   <thead>
                     <tr>
                       <th>Block</th>
                       <th>Section</th>
-                      <th>Stage</th>
                       <th>DAF</th>
                       <th>Area</th>
                       <th>Bearing</th>
+                      <th>Non-Bearing</th>
                       <th>Non-Viable</th>
                       <th>Status</th>
                     </tr>
@@ -690,10 +691,10 @@
           [
             "Block",
             "Section",
-            "Stage",
             "Days After Flowering",
             "Area (ha)",
             "Bearing %",
+            "Non-Bearing %",
             "Non-Viable %",
             "Status",
           ],
@@ -702,10 +703,10 @@
           rows.push([
             '"' + (block.blockName || "").replace(/"/g, '""') + '"',
             '"' + (block.section || "").replace(/"/g, '""') + '"',
-            '"' + (block.stage || "").replace(/"/g, '""') + '"',
             block.daf,
             block.area,
             block.bearing.toFixed(1),
+            block.nonbearing.toFixed(1),
             block.nonViable.toFixed(1),
             statusLabel(blockStatusClass(block)),
           ]);
@@ -753,7 +754,7 @@
 
         if (blocks.length === 0) {
           document.getElementById("report-tbody").innerHTML =
-            '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:var(--space-2xl);">No blocks match the selected filters.</td></tr>';
+          '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:var(--space-2xl);">No blocks match the selected filters.</td></tr>';
           return;
         }
 
@@ -764,10 +765,10 @@
                     <tr>
                         <td><strong>${escapeHtml(block.blockName)}</strong></td>
                         <td>${escapeHtml(block.section)}</td>
-                        <td style="font-size:var(--font-size-sm);color:var(--muted);">${escapeHtml(block.stage)}</td>
                         <td style="font-family:var(--font-mono);">${block.daf}d</td>
                         <td style="font-family:var(--font-mono);">${utils.formatArea(block.area)}</td>
                         <td>${utils.buildInlineBar(block.bearing, utils.barColor(block.bearing))}</td>
+                        <td>${utils.buildInlineBar(block.nonbearing, "var(--amber-mid)")}</td>
                         <td>${utils.buildInlineBar(block.nonViable, "var(--yellow-mid)")}</td>
                         <td>${blockStatusBadge(statusClass)}</td>
                     </tr>`;

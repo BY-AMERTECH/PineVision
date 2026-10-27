@@ -903,6 +903,7 @@
 
       let currentBlock = null;
       let currentUserId = null;
+      let currentAccountName = null;
 
       window.initPage = async function () {
         // Mark "Fruit Blocks" as the active nav link
@@ -916,6 +917,7 @@
         // above).
         const session = auth.getSession();
         currentUserId = session ? session.uid : null;
+        currentAccountName = session && (session.fullName || session.username || session.email) || null;
 
         // Get block ID from URL
         const blockId = new URLSearchParams(window.location.search).get("id");
@@ -967,6 +969,7 @@
           currentBlock = {
             id: blockDoc.id,
             userId: blockData.userId,
+            accountName: currentAccountName,
             activeCycleId: blockData.activeCycleId || null,
             blockId: blockData.blockId,
             blockName: blockData.blockName,

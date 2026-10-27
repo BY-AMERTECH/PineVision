@@ -43,9 +43,6 @@ const DRONE_STATE = {
     hls:                  null,
     firebaseListener:     null,
     scanFirebaseListener: null,
-    liveSocket:           null,
-    liveSocketReady:      false,
-    liveSocketFrame:      -1,
     videoMode:            false,    // true when playing an uploaded MP4 (not live HLS)
     videoBlobUrl:         null,     // object URL for the uploaded file
     videoEnded:           false,    // true when browser video element has finished playing
@@ -352,7 +349,7 @@ async function apiStatus(path) {
     return resp.json();
 }
 
-async function apiStartDetection(hlsUrl, blockId, userId, fps = 3) {
+async function apiStartDetection(hlsUrl, blockId, userId, fps = 2) {
     const resp = await fetch(`${API_BASE}/api/drone/start-detection`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -599,7 +596,7 @@ async function startDetection() {
             DRONE_STATE.streamUrl,
             DRONE_STATE.blockId,
             DRONE_STATE.userId,
-            3
+            2
         );
 
         if (result.ok) {
@@ -608,7 +605,6 @@ async function startDetection() {
             DRONE_STATE.finalizedScanReady = false;
             startFirebaseListener();
             startLiveScanStatsListener();
-            startLiveDetectionSocket(result.scan_id);
             BboxOverlay.start('live');
             startLiveCountdown();
             return true;
@@ -1064,7 +1060,6 @@ function startFirebaseListener() {
             const liveFrame = data.liveDetections;
             if (
                 !DRONE_STATE.videoMode &&
-                !DRONE_STATE.liveSocketReady &&
                 liveFrame &&
                 liveFrame.scanId === DRONE_STATE.scanId
             ) {
@@ -1073,81 +1068,6 @@ function startFirebaseListener() {
         }, (error) => {
             console.error('❌ Firebase listener error:', error);
         });
-}
-
-async function startLiveDetectionSocket(scanId) {
-    stopLiveDetectionSocket();
-    if (typeof io !== 'function' || typeof firebase === 'undefined') return;
-
-    const firebaseUser = firebase.auth().currentUser;
-    if (!firebaseUser || !scanId) {
-        console.warn('⚠️ Live box socket unavailable; keeping Firestore fallback');
-        return;
-    }
-
-    try {
-        const token = await firebaseUser.getIdToken();
-        if (DRONE_STATE.scanId !== scanId || DRONE_STATE.videoMode) return;
-
-        const socket = io({
-            autoConnect: false,
-            auth: { token },
-            transports: ['websocket', 'polling'],
-        });
-        DRONE_STATE.liveSocket = socket;
-        DRONE_STATE.liveSocketFrame = -1;
-
-        socket.on('connect', () => {
-            if (DRONE_STATE.liveSocket !== socket) return;
-            socket.emit('join_live_scan', { scanId }, (ack) => {
-                if (DRONE_STATE.liveSocket !== socket) return;
-                DRONE_STATE.liveSocketReady = Boolean(ack && ack.ok);
-                if (!DRONE_STATE.liveSocketReady) {
-                    console.warn('⚠️ Could not join live detection room; using Firestore fallback');
-                }
-            });
-        });
-
-        socket.on('live_detections', (payload) => {
-            if (
-                DRONE_STATE.liveSocket !== socket ||
-                DRONE_STATE.videoMode ||
-                DRONE_STATE.scanId !== scanId ||
-                !payload ||
-                payload.scanId !== scanId
-            ) return;
-
-            const frameNumber = Number(payload.frame);
-            if (Number.isFinite(frameNumber) && frameNumber <= DRONE_STATE.liveSocketFrame) return;
-            if (Number.isFinite(frameNumber)) DRONE_STATE.liveSocketFrame = frameNumber;
-            DRONE_STATE.liveSocketReady = true;
-            BboxOverlay.setLiveDetections(Array.isArray(payload.d) ? payload.d : []);
-        });
-
-        socket.on('disconnect', () => {
-            if (DRONE_STATE.liveSocket === socket) DRONE_STATE.liveSocketReady = false;
-        });
-
-        socket.on('connect_error', (error) => {
-            if (DRONE_STATE.liveSocket === socket) DRONE_STATE.liveSocketReady = false;
-            console.warn('⚠️ Live box socket connection failed; using Firestore fallback:', error.message);
-        });
-
-        socket.connect();
-    } catch (error) {
-        console.warn('⚠️ Could not start live box socket; using Firestore fallback:', error);
-    }
-}
-
-function stopLiveDetectionSocket() {
-    const socket = DRONE_STATE.liveSocket;
-    DRONE_STATE.liveSocket = null;
-    DRONE_STATE.liveSocketReady = false;
-    DRONE_STATE.liveSocketFrame = -1;
-    if (socket) {
-        socket.removeAllListeners();
-        socket.disconnect();
-    }
 }
 
 function startLiveScanStatsListener() {
@@ -1171,7 +1091,6 @@ function startLiveScanStatsListener() {
 }
 
 function stopFirebaseListener() {
-    stopLiveDetectionSocket();
     if (DRONE_STATE.firebaseListener) {
         DRONE_STATE.firebaseListener();
         DRONE_STATE.firebaseListener = null;
