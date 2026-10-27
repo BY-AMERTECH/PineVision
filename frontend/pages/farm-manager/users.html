@@ -413,90 +413,6 @@
         font-family: var(--font-mono);
       }
 
-      .detail-stats {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: var(--space-md);
-        margin-bottom: var(--space-xl);
-      }
-
-      .detail-stat {
-        background: var(--color-background-secondary);
-        border-radius: var(--radius-md);
-        padding: var(--space-md);
-        text-align: center;
-      }
-
-      .detail-stat-val {
-        font-size: var(--font-size-xl);
-        font-weight: var(--font-weight-semibold);
-        font-family: var(--font-mono);
-        color: var(--color-text-primary);
-      }
-
-      .detail-stat-lbl {
-        font-size: 11px;
-        color: var(--muted);
-        margin-top: 2px;
-      }
-
-      .modal-tabs {
-        display: flex;
-        gap: 2px;
-        margin-bottom: var(--space-xl);
-        border-bottom: 1px solid var(--border);
-      }
-
-      .modal-tab {
-        padding: var(--space-md) var(--space-lg);
-        font-size: var(--font-size-sm);
-        font-weight: var(--font-weight-medium);
-        color: var(--muted);
-        border: none;
-        background: none;
-        cursor: pointer;
-        border-bottom: 2px solid transparent;
-        margin-bottom: -1px;
-        transition: all var(--transition-fast);
-      }
-
-      .modal-tab:hover {
-        color: var(--color-text-primary);
-      }
-
-      .modal-tab.active {
-        color: var(--green);
-        border-bottom-color: var(--green);
-        font-weight: var(--font-weight-semibold);
-      }
-
-      .modal-tab-panel {
-        display: none;
-      }
-
-      .modal-tab-panel.active {
-        display: block;
-      }
-
-      .perm-list {
-        display: flex;
-        flex-wrap: wrap;
-        gap: var(--space-sm);
-        margin-bottom: var(--space-xl);
-      }
-
-      .perm-pill {
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-        padding: 4px 10px;
-        background: var(--green-bg);
-        border-radius: 999px;
-        font-size: 11px;
-        font-weight: var(--font-weight-medium);
-        color: var(--green);
-      }
-
       .bs-modal .modal-content {
         background: var(--color-background-primary);
         border: 1.5px solid var(--color-border-primary);
@@ -2386,19 +2302,6 @@
               })
             : "Unknown";
 
-          var perms = u.permissions || [];
-          var daysSince = u.lastLogin
-            ? Math.floor(
-                (Date.now() - u.lastLogin.toDate().getTime()) / 86400000,
-              )
-            : null;
-          var daysSinceStr =
-            daysSince === null
-              ? "—"
-              : daysSince === 0
-                ? "Today"
-                : daysSince + "d ago";
-
           var html = "";
 
           // Profile header
@@ -2434,28 +2337,7 @@
             "</div>" +
             "</div>";
 
-          // Stats
-          html +=
-            '<div class="detail-stats">' +
-            '<div class="detail-stat"><div class="detail-stat-val">' +
-            (perms[0] === "all" ? "∞" : perms.length) +
-            '</div><div class="detail-stat-lbl">Permissions</div></div>' +
-            '<div class="detail-stat"><div class="detail-stat-val">0</div><div class="detail-stat-lbl">Activity Events</div></div>' +
-            '<div class="detail-stat"><div class="detail-stat-val">' +
-            daysSinceStr +
-            '</div><div class="detail-stat-lbl">Last Login</div></div>' +
-            "</div>";
-
-          // Tabs
-          html +=
-            '<div class="modal-tabs">' +
-            '<button class="modal-tab active" onclick="switchTab(this,\'dt-overview\')">Overview</button>' +
-            '<button class="modal-tab" onclick="switchTab(this,\'dt-activity\')">Activity</button>' +
-            "</div>";
-
           // Overview tab
-          html += '<div class="modal-tab-panel active" id="dt-overview">';
-
           html +=
             '<div style="font-size:11px;font-weight:var(--font-weight-semibold);color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:var(--space-md);">Last Login</div>';
           html +=
@@ -2465,36 +2347,6 @@
             logins +
             "</span>" +
             "</div>";
-
-          html +=
-            '<div style="font-size:11px;font-weight:var(--font-weight-semibold);color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:var(--space-md);">Permissions</div>';
-          if (perms.length === 0) {
-            html +=
-              '<div style="margin-bottom:var(--space-xl);font-size:var(--font-size-sm);color:var(--muted);">No permissions assigned</div>';
-          } else if (perms[0] === "all") {
-            html +=
-              '<div style="margin-bottom:var(--space-xl);display:flex;align-items:center;gap:var(--space-sm);padding:var(--space-md);background:var(--amber-bg);border-radius:var(--radius-md);">' +
-              '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>' +
-              '<span style="font-size:var(--font-size-sm);color:var(--amber);font-weight:var(--font-weight-medium);">Full admin access — all permissions granted</span>' +
-              "</div>";
-          } else {
-            var permLabels = {
-              view_dashboard: "Dashboard",
-              view_blocks: "View Blocks",
-              view_scans: "View Scans",
-              view_alerts: "Manage Alerts",
-              generate_report: "Generate Reports",
-            };
-            html += '<div class="perm-list">';
-            perms.forEach(function (perm) {
-              var lbl = permLabels[perm] || perm.replace(/_/g, " ");
-              html +=
-                '<span class="perm-pill"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' +
-                lbl +
-                "</span>";
-            });
-            html += "</div>";
-          }
 
           html +=
             '<div style="font-size:11px;font-weight:var(--font-weight-semibold);color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:var(--space-md);">Account Info</div>';
@@ -2515,14 +2367,6 @@
             "</div>" +
             "</div>" +
             "</div>";
-
-          html += "</div>";
-
-          // Activity tab
-          html += '<div class="modal-tab-panel" id="dt-activity">';
-          html +=
-            '<div class="empty-state" style="padding:var(--space-2xl) 0;"><div class="empty-state-title">No Activity</div><div class="empty-state-text">Activity tracking coming soon</div></div>';
-          html += "</div>";
 
           document.getElementById("detail-modal-body").innerHTML = html;
           document.getElementById("detail-modal-title").textContent =
@@ -2547,19 +2391,6 @@
           console.error("Error loading user details:", error);
           utils.showToast("Failed to load user details", "error");
         }
-      }
-
-      function switchTab(btn, panelId) {
-        var ctx = btn.closest(".modal-body");
-        ctx.querySelectorAll(".modal-tab").forEach(function (t) {
-          t.classList.remove("active");
-        });
-        btn.classList.add("active");
-        ctx.querySelectorAll(".modal-tab-panel").forEach(function (p) {
-          p.classList.remove("active");
-        });
-        var panel = document.getElementById(panelId);
-        if (panel) panel.classList.add("active");
       }
 
       // ── Add / Edit Modal ─────────────────────────────────────────────────
