@@ -739,6 +739,18 @@ tbody tr:hover {
     vertical-align: middle;
 }
 
+.fruit-breakdown-header td {
+    padding-top: var(--space-md);
+    padding-bottom: var(--space-md);
+    color: var(--color-text-primary);
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+}
+
+.fruit-breakdown-header .fruit-breakdown-count {
+    white-space: nowrap;
+}
+
 .fruit-breakdown-condition {
     display: flex;
     flex-direction: column;
