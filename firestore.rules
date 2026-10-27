@@ -9,6 +9,7 @@ service cloud.firestore {
       allow delete: if request.auth != null;  // Authenticated users can delete
     }
 
+
     // Scheduled Scans
     match /scheduled_scans/{docId} {
       allow read, update: if request.auth != null &&

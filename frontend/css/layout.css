@@ -475,6 +475,14 @@ html.sidebar-collapsed .nav-link[data-tooltip]:hover::after {
     font-size: var(--font-size-sm);
     flex-shrink: 0;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    overflow: hidden;
+}
+
+.topbar-account-avatar img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 .topbar-account-info {

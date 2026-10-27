@@ -997,8 +997,8 @@
       var dismissedNotificationIds = new Set();
 
       function dismissedNotificationStorageKey() {
-        var user = firebase.auth().currentUser;
-        return "pinevision_fm_dismissed_notifications_" + (user ? user.uid : "unknown");
+        var session = auth.getSession();
+        return "pinevision_fm_dismissed_notifications_" + (session && session.uid ? session.uid : "unknown");
       }
 
       function restoreDismissedNotifications() {
@@ -1023,7 +1023,7 @@
         try {
           localStorage.setItem(dismissedNotificationStorageKey(), JSON.stringify(Array.from(updated)));
           dismissedNotificationIds = updated;
-          mergeAndRenderAlerts();
+          updateNavBadge();
           utils.showToast("Notifications cleared from this browser.", "success");
         } catch (error) {
           console.error("Could not clear notifications:", error);
@@ -1032,9 +1032,7 @@
       }
 
       function mergeAndRenderAlerts() {
-        ACCOUNT_ALERTS = SECURITY_ALERTS.concat(MONITORING_ALERTS).filter(function (alert) {
-          return !dismissedNotificationIds.has(alert.source + ":" + alert.id);
-        }).sort(
+        ACCOUNT_ALERTS = SECURITY_ALERTS.concat(MONITORING_ALERTS).sort(
           function (a, b) {
             return new Date(b.timestamp) - new Date(a.timestamp);
           },
@@ -1129,7 +1127,7 @@
       /* ── Nav Badge ───────────────────────────────────────────────────────── */
       function updateNavBadge() {
         var active = ACCOUNT_ALERTS.filter(function (a) {
-          return a.status === "active";
+          return a.status === "active" && !dismissedNotificationIds.has(a.source + ":" + a.id);
         }).length;
         var badge = document.getElementById("nav-badge-alerts");
         if (badge && active > 0) {

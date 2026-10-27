@@ -2,6 +2,7 @@
 serviceAccountKey.json
 firebase-service-account.json
 *.json
+!firebase.json
 
 # Python
 __pycache__/

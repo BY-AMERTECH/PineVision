@@ -288,13 +288,40 @@ const app = (function() {
         const menuNameEl = topbar.querySelector('.topbar-account-menu-name');
         const menuEmailEl = topbar.querySelector('.topbar-account-menu-email');
 
-        if (avatarEl) avatarEl.textContent = initials;
+        if (avatarEl) {
+            renderAccountAvatar(avatarEl, initials, null);
+            if (session.uid && window.firebase && firebase.firestore) {
+                firebase.firestore().collection('users').doc(session.uid).get().then(function (snapshot) {
+                    if (!snapshot.exists) return;
+                    const currentUrl = snapshot.data().avatarUrl;
+                    if (currentUrl && !avatarEl.dataset.avatarLocalChange) renderAccountAvatar(avatarEl, initials, currentUrl);
+                }).catch(function () {
+                    // The initials remain visible when profile data is unavailable.
+                });
+            }
+        }
         if (nameEl) nameEl.textContent = displayName;
         if (roleEl) roleEl.textContent = roleLabel;
         if (menuNameEl) menuNameEl.textContent = displayName;
         if (menuEmailEl) menuEmailEl.textContent = session.email || '';
 
         setupAccountMenu(topbar);
+    }
+
+    function renderAccountAvatar(element, initials, url) {
+        element.textContent = '';
+        if (!url) {
+            element.textContent = initials;
+            return;
+        }
+        const image = document.createElement('img');
+        image.alt = '';
+        image.src = url;
+        image.onerror = function () {
+            image.remove();
+            element.textContent = initials;
+        };
+        element.appendChild(image);
     }
 
     /**

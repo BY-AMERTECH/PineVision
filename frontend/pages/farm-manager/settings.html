@@ -372,29 +372,6 @@
         white-space: nowrap;
       }
 
-      /* ── Session rows ───────────────────────────────── */
-      .session-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: var(--space-md) 0;
-        border-bottom: var(--border-width-thin) solid var(--border);
-        gap: var(--space-md);
-      }
-      .session-row:last-child {
-        border-bottom: none;
-      }
-      .session-device {
-        font-size: var(--font-size-sm);
-        font-weight: var(--font-weight-medium);
-        color: var(--color-text-primary);
-      }
-      .session-meta {
-        font-size: var(--font-size-xs);
-        color: var(--muted);
-        margin-top: 2px;
-      }
-
       /* ── Scrollable history ─────────────────────────── */
       .history-scroll {
         max-height: 210px;
@@ -886,29 +863,6 @@
                     </svg>
                     Farm Manager Panel
                   </button>
-                  <button
-                    class="nav-link"
-                    id="tab-security"
-                    data-bs-toggle="pill"
-                    data-bs-target="#pane-security"
-                    type="button"
-                    role="tab"
-                    aria-selected="false"
-                  >
-                    <svg
-                      width="15"
-                      height="15"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    >
-                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                    </svg>
-                    Security
-                  </button>
                 </nav>
               </div>
             </div>
@@ -1071,7 +1025,7 @@
                     <div class="scard-head">
                       <div class="scard-title">Profile</div>
                       <p class="scard-desc">
-                        Your admin account identity and display name
+                        Your Farm Manager account identity and display name
                       </p>
                     </div>
 
@@ -1555,94 +1509,6 @@
                 </div>
                 <!-- /pane-notifications -->
 
-                <!-- ════════════════════════════════════
-                             SECURITY
-                             ════════════════════════════════════ -->
-                <div
-                  class="tab-pane fade"
-                  id="pane-security"
-                  role="tabpanel"
-                  aria-labelledby="tab-security"
-                >
-                  <!-- 2FA + Session -->
-                  <div class="scard">
-                    <div class="scard-head">
-                      <div class="scard-title">Access Security</div>
-                      <p class="scard-desc">
-                        Two-factor authentication and session policies
-                      </p>
-                    </div>
-                    <div class="srow">
-                      <div class="srow-label">
-                        <div class="srow-title">Two-Factor Authentication</div>
-                        <div class="srow-desc">
-                          Require a verification code on each login
-                        </div>
-                      </div>
-                      <div class="srow-ctrl d-flex align-items-center gap-2">
-                        <span
-                          class="badge"
-                          style="
-                            background: var(--amber-bg);
-                            color: var(--amber);
-                          "
-                        >
-                          <span
-                            class="bdot"
-                            style="background: var(--amber-mid)"
-                          ></span
-                          >Not configured
-                        </span>
-                        <button
-                          class="btn btn-secondary btn-sm"
-                          onclick="
-                            utils.showToast(
-                              '2FA setup not available in this version',
-                              'warning',
-                            )
-                          "
-                        ><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Set Up</button>
-                      </div>
-                    </div>
-                    <div class="srow">
-                      <div class="srow-label">
-                        <div class="srow-title">Session Timeout</div>
-                        <div class="srow-desc">
-                          Automatically log out after a period of inactivity
-                        </div>
-                      </div>
-                      <div class="srow-ctrl">
-                        <select
-                          class="s-select"
-                          id="session-timeout"
-                          onchange="markUnsaved()"
-                        >
-                          <option value="30">30 minutes</option>
-                          <option value="60" selected>1 hour</option>
-                          <option value="240">4 hours</option>
-                          <option value="480">8 hours</option>
-                          <option value="0">Never</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Active sessions -->
-                  <div class="scard">
-                    <div class="scard-head">
-                      <div class="scard-title">Active Sessions</div>
-                      <p class="scard-desc">
-                        Devices currently signed in to your admin account
-                      </p>
-                    </div>
-
-                    <div id="session-list" class="card-scroll-region" tabindex="0" role="region" aria-label="Active sessions"></div>
-                    <p style="font-size:var(--font-size-xs);color:var(--color-text-tertiary);margin:var(--space-md) 0 0;">
-                      This panel shows the device you're currently using. PineVision doesn't yet track sign-ins across other devices or browsers.
-                    </p>
-                  </div>
-                </div>
-                <!-- /pane-security -->
               </div>
               <!-- /tab-content -->
             </div>
@@ -1672,65 +1538,7 @@
       window.initPage = function () {
         loadCurrentSettings();
         loadAccountInfo();
-        renderSessionList();
       };
-
-      function renderSessionList() {
-        const listEl = document.getElementById("session-list");
-        if (!listEl) return;
-
-        const session = auth.getSession();
-        const ua = navigator.userAgent || "";
-
-        function detectBrowser(ua) {
-          if (/Edg\//.test(ua)) return "Edge";
-          if (/OPR\//.test(ua)) return "Opera";
-          if (/Chrome\//.test(ua) && !/Chromium/.test(ua)) return "Chrome";
-          if (/Firefox\//.test(ua)) return "Firefox";
-          if (/Safari\//.test(ua) && !/Chrome/.test(ua)) return "Safari";
-          return "Unknown browser";
-        }
-
-        function detectOS(ua) {
-          if (/Windows/.test(ua)) return "Windows";
-          if (/Mac OS X/.test(ua)) return "macOS";
-          if (/Android/.test(ua)) return "Android";
-          if (/iPhone|iPad|iPod/.test(ua)) return "iOS";
-          if (/Linux/.test(ua)) return "Linux";
-          return "Unknown device";
-        }
-
-        const deviceLabel = detectBrowser(ua) + " on " + detectOS(ua);
-        const who = session
-          ? session.fullName || session.username || "This account"
-          : "This account";
-
-        listEl.innerHTML = "";
-
-        const row = document.createElement("div");
-        row.className = "session-row";
-
-        const left = document.createElement("div");
-        const deviceDiv = document.createElement("div");
-        deviceDiv.className = "session-device";
-        deviceDiv.textContent = deviceLabel;
-        const metaDiv = document.createElement("div");
-        metaDiv.className = "session-meta";
-        metaDiv.textContent = who + " · Signed in this browser";
-        left.appendChild(deviceDiv);
-        left.appendChild(metaDiv);
-
-        const badge = document.createElement("span");
-        badge.className = "badge good";
-        const bdot = document.createElement("span");
-        bdot.className = "bdot";
-        badge.appendChild(bdot);
-        badge.appendChild(document.createTextNode("Current"));
-
-        row.appendChild(left);
-        row.appendChild(badge);
-        listEl.appendChild(row);
-      }
 
       function loadCurrentSettings() {
         const settings = utils.getSettings();
@@ -1770,7 +1578,6 @@
         { id: "sev-info", type: "checked" },
         { id: "digest-freq", type: "value" },
         { id: "quiet-hours", type: "checked" },
-        { id: "session-timeout", type: "value" },
       ];
 
       function restoreNotificationPreferences() {
