@@ -1,0 +1,30 @@
+{
+  "version": 2,
+  "outputDirectory": "frontend",
+  "rewrites": [
+    {
+      "source": "/",
+      "destination": "/pages/index.html"
+    },
+    {
+      "source": "/index.html",
+      "destination": "/pages/index.html"
+    },
+    {
+      "source": "/admin/:path*",
+      "destination": "/pages/admin/:path*"
+    },
+    {
+      "source": "/client/:path*",
+      "destination": "/pages/client/:path*"
+    },
+    {
+      "source": "/farm-manager/:path*",
+      "destination": "/pages/farm-manager/:path*"
+    },
+    {
+      "source": "/frontend/:path*",
+      "destination": "/:path*"
+    }
+  ]
+}
