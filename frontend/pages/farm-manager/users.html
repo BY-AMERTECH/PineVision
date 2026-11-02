@@ -1536,6 +1536,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 
+    <script src="../../js/backend-config.js"></script>
     <script src="../../js/auth.js"></script>
     <script src="../../js/data.js"></script>
     <script src="../../js/utils.js"></script>
@@ -1611,6 +1612,7 @@
 
       async function apiCall(method, path, body) {
         const token = await getAuthToken();
+        const apiBase = (window.PINEVISION_API_BASE || "").replace(/\/$/, "");
         const options = {
           method: method,
           headers: {
@@ -1619,7 +1621,7 @@
           },
         };
         if (body !== undefined) options.body = JSON.stringify(body);
-        const resp = await fetch(path, options);
+        const resp = await fetch(apiBase + path, options);
         const data = await resp.json();
         if (!resp.ok) throw new Error(data.error || "Request failed");
         return data;
