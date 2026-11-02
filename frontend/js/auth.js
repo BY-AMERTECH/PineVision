@@ -79,6 +79,8 @@ var auth = (function () {
 
         if (remember) {
             localStorage.setItem(REMEMBER_KEY, JSON.stringify(sessionData));
+        } else {
+            localStorage.removeItem(REMEMBER_KEY);
         }
     }
 
@@ -212,6 +214,13 @@ var auth = (function () {
                 email = userData.email;
                 console.log('Found email:', email);
             }
+
+            // Match Firebase's persistence to the Remember me choice.
+            await firebaseAuth.setPersistence(
+                remember
+                    ? firebase.auth.Auth.Persistence.LOCAL
+                    : firebase.auth.Auth.Persistence.SESSION
+            );
 
             // Now sign in with email and password
             const userCredential = await firebaseAuth.signInWithEmailAndPassword(email, password);
@@ -353,7 +362,7 @@ var auth = (function () {
     }
 
     async function requestPasswordReset(identifier) {
-        const response = await fetch('/api/auth/password-reset', {
+        const response = await fetch(`${window.PINEVISION_API_BASE || ''}/api/auth/password-reset`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ identifier: identifier })
