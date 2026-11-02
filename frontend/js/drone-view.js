@@ -14,7 +14,7 @@
 
 // ── Constants ─────────────────────────────────────────────────
 
-const API_BASE         = '';
+const API_BASE         = (window.PINEVISION_API_BASE || '').replace(/\/$/, '');
 const POLL_INTERVAL_MS = 5_000;
 const MAX_RECONNECT    = 3;
 
