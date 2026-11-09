@@ -1282,8 +1282,6 @@
             l.action.startsWith("delete")
           );
         }).length;
-        var activeSess = ACTIVE_SESSIONS.length;
-
         var colorMap = {
           green: { fg: "var(--green)", bg: "var(--green-bg)" },
           amber: { fg: "var(--amber)", bg: "var(--amber-bg)" },
@@ -1313,15 +1311,6 @@
             trend: failed > 0 ? "dn" : "up",
             trendTxt: failed > 0 ? "Monitor IPs" : "No failures",
             icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
-          },
-          {
-            label: "Active Sessions",
-            value: activeSess,
-            sub: "Currently online",
-            color: activeSess > 0 ? "green" : "",
-            trend: activeSess > 0 ? "up" : "fl",
-            trendTxt: activeSess > 0 ? "Live now" : "No sessions",
-            icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>',
           },
           {
             label: "Login Attempts",
