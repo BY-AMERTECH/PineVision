@@ -1089,6 +1089,7 @@
       var EXTENDED_LOGS = [];
 
       var ACTIVE_SESSIONS = [];
+      var SESSION_LOGS = [];
 
       /* ── State ─────────────────────────────────────────────────── */
       var allLogs = [];
@@ -1106,6 +1107,33 @@
             .orderBy("timestamp", "desc")
             .limit(50)
             .get();
+
+          // Session status must use the complete login/logout history rather
+          // than only the 50 rows shown in the recent activity window.
+          const sessionSnapshot = await firebase
+            .firestore()
+            .collection("activity_logs")
+            .where("action", "in", ["login", "logout"])
+            .get();
+          SESSION_LOGS = [];
+          sessionSnapshot.forEach(function (doc) {
+            const data = doc.data();
+            const rawTimestamp = data.timestamp;
+            const sessionDate = rawTimestamp && typeof rawTimestamp.toDate === "function"
+              ? rawTimestamp.toDate()
+              : rawTimestamp ? new Date(rawTimestamp) : null;
+            if (!sessionDate || !Number.isFinite(sessionDate.getTime())) return;
+            SESSION_LOGS.push({
+              user: data.user || data.email || "unknown",
+              userId: data.userId || null,
+              email: data.email || null,
+              role: data.role || "client",
+              action: data.action,
+              status: data.status || "success",
+              device: data.device || "Unknown",
+              timestamp: sessionDate.toISOString(),
+            });
+          });
 
           EXTENDED_LOGS = [];
           var idCounter = 1;
@@ -1164,6 +1192,7 @@
         } catch (error) {
           console.error("❌ Error loading activity logs:", error);
           allLogs = [];
+          SESSION_LOGS = [];
           updateTimestamp();
           loadStats();
           loadCharts();
@@ -1674,9 +1703,8 @@
       }
 
       /* ── Sessions ──────────────────────────────────────────────── */
-      // Derived from real login/logout events already present in the
-      // loaded activity_logs window (allLogs), rather than a fabricated
-      // single-row session with an invented IP. For each user, the most
+      // Derived from the full login/logout history, separately from the
+      // limited recent activity list. For each user, the most
       // recent auth event is checked: a "login" with no later "logout"
       // in the window is treated as still signed in. The signed-in admin
       // themselves is marked "Live"; everyone else is shown honestly as
@@ -1685,15 +1713,16 @@
       function renderSessions() {
         var currentUser = auth.getCurrentUser();
 
-        var authEvents = allLogs.filter(function (l) {
+        var authEvents = (SESSION_LOGS.length ? SESSION_LOGS : allLogs).filter(function (l) {
           return l.action === "login" || l.action === "logout";
         });
 
         var latestByUser = {};
         authEvents.forEach(function (l) {
-          var existing = latestByUser[l.user];
+          var sessionKey = l.userId || l.email || l.user;
+          var existing = latestByUser[sessionKey];
           if (!existing || new Date(l.timestamp) > new Date(existing.timestamp)) {
-            latestByUser[l.user] = l;
+            latestByUser[sessionKey] = l;
           }
         });
 
@@ -1706,13 +1735,13 @@
           })
           .map(function (l) {
             return {
-              id: l.user + "_" + l.timestamp,
+              id: (l.userId || l.email || l.user) + "_" + l.timestamp,
               user: l.user,
               role: l.role,
               device: l.device && l.device !== "Unknown" ? l.device : "Unknown device",
               login_at: l.timestamp,
               last_active: l.timestamp,
-              isCurrent: !!(currentUser && (l.user === currentUser.username || l.user === currentUser.email)),
+              isCurrent: !!(currentUser && (l.userId === currentUser.uid || l.user === currentUser.username || l.user === currentUser.email)),
             };
           })
           .sort(function (a, b) {
@@ -1724,7 +1753,7 @@
 
         if (!ACTIVE_SESSIONS.length) {
           document.getElementById("sessions-list").innerHTML =
-            '<p style="font-size:var(--font-size-xs);color:var(--color-text-tertiary);margin:0;">No login activity in the recent audit log.</p>';
+            '<p style="font-size:var(--font-size-xs);color:var(--color-text-tertiary);margin:0;">No open login sessions found.</p>';
           return;
         }
 
