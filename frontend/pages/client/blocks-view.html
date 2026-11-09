@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <link rel="icon" type="image/svg+xml" href="../../assets/images/pinevision-logo.svg" />
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
@@ -18,8 +19,6 @@
       })();
     </script>
     <title>Block Detail - PineVision</title>
-    <link rel="icon" type="image/x-icon" href="/frontend/assets/images/pinevision-favicon.ico" />
-    <link rel="icon" type="image/webp" sizes="64x64" href="/frontend/assets/images/pinevision-favicon.webp" />
     <link rel="apple-touch-icon" sizes="180x180" href="/frontend/assets/images/pinevision-touch-icon.png" />
 
     <link rel="stylesheet" href="../../bootstrap/css/bootstrap.min.css" />
@@ -56,6 +55,7 @@
 
       /* ── Page Header ──────────────────────────────────────── */
       .block-page-header {
+        position: relative;
         display: flex;
         justify-content: space-between;
         align-items: flex-start;
@@ -67,6 +67,8 @@
       /* Stack back button above block identity vertically */
       .block-header-left {
         display: flex;
+        flex: 1 1 auto;
+        min-width: 0;
         flex-direction: column;
         align-items: flex-start;
         gap: var(--space-sm);
@@ -178,6 +180,32 @@
       .trend-compact-card .thead-row { flex-wrap: wrap; gap: var(--space-md); }
       .trend-compact-card .thead-row > .d-flex { flex-wrap: wrap; min-width: 0; }
       .trend-compact-card .trend-actions { margin-left: auto; flex-shrink: 0; }
+      .block-header-left > div:last-child { width:100%; min-width:0; }
+      .recent-scan-row { display:flex; flex:0 0 100%; order:1; align-items:center; width:100%; min-height:28px; gap:8px; margin-top:-6px; }
+      .metric-card-tooltip { position:absolute; z-index:10; left:10px; right:10px; bottom:calc(100% + 8px); display:none; padding:9px 11px; border-radius:var(--radius-sm); background:#17231b; color:#fff; font-size:12px; font-weight:400; line-height:1.4; box-shadow:0 5px 16px rgba(0,0,0,.2); }
+      .mcard { overflow:visible; }
+      .mcard:focus .metric-card-tooltip, .mcard:hover .metric-card-tooltip { display:block; }
+      .mcard:focus-visible { outline:2px solid var(--green); outline-offset:2px; }
+      .scan-history-trend { padding:20px; border:1px solid #e4ebe5; border-radius:16px; background:linear-gradient(145deg,#fff 0%,#f8fbf8 100%); box-shadow:0 5px 18px rgba(31,68,43,.06); }
+      .scan-trend-header { display:flex; justify-content:space-between; align-items:center; gap:14px; margin-bottom:10px; }
+      .scan-trend-eyebrow { color:var(--green); font-size:10px; font-weight:700; letter-spacing:.1em; }
+      .scan-trend-header h3 { margin:3px 0 2px; color:var(--color-text-primary); font-size:var(--font-size-md); font-weight:700; }
+      .scan-trend-header p { margin:0; color:var(--muted); font-size:var(--font-size-xs); }
+      .scan-trend-count { flex:0 0 auto; padding:6px 11px; border:1px solid #dcebe0; border-radius:999px; background:#eff7f1; color:#287247; font-size:12px; font-weight:700; }
+      .scan-trend-chart { overflow:hidden; border-radius:12px; background:rgba(255,255,255,.72); }
+      .scan-trend-chart svg { display:block; width:100%; height:auto; }
+      .scan-trend-legend { display:flex; justify-content:center; flex-wrap:wrap; gap:20px; padding:10px 0 14px; color:#46564a; font-size:12px; }
+      .scan-trend-legend span { display:inline-flex; align-items:center; gap:7px; }
+      .scan-trend-legend i { width:20px; height:3px; border-radius:4px; background:var(--series-color); }
+      .scan-trend-results { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:9px; }
+      .scan-trend-result { padding:10px 12px; border:1px solid #e5ece6; border-radius:11px; background:#fff; }
+      .scan-trend-date { display:flex; justify-content:space-between; gap:8px; margin-bottom:8px; color:#344239; font-size:12px; }
+      .scan-trend-date span { color:var(--muted); font-weight:400; }
+      .scan-trend-values { display:flex; flex-wrap:wrap; gap:7px; }
+      .scan-trend-values span { display:inline-flex; gap:5px; padding:5px 7px; border-radius:7px; font-size:11px; }
+      .scan-trend-bearing { background:#eff7f1; color:#287247; }
+      .scan-trend-nonbearing { background:#fff6e5; color:#946400; }
+      @media (max-width: 600px) { .scan-history-trend { padding:14px; } .scan-trend-header { align-items:flex-start; } .scan-trend-chart svg { min-width:680px; } .scan-trend-chart { overflow-x:auto; } }
       .trend-view-hint {
         font-size: var(--font-size-xs);
         color: var(--muted);
@@ -601,7 +629,6 @@
                   <div id="detail-badge"></div>
                 </div>
                 <div class="block-page-subtitle" id="detail-subtitle"></div>
-                <div id="detail-recent-scan"></div>
               </div>
             </div>
             <!-- Right: action buttons -->
@@ -647,6 +674,9 @@
                 New Scan
               </a>
             </div>
+            <div class="recent-scan-row">
+              <div id="detail-recent-scan"></div>
+            </div>
           </div>
 
           <!-- Metric Cards: Estimated Total, Bearing, Non-Bearing, Discolored -->
@@ -654,7 +684,6 @@
             class="row row-cols-2 row-cols-md-4 g-3 mb-4"
             id="metric-cards-row"
           ></div>
-
           <!-- Field Info Cards (two side-by-side) -->
           <div class="row g-3 mb-4" id="field-info-row"></div>
 
@@ -672,6 +701,7 @@
                 <button type="button" class="btn btn-sm btn-navigation" onclick="openTrendModal()"><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg> View History <svg class="btn-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>
               </div>
             </div>
+            <div class="mb-4" id="block-bearing-trend" aria-label="Bearing results by scan"></div>
           </div>
 
           <!-- Fruit Condition Breakdown -->
@@ -1060,7 +1090,7 @@
       // ── Render ───────────────────────────────────────────────────────
 
       function renderPage(block) {
-        const statusClass = getStatusClass(block.bearing);
+        const statusClass = getStatusClass(block);
 
         document.getElementById("detail-title").textContent =
           block.blockName || "Block " + block.blockId;
@@ -1082,6 +1112,19 @@
         renderMetricCards(block);
         renderFieldInfo(block);
         renderConditionBreakdown(block);
+        renderBearingTrend(block.id, currentUserId);
+      }
+
+      async function renderBearingTrend(blockId, userId) {
+        const container = document.getElementById("block-bearing-trend");
+        container.innerHTML = '<div class="scan-history-empty">Loading scan trend…</div>';
+        try {
+          const history = await blockScanHistory.load(blockId, userId, true);
+          blockScanHistory.renderTrend(history, container);
+        } catch (error) {
+          console.error("❌ Error loading scan trend:", error);
+          container.innerHTML = '<div class="scan-history-empty">Could not load scan trend.</div>';
+        }
       }
 
       function getDisplayedResultCounts(block) {
@@ -1272,15 +1315,17 @@
       }
       // ── Helper Functions ─────────────────────────────────────────
 
-      function getStatusClass(bearing) {
+      function getStatusClass(block) {
+        const bearing = Number(block.bearing) || 0;
+        if (!block.totalScans && bearing === 0 && !(Number(block.nonbearing) || 0) && !(Number(block.nonViable) || 0)) return "none";
         if (bearing >= 80) return "good";
         if (bearing >= 60) return "warn";
         return "crit";
       }
 
       function statusBadge(status) {
-        const labels = { good: "Healthy", warn: "Watch", crit: "Critical" };
-        const colors = { good: "good", warn: "warn", crit: "crit" };
+        const labels = { good: "Healthy", warn: "Watch", crit: "Critical", none: "No Scan Data" };
+        const colors = { good: "good", warn: "warn", crit: "crit", none: "secondary" };
         return (
           '<span class="badge ' +
           colors[status] +
@@ -1292,17 +1337,28 @@
 
       function buildMetricCard(label, value, sub, color) {
         const colorClass = color ? "mc-" + color : "";
+        const metricDescriptions = {
+          "Estimated Plant Count": ["estimated-plant-count", "Bearing plus non-bearing plants from the latest completed scan."],
+          "Bearing": ["bearing", "Plants currently producing fruit."],
+          "Non-Bearing": ["non-bearing", "These plants are alive but are not currently producing fruit."],
+          "Non-Viable": ["non-viable", "Detected plants classified as unhealthy or unusable."]
+        };
+        const metricHelp = metricDescriptions[label];
+        const helpAttributes = metricHelp ? `tabindex="0" aria-describedby="metric-help-${metricHelp[0]}"` : "";
+        const helpTooltip = metricHelp ? `<span id="metric-help-${metricHelp[0]}" class="metric-card-tooltip" role="tooltip">${metricHelp[1]}</span>` : "";
 
         // No progress bars at all
         return `
         <div class="col">
-            <div class="mcard ${colorClass}">
+            <div class="mcard ${colorClass}" ${helpAttributes}>
                 <div class="mc-label">${label}</div>
                 <div class="mc-val">${value}</div>
                 <div class="mc-sub">${sub}</div>
+                ${helpTooltip}
             </div>
         </div>`;
       }
+
 
       function buildInlineBar(percent, color) {
         return `<div class="bar-wrap"><div class="bar-fill" style="width:${percent}%;background:${color};"></div></div><div class="bar-label">${percent.toFixed(1)}%</div>`;

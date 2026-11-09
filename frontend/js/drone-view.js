@@ -712,7 +712,7 @@ async function apiUploadVideo(formData) {
     const resp = await fetch(`${API_BASE}/api/drone/upload-video`, {
         method: 'POST',
         body:   formData,
-        signal: AbortSignal.timeout(120_000),
+        signal: AbortSignal.timeout(900_000),
     });
     if (!resp.ok) {
         let msg = `Server error (HTTP ${resp.status})`;
@@ -1580,6 +1580,36 @@ function validateRtmpUrl(url) {
     return typeof url === 'string' && /^rtmp:\/\/.+/.test(url) && url.length > 10;
 }
 
+async function copyRtmpUrl() {
+    const input = document.getElementById('input-rtmp-url');
+    const value = input?.value.trim();
+    if (!value) {
+        utils.showToast('Enter an RTMP URL before copying it.', 'info');
+        return;
+    }
+
+    try {
+        if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(value);
+        } else {
+            const temporaryInput = document.createElement('textarea');
+            temporaryInput.value = value;
+            temporaryInput.setAttribute('readonly', '');
+            temporaryInput.style.position = 'fixed';
+            temporaryInput.style.left = '-9999px';
+            document.body.appendChild(temporaryInput);
+            temporaryInput.select();
+            const copied = document.execCommand('copy');
+            temporaryInput.remove();
+            if (!copied) throw new Error('Clipboard copy was rejected');
+        }
+        utils.showToast('RTMP URL copied.', 'success');
+    } catch (error) {
+        console.error('❌ Could not copy RTMP URL:', error);
+        utils.showToast('Could not copy the RTMP URL. Select and copy it manually.', 'error');
+    }
+}
+
 // ── Modal Event Wiring ────────────────────────────────────────
 
 function setupModalEvents() {
@@ -1594,6 +1624,8 @@ function setupModalEvents() {
     });
     document.getElementById('btn-connect-submit')
         .addEventListener('click', handleConnect);
+    document.getElementById('btn-copy-rtmp-url')
+        .addEventListener('click', copyRtmpUrl);
     document.getElementById('btn-start-counting')
         .addEventListener('click', handleStartCounting);
     document.getElementById('input-rtmp-url')

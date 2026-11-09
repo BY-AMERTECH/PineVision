@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <link rel="icon" type="image/svg+xml" href="../../assets/images/pinevision-logo.svg" />
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
@@ -18,8 +19,6 @@
       })();
     </script>
     <title>Settings - PineVision</title>
-    <link rel="icon" type="image/x-icon" href="/frontend/assets/images/pinevision-favicon.ico" />
-    <link rel="icon" type="image/webp" sizes="64x64" href="/frontend/assets/images/pinevision-favicon.webp" />
     <link rel="apple-touch-icon" sizes="180x180" href="/frontend/assets/images/pinevision-touch-icon.png" />
 
     <!-- CSS: Bootstrap first, then custom overrides -->
@@ -626,26 +625,31 @@
             } else if (userData.lastName) {
               fullName = userData.lastName;
             } else {
-              fullName = userData.email || "User";
+              fullName = userData.email || "Operator";
             }
 
             // Get role
             const role = userData.role || "client";
+            const roleLabels = {
+              admin: "Super Admin",
+              farm_manager: "Farm Manager",
+              client: "Operator",
+            };
+            const roleLabel = roleLabels[role] || role;
 
             // Display in settings page
             document.getElementById("current-username").textContent = fullName;
-            document.getElementById("current-role").textContent =
-              role.charAt(0).toUpperCase() + role.slice(1);
+            document.getElementById("current-role").textContent = roleLabel;
 
             // Update sidebar user info
-            updateSidebarUserInfo(fullName, role);
+            updateSidebarUserInfo(fullName, roleLabel);
 
-            console.log("✅ User info loaded:", fullName, role);
+            console.log("✅ Operator info loaded:", fullName, role);
           } else {
-            console.warn("⚠️ User document not found");
+            console.warn("⚠️ Operator document not found");
             document.getElementById("current-username").textContent =
-              currentUser.email || "User";
-            document.getElementById("current-role").textContent = "User";
+              currentUser.email || "Operator";
+            document.getElementById("current-role").textContent = "Operator";
           }
         } catch (error) {
           console.error("❌ Error loading account info:", error);

@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <link rel="icon" type="image/svg+xml" href="../../assets/images/pinevision-logo.svg" />
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script>
@@ -15,8 +16,6 @@
       })();
     </script>
     <title>Reports - PineVision</title>
-    <link rel="icon" type="image/x-icon" href="/frontend/assets/images/pinevision-favicon.ico" />
-    <link rel="icon" type="image/webp" sizes="64x64" href="/frontend/assets/images/pinevision-favicon.webp" />
     <link rel="apple-touch-icon" sizes="180x180" href="/frontend/assets/images/pinevision-touch-icon.png" />
 
     <!-- CSS: Bootstrap first, then custom overrides -->
@@ -445,7 +444,7 @@
                 <div class="report-subtitle" id="report-subtitle-text"></div>
               </div>
               <div class="export-actions">
-                <button class="btn-export btn btn-primary" title="Download this report as CSV" onclick="exportReportCSV()"><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg> <span>Export CSV</span></button>
+                <button class="btn-export btn btn-primary" title="Download this report as an Excel workbook" onclick="exportReportExcel()"><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg> <span>Export Excel</span></button>
               </div>
             </div>
 
@@ -527,7 +526,7 @@
       let BLOCKS_RAW = [];  // [{id, blockName, section, stage, daf, area, bearing, nonbearing, nonViable, plants}]
       let SCANS_RAW = [];   // [{id, blockId, startTime}]
       let dataReady = false;
-      let CURRENT_REPORT_BLOCKS = [];  // last filtered set rendered by generateReport(), used by exportReportCSV()
+      let CURRENT_REPORT_BLOCKS = [];  // last filtered set rendered by generateReport(), used by exportReportExcel()
 
       window.initPage = function () {
         const today = new Date();
@@ -569,14 +568,17 @@
                 id: doc.id,
                 activeCycleId: d.activeCycleId || null,
                 blockName: d.blockName || d.blockId || doc.id,
-                section: d.section || "—",
+                section: d.section && String(d.section).trim() ? String(d.section).trim() : "N/A",
                 stage: d.stage || "—",
                 daf: typeof d.daf === "number" ? d.daf : parseInt(d.daf, 10) || 0,
                 area: typeof d.area === "number" ? d.area : parseFloat(d.area) || 0,
                 bearing: d.bearingPercent || 0,
                 nonbearing: d.nonBearingPercent || 0,
                 nonViable: d.nonViable || 0,
-                plants: 0,
+                plants: typeof d.totalPineapples === "number" ? d.totalPineapples : null,
+                bearingCount: null,
+                nonbearingCount: null,
+                nonViableCount: null,
                 totalScans: d.totalScans || 0,
               });
             });
@@ -587,14 +589,25 @@
                 .where("userId", "==", currentUser.uid)
                 .get();
             }));
-            const latestCounts = blockScanHistory.latestPlantCountsFromSnapshots(
-              BLOCKS_RAW.map((block) => block.id),
-              scanSnapshots,
-              currentUser.uid,
-              Object.fromEntries(BLOCKS_RAW.map((block) => [block.id, block.activeCycleId])),
-            );
             BLOCKS_RAW.forEach(function (block) {
-              block.plants = latestCounts.get(block.id) || 0;
+              const history = [];
+              const blockSnapshot = scanSnapshots[BLOCKS_RAW.findIndex((item) => item.id === block.id)];
+              blockSnapshot.forEach(function (doc) {
+                const data = doc.data() || {};
+                const date = data.startTime && typeof data.startTime.toDate === "function"
+                  ? data.startTime.toDate()
+                  : null;
+                if (date) history.push({ id: doc.id, date: date, data: data });
+              });
+              const cycleHistory = block.activeCycleId
+                ? history.filter((scan) => scan.data.cycleId === block.activeCycleId)
+                : history;
+              const latestResult = blockScanHistory.latestCompletedResult(cycleHistory, block.activeCycleId);
+              if (latestResult) {
+                block.bearingCount = latestResult.bearing;
+                block.nonbearingCount = latestResult.nonBearing;
+                block.nonViableCount = latestResult.nonViable;
+              }
             });
 
             SCANS_RAW = [];
@@ -678,11 +691,8 @@
         results.scrollIntoView({ behavior: "smooth", block: "start" });
       }
 
-      /* ── Export CSV ────────────────────────────────────────────────
-       * Reuses the same Blob/createObjectURL pattern as
-       * admin/activity.html's exportCSV() — exports the report table
-       * exactly as currently filtered/generated. */
-      function exportReportCSV() {
+      /* ── Export Excel workbook ──────────────────────────────────── */
+      function exportReportExcel() {
         if (!CURRENT_REPORT_BLOCKS.length) {
           utils.showToast("Generate a report first.", "info");
           return;
@@ -693,6 +703,10 @@
             "Section",
             "Days After Flowering",
             "Area (ha)",
+            "Estimated Plant Count",
+            "Bearing",
+            "Non-Bearing",
+            "Non-Viable",
             "Bearing %",
             "Non-Bearing %",
             "Non-Viable %",
@@ -701,24 +715,21 @@
         ];
         CURRENT_REPORT_BLOCKS.forEach((block) => {
           rows.push([
-            '"' + (block.blockName || "").replace(/"/g, '""') + '"',
-            '"' + (block.section || "").replace(/"/g, '""') + '"',
-            block.daf,
-            block.area,
-            block.bearing.toFixed(1),
-            block.nonbearing.toFixed(1),
-            block.nonViable.toFixed(1),
-            statusLabel(blockStatusClass(block)),
+            block.blockName || "N/A",
+            block.section || "N/A",
+            block.daf || "N/A",
+            block.area || "N/A",
+            block.plants || "N/A",
+            block.bearingCount ?? "N/A",
+            block.nonbearingCount ?? "N/A",
+            block.nonViableCount ?? "N/A",
+            block.plants != null ? block.bearing.toFixed(1) : "N/A",
+            block.plants != null ? block.nonbearing.toFixed(1) : "N/A",
+            block.plants != null ? block.nonViable.toFixed(1) : "N/A",
+            statusLabel(blockStatusClass(block)) || "N/A",
           ]);
         });
-        const csv = rows.map((r) => r.join(",")).join("\n");
-        const blob = new Blob([csv], { type: "text/csv" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "pinevision-report-" + new Date().toISOString().slice(0, 10) + ".csv";
-        a.click();
-        URL.revokeObjectURL(url);
+        blockScanHistory.downloadRowsXlsx(rows, "pinevision-report-" + new Date().toISOString().slice(0, 10) + ".xlsx", "Farm Report");
         utils.showToast("Exported " + CURRENT_REPORT_BLOCKS.length + " block" + (CURRENT_REPORT_BLOCKS.length !== 1 ? "s" : ""), "success");
       }
 
@@ -729,7 +740,7 @@
           return;
         }
 
-        const totalPlants = blocks.reduce((s, b) => s + b.plants, 0);
+        const totalPlants = blocks.reduce((s, b) => s + (b.plants || 0), 0);
         const avgBearing =
           blocks.reduce((s, b) => s + b.bearing, 0) / blocks.length;
         const avgNonbearing =

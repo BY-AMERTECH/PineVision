@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <link rel="icon" type="image/svg+xml" href="../../assets/images/pinevision-logo.svg" />
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
@@ -18,8 +19,6 @@
       })(); 
     </script>
     <title>Audit Logs - PineVision</title>
-    <link rel="icon" type="image/x-icon" href="/frontend/assets/images/pinevision-favicon.ico" />
-    <link rel="icon" type="image/webp" sizes="64x64" href="/frontend/assets/images/pinevision-favicon.webp" />
     <link rel="apple-touch-icon" sizes="180x180" href="/frontend/assets/images/pinevision-touch-icon.png" />
     <link rel="stylesheet" href="../../bootstrap/css/bootstrap.min.css" />
     <link rel="stylesheet" href="../../css/tokens.css" />
@@ -270,7 +269,7 @@
         color: var(--red);
       }
 
-      /* ─── User Cell ───────────────────────────────────────────── */
+      /* ─── Operator Cell ───────────────────────────────────────────── */
       .log-avatar {
         width: 26px;
         height: 26px;
@@ -733,7 +732,7 @@
             <div class="nav-section-title">Monitoring</div>
             <ul class="nav-links">
               <li>
-                <a href="users.html" class="nav-link" data-tooltip="Users">
+                <a href="users.html" class="nav-link" data-tooltip="Operators">
                   <span class="nav-link-icon"
                     ><img
                       src="/frontend/assets/icons/nav-users.svg"
@@ -741,7 +740,7 @@
                       width="18"
                       height="18"
                   /></span>
-                  <span class="nav-link-text">Users</span>
+                  <span class="nav-link-text">Operators</span>
                 </a>
               </li>
               <li>
@@ -1044,7 +1043,7 @@
                     <thead>
                       <tr>
                         <th style="width: 145px">Timestamp</th>
-                        <th style="width: 120px">User</th>
+                        <th style="width: 120px">Operator</th>
                         <th>Action</th>
                       </tr>
                     </thead>
@@ -1198,12 +1197,12 @@
           action === "logout"
         )
           return "Authentication";
-        if (action.startsWith("view_user")) return "User Management";
+        if (action.startsWith("view_user")) return "Operator Management";
         if (
           action.startsWith("update_user") ||
           action.startsWith("create_user")
         )
-          return "User Management";
+          return "Operator Management";
         if (action.startsWith("view_dashboard")) return "Dashboard";
         if (action.startsWith("view_blocks")) return "Blocks";
         if (action.startsWith("view_scans")) return "Scan Operations";
@@ -1235,7 +1234,7 @@
           );
         }
         if (data.action.startsWith("update_user")) {
-          return "Updated user account";
+          return "Updated operator account";
         }
         return data.action.replace(/_/g, " ");
       }
@@ -1611,12 +1610,12 @@
           logout: "← Logout",
           login_failed: "✕ Failed Login",
           view_dashboard: "👁 Dashboard",
-          view_users: "👁 Users",
+          view_users: "👁 Operators",
           view_blocks: "👁 Blocks",
           view_scan: "👁 Scan",
           view_alerts: "👁 Alerts",
-          update_user: "✎ Update User",
-          create_user: "+ Create User",
+          update_user: "✎ Update Operator",
+          create_user: "+ Create Operator",
           upload_scan: "↑ Upload Scan",
           generate_report: "⊞ Report",
         };
@@ -1888,7 +1887,7 @@
               log.details +
               "</span>",
           ) +
-          '<div class="det-section">User & Session</div>' +
+          '<div class="det-section">Operator & Session</div>' +
           detRow("Username", "<strong>" + log.user + "</strong>") +
           detRow(
             "Role",
@@ -1896,7 +1895,7 @@
               ? '<span style="color:var(--amber);font-weight:var(--font-weight-medium);">Administrator</span>'
               : log.user === "unknown"
                 ? '<span style="color:var(--red);">Unknown / Unauthenticated</span>'
-                : "User",
+                : "Operator",
           ) +
           detRow("IP Address", ipHtml) +
           detRow(

@@ -263,6 +263,87 @@ window.blockScanHistory = (function () {
             ordered.map(function (entry) { return scanMarkup(entry, cycles); }).join('') + '</div>';
     }
 
+    function renderTrend(history, container) {
+        const ordered = (history || []).slice().sort(function (a, b) { return a.date - b.date; });
+        const completedCount = ordered.filter(function (entry) { return getStatus(entry.data) === 'Completed'; }).length;
+        const markup = historyTrendMarkup(ordered);
+        container.innerHTML = markup || `<div class="scan-history-empty">${completedCount ? completedCount + ' completed ' + (completedCount === 1 ? 'scan has' : 'scans have') + ' no bearing classification results to compare yet.' : 'Bearing results will appear here after a completed scan.'}</div>`;
+    }
+
+    function historyTrendMarkup(ordered) {
+        const completed = ordered.filter(function (entry) {
+            return getStatus(entry.data) === 'Completed';
+        });
+        const points = completed.map(function (entry, index) {
+            const bearing = metric(entry.data, 'bearing');
+            const nonBearing = metric(entry.data, 'nonBearing');
+            const denominator = bearing === null || nonBearing === null ? 0 : bearing + nonBearing;
+            return denominator > 0 ? {
+                date: entry.date,
+                scanNumber: index + 1,
+                monthIndex: entry.date.getMonth(),
+                bearing: bearing,
+                nonBearing: nonBearing,
+                nonViable: metric(entry.data, 'nonViable'),
+                bearingPercent: bearing / denominator * 100,
+                nonBearingPercent: nonBearing / denominator * 100,
+            } : null;
+        }).filter(Boolean);
+        if (!points.length) return '';
+        const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        const monthlyCounts = Array(12).fill(0);
+        points.forEach(function (point) { monthlyCounts[point.monthIndex]++; });
+        const monthlyPositions = Array(12).fill(0);
+        points.forEach(function (point) {
+            const position = monthlyPositions[point.monthIndex]++;
+            point.monthFraction = (position + 1) / (monthlyCounts[point.monthIndex] + 1);
+        });
+        points.forEach(function (point, index) {
+            const previous = points[index - 1];
+            point.periodLabel = previous
+                ? Math.round((point.date - previous.date) / 86400000) + ' days since previous scan'
+                : 'First scan in this history';
+            point.tooltip = [
+                'Scan ' + point.scanNumber + ' · ' + formatDateTime(point.date),
+                point.periodLabel,
+                'Bearing: ' + formatCount(point.bearing) + ' plants (' + point.bearingPercent.toFixed(1) + '%)',
+                'Non-bearing: ' + formatCount(point.nonBearing) + ' plants (' + point.nonBearingPercent.toFixed(1) + '%)',
+                point.nonViable === null ? 'Non-viable: unavailable' : 'Non-viable: ' + formatCount(point.nonViable) + ' plants',
+            ].join(' · ');
+        });
+        const width = 1200, height = 320, left = 72, right = 28, top = 36, bottom = 72;
+        const plotWidth = width - left - right, plotHeight = height - top - bottom;
+        const x = function (monthIndex, fraction) { return left + (monthIndex + fraction) * plotWidth / 12; };
+        const y = function (value) { return top + (100 - value) * plotHeight / 100; };
+        const ticks = [0, 25, 50, 75, 100].map(function (value) {
+            return `<line x1="${left}" y1="${y(value)}" x2="${width-right}" y2="${y(value)}" stroke="#e1e7e2"/><text x="${left-10}" y="${y(value)+4}" text-anchor="end" font-size="11" fill="#68756b">${value}%</text>`;
+        }).join('');
+        const series = [
+            { key: 'bearingPercent', label: 'Bearing', color: '#2f8f5b' },
+            { key: 'nonBearingPercent', label: 'Non-bearing', color: '#d39a22' },
+        ];
+        const paths = series.map(function (line) {
+            const coordinates = points.map(function (point) {
+                return { x: x(point.monthIndex, point.monthFraction), y: y(point[line.key]), value: point[line.key], point: point };
+            });
+            const linePath = coordinates.map(function (point, index) {
+                const command = index === 0 ? 'M' : 'L';
+                return command + point.x.toFixed(1) + ',' + point.y.toFixed(1);
+            }).join(' ');
+            const markers = coordinates.map(function (point) {
+                return `<circle cx="${point.x}" cy="${point.y}" r="5" fill="${line.color}" tabindex="0" role="img" aria-label="${escapeHtml(point.point.tooltip)}"><title>${escapeHtml(point.point.tooltip)}</title></circle>`;
+            }).join('');
+            return `<path d="${linePath}" fill="none" stroke="${line.color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>${markers}`;
+        }).join('');
+        const xLabels = months.map(function (month, index) {
+            return `<text x="${x(index, 0.5)}" y="${height-bottom+28}" text-anchor="middle" font-size="10" font-weight="600" fill="#344239">${month}</text>`;
+        }).join('');
+        const interval = completed.length > 1 ? Math.round((completed[completed.length-1].date - completed[0].date) / 86400000) : null;
+        const frequency = completed.length === 1 ? '1 completed scan' : `${completed.length} completed scans · ${interval} days between first and last scan`;
+        const legend = `<div class="scan-trend-legend" aria-label="Graph legend"><span><i style="--series-color:${series[0].color}"></i>Bearing %</span><span><i style="--series-color:${series[1].color}"></i>Non-bearing %</span></div>`;
+        return `<section class="scan-history-trend" aria-label="Scan history comparison"><header class="scan-trend-header"><div><span class="scan-trend-eyebrow">BLOCK PERFORMANCE</span><h3>Scan history comparison</h3><p>${frequency} · each point represents one scan</p></div><span class="scan-trend-count">${completed.length} ${completed.length === 1 ? 'scan' : 'scans'}</span></header><div class="scan-trend-chart"><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Bearing and non-bearing percentages for individual scans, shown across January through December"><line x1="${left}" y1="${top}" x2="${left}" y2="${height-bottom}" stroke="#bdc9c0"/><line x1="${left}" y1="${height-bottom}" x2="${width-right}" y2="${height-bottom}" stroke="#bdc9c0"/>${ticks}${paths}${xLabels}<text x="17" y="${top+plotHeight/2}" transform="rotate(-90 17 ${top+plotHeight/2})" text-anchor="middle" font-size="12" fill="#536057">Plants (%)</text></svg></div>${legend}</section>`;
+    }
+
     function timestamp(value) {
         if (typeof value === 'number' && Number.isFinite(value)) return new Date(value).toISOString();
         if (value instanceof Date && Number.isFinite(value.getTime())) return value.toISOString();
@@ -468,10 +549,9 @@ window.blockScanHistory = (function () {
     function workbookBlob(history, block, cycles) {
         const scanRows = [[
             'Scan reference', 'Crop Cycle', 'Block ID', 'Block name', 'Section', 'Account',
-            'Start time (UTC)', 'End time (UTC)', 'Duration (seconds)',
+            'Start date (UTC)', 'End date (UTC)', 'Duration (seconds)',
             'Bearing detections', 'Non-bearing detections', 'Non-viable detections',
-            'Estimated plant count', 'Bearing share (%)',
-            'Total frames', 'Manifest ready',
+            'Estimated plant count',
         ]];
         const orderedHistory = history.slice().sort(function (a, b) { return a.date - b.date; });
         const scanCounts = new Map();
@@ -485,13 +565,11 @@ window.blockScanHistory = (function () {
             if (cycle) scanCounts.set(cycle.id, (scanCounts.get(cycle.id) || 0) + 1);
             scanRows.push([
                 scanReference(entry), cycle ? 'Cycle ' + cycle.displayNumber : 'Unassigned', blockReference,
-                block.blockName || blockReference, sectionValue(block.section), block.accountName || block.registeredBy || 'Unavailable',
-                entry.date.toISOString(), timestamp(d.endTime) || 'Unavailable',
-                end && end >= entry.date ? Math.round((end - entry.date) / 1000) : 'Unavailable',
-                bearing ?? 'Unavailable', nonBearing ?? 'Unavailable', metric(d, 'nonViable') ?? 'Unavailable',
-                bearing !== null && nonBearing !== null ? bearing + nonBearing : 'Unavailable',
-                formatPercent(bearing, bearing !== null && nonBearing !== null ? bearing + nonBearing : null) || 'Unavailable',
-                metric(d, 'totalFrames') ?? 'Unavailable', d.manifestReady == null ? 'Unavailable' : d.manifestReady,
+                block.blockName || blockReference, sectionValue(block.section), block.accountName || block.registeredBy || 'N/A',
+                entry.date.toISOString().slice(0, 10), end ? end.toISOString().slice(0, 10) : 'N/A',
+                end && end >= entry.date ? Math.round((end - entry.date) / 1000) : 'N/A',
+                bearing ?? 'N/A', nonBearing ?? 'N/A', metric(d, 'nonViable') ?? 'N/A',
+                bearing !== null && nonBearing !== null ? bearing + nonBearing : 'N/A',
             ]);
         });
 
@@ -514,6 +592,25 @@ window.blockScanHistory = (function () {
             { name: 'xl/worksheets/sheet2.xml', content: worksheetXml(cycleRows) },
         ];
         return storedZip(entries);
+    }
+
+    function downloadRowsXlsx(rows, filename, sheetName) {
+        const entries = [
+            { name: '[Content_Types].xml', content: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>' },
+            { name: '_rels/.rels', content: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>' },
+            { name: 'xl/workbook.xml', content: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="' + xmlEscape(sheetName || 'Report') + '" sheetId="1" r:id="rId1"/></sheets></workbook>' },
+            { name: 'xl/_rels/workbook.xml.rels', content: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>' },
+            { name: 'xl/worksheets/sheet1.xml', content: worksheetXml(rows) },
+        ];
+        const blob = storedZip(entries);
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
     }
 
     async function download(block, userId, history, cycles, button) {
@@ -555,6 +652,7 @@ window.blockScanHistory = (function () {
         loadLatestPlantCounts: loadLatestPlantCounts,
         latestPlantCountsFromSnapshots: latestPlantCountsFromSnapshots,
         render: render,
+        renderTrend: renderTrend,
         assignedCycle: assignedCycle,
         latestCompletedResult: latestCompletedResult,
         cycleCompletedAtMs: cycleCompletedAtMs,
@@ -562,5 +660,6 @@ window.blockScanHistory = (function () {
         renderCycles: renderCycles,
         download: download,
         workbookBlob: workbookBlob,
+        downloadRowsXlsx: downloadRowsXlsx,
     };
 })();

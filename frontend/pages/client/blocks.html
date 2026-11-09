@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <link rel="icon" type="image/svg+xml" href="../../assets/images/pinevision-logo.svg" />
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
@@ -18,8 +19,6 @@
       })();
     </script>
     <title>Fruit Blocks - PineVision</title>
-    <link rel="icon" type="image/x-icon" href="/frontend/assets/images/pinevision-favicon.ico" />
-    <link rel="icon" type="image/webp" sizes="64x64" href="/frontend/assets/images/pinevision-favicon.webp" />
     <link rel="apple-touch-icon" sizes="180x180" href="/frontend/assets/images/pinevision-touch-icon.png" />
 
     <!-- CSS: Bootstrap first, then custom overrides -->
@@ -88,8 +87,12 @@
       .filter-bar-actions {
         display: flex;
         align-items: center;
+        gap: var(--space-sm);
         margin-left: auto;
       }
+
+      .filter-bar-actions .form-select { width: auto; min-width: 150px; }
+      .filter-bar-actions .btn { flex: 0 0 auto; white-space: nowrap; }
 
       .filter-group {
         display: flex;
@@ -231,6 +234,9 @@
         .filter-bar {
           gap: var(--space-md);
         }
+        .filter-bar-actions { width: 100%; margin-left: 0; flex-direction: column; align-items: stretch; }
+        .filter-bar-actions .form-select { width: 100%; min-width: 0; }
+        .filter-bar-actions .btn { width: 100%; }
         .block-detail-header {
           gap: var(--space-md);
         }
@@ -489,6 +495,11 @@
                 </button>
               </div>
               <div class="filter-bar-actions">
+                <select id="blocks-sort" class="form-select form-select-sm" aria-label="Sort blocks" onchange="renderBlocks()">
+                  <option value="newest">Newest first</option>
+                  <option value="name">Name A–Z</option>
+                  <option value="bearing-desc">Bearing rate: highest first</option>
+                </select>
                 <button class="btn btn-primary btn-filled" onclick="openAddBlockModal()">
                   <svg
                     width="16"
@@ -685,6 +696,7 @@
               // Metadata
               lastScanned: blockData.lastScanned,
               totalScans: blockData.totalScans || 0,
+              createdAt: blockData.createdAt && blockData.createdAt.toDate ? blockData.createdAt.toDate() : null,
             });
           });
 
@@ -725,7 +737,7 @@
       // ── Render Blocks Grid ───────────────────────────────────────────
 
       function renderBlocks() {
-        let blocks = ALL_BLOCKS;
+        let blocks = ALL_BLOCKS.slice();
         const search = document.getElementById("blocks-search").value.trim().toLowerCase();
         if (search) {
           blocks = blocks.filter(function (block) {
@@ -738,10 +750,17 @@
         // Apply status filter
         if (activeFilters.status !== "all") {
           blocks = blocks.filter(function (b) {
-            const statusClass = getStatusClass(b.bearing);
+            const statusClass = getStatusClass(b);
             return statusClass === activeFilters.status;
           });
         }
+
+        const sort = document.getElementById("blocks-sort")?.value || "newest";
+        blocks.sort(function (a, b) {
+          if (sort === "name") return String(a.blockName || "").localeCompare(String(b.blockName || ""));
+          if (sort === "bearing-desc") return (b.bearing || 0) - (a.bearing || 0);
+          return (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0);
+        });
 
         const grid = document.getElementById("blocks-grid");
 
@@ -760,7 +779,7 @@
 
         grid.innerHTML = blocks
           .map(function (block) {
-            const statusClass = getStatusClass(block.bearing);
+            const statusClass = getStatusClass(block);
             const barColorVal = getBarColor(block.bearing);
             const nonViableColor =
               block.nonViable > 10 ? "var(--red)" : "var(--amber)";
@@ -800,7 +819,9 @@
 
       // ── Helper Functions ─────────────────────────────────────────────
 
-      function getStatusClass(bearing) {
+      function getStatusClass(block) {
+        const bearing = Number(block.bearing) || 0;
+        if (!block.totalScans && bearing === 0 && !(Number(block.nonbearing) || 0) && !(Number(block.nonViable) || 0)) return "none";
         if (bearing >= 80) return "good";
         if (bearing >= 60) return "warn";
         return "crit";
@@ -813,8 +834,8 @@
       }
 
       function statusBadge(status) {
-        const labels = { good: "Healthy", warn: "Watch", crit: "Critical" };
-        const colors = { good: "good", warn: "warn", crit: "crit" };
+        const labels = { good: "Healthy", warn: "Watch", crit: "Critical", none: "No Scan Data" };
+        const colors = { good: "good", warn: "warn", crit: "crit", none: "secondary" };
         return (
           '<span class="badge ' +
           colors[status] +
@@ -913,10 +934,10 @@
             // Initial values
             stage: formData.daf + " DAF",
             daf: parseInt(formData.daf),
-            bearingPercent: 0.01,
-            nonBearingPercent: 0.01,
+              bearingPercent: 0,
+              nonBearingPercent: 0,
             totalPineapples: 0,
-            nonViable: 0.01,
+              nonViable: 0,
 
             // Metadata
             planted: formData.planted,
