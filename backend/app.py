@@ -77,6 +77,49 @@ def _verify_farm_manager_token():
     return decoded, None
 
 
+def _verify_client_token():
+    """Verify the Firebase ID token and require the client role."""
+    header = request.headers.get('Authorization', '')
+    if not header.startswith('Bearer '):
+        return None, (jsonify({'error': 'Missing or invalid Authorization header'}), 401)
+    try:
+        decoded = auth.verify_id_token(header.split('Bearer ', 1)[1].strip())
+    except Exception:
+        return None, (jsonify({'error': 'Invalid or expired token'}), 401)
+
+    if not db:
+        return None, (jsonify({'error': 'Firebase not initialized'}), 500)
+    user_doc = db.collection('users').document(decoded['uid']).get()
+    if not user_doc.exists or user_doc.to_dict().get('role') != 'client':
+        return None, (jsonify({'error': 'Client access required'}), 403)
+    return decoded, None
+
+
+def _validate_alert_thresholds(value):
+    """Validate and normalize all three account alert threshold pairs."""
+    if not isinstance(value, dict) or set(value) != {'bearing', 'nonbearing', 'discolored'}:
+        return None
+
+    normalized = {}
+    for metric, bearing_rate in (
+        ('bearing', True), ('nonbearing', False), ('discolored', False)
+    ):
+        pair = value.get(metric)
+        if not isinstance(pair, dict) or set(pair) != {'watch', 'critical'}:
+            return None
+        watch = pair.get('watch')
+        critical = pair.get('critical')
+        if (isinstance(watch, bool) or not isinstance(watch, (int, float)) or
+                isinstance(critical, bool) or not isinstance(critical, (int, float))):
+            return None
+        if not (0 <= watch <= 100 and 0 <= critical <= 100):
+            return None
+        if (bearing_rate and critical >= watch) or (not bearing_rate and critical <= watch):
+            return None
+        normalized[metric] = {'watch': watch, 'critical': critical}
+    return normalized
+
+
 def _verify_history_viewer_token():
     """Allow only authenticated Super Admins and Farm Managers to read shared history."""
     decoded, error = _verify_admin_token()
@@ -119,6 +162,36 @@ def api_test():
         'status': 'success',
         'firebase': 'connected' if db else 'disconnected'
     }), 200
+
+
+@app.route('/api/client/alert-thresholds', methods=['GET', 'PUT'])
+def client_alert_thresholds():
+    """Read or update the authenticated client's own alert thresholds."""
+    decoded, err = _verify_client_token()
+    if err:
+        return err
+
+    settings_ref = db.collection('user_settings').document(decoded['uid'])
+    try:
+        if request.method == 'GET':
+            settings_doc = settings_ref.get()
+            saved = (settings_doc.to_dict() or {}).get('alertThresholds') if settings_doc.exists else None
+            thresholds = _validate_alert_thresholds(saved) if saved else None
+            return jsonify({'alertThresholds': thresholds or {
+                'bearing': {'watch': 75, 'critical': 60},
+                'nonbearing': {'watch': 30, 'critical': 50},
+                'discolored': {'watch': 15, 'critical': 25},
+            }}), 200
+
+        data = request.get_json(silent=True) or {}
+        thresholds = _validate_alert_thresholds(data.get('alertThresholds'))
+        if thresholds is None:
+            return jsonify({'error': 'Thresholds must include valid bearing, non-bearing, and non-viable watch/critical values'}), 400
+        settings_ref.set({'alertThresholds': thresholds}, merge=True)
+        return jsonify({'alertThresholds': thresholds}), 200
+    except Exception as exc:
+        print(f"❌ Failed to process alert thresholds for {decoded['uid']}: {exc}")
+        return jsonify({'error': 'Could not load or save alert thresholds'}), 500
 
 
 @app.route('/api/auth/password-reset', methods=['POST'])

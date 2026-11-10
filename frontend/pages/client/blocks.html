@@ -641,6 +641,7 @@
 
     <!-- Application JavaScript -->
     <script src="../../js/auth.js"></script>
+    <script src="../../js/client-thresholds.js"></script>
     <script src="../../js/utils.js"></script>
     <script src="../../js/block-scan-history.js"></script>
     <script src="../../js/app.js"></script>
@@ -654,6 +655,8 @@
       let ALL_BLOCKS = [];
 
       window.initPage = async function () {
+        const currentUser = auth.getCurrentUser();
+        await window.clientThresholds.load(currentUser && currentUser.uid);
         await loadBlocksFromFirebase();
         utils.setupModalClose("add-block-modal");
       };
@@ -781,8 +784,8 @@
           .map(function (block) {
             const statusClass = getStatusClass(block);
             const barColorVal = getBarColor(block.bearing);
-            const nonViableColor =
-              block.nonViable > 10 ? "var(--red)" : "var(--amber)";
+            const nonViableColor = window.clientThresholds.metricColor("discolored", block.nonViable);
+            const nonbearingColor = window.clientThresholds.metricColor("nonbearing", block.nonbearing);
 
             return `
                       <div class="col">
@@ -809,7 +812,7 @@
                               <div class="bcard-foot">
                                   <span class="bcard-foot-stat">Estimated Plant Count: ${block.estimatedTotalPlantCount === null ? "Unavailable" : formatNumber(block.estimatedTotalPlantCount)}</span>
                                   <span class="bcard-foot-stat" style="color: ${nonViableColor};">${formatPercent(block.nonViable)} non-viable</span>
-                                  <span class="bcard-foot-stat" style="color: var(--amber);">${formatPercent(block.nonbearing)} non-bearing</span>
+                                  <span class="bcard-foot-stat" style="color: ${nonbearingColor};">${formatPercent(block.nonbearing)} non-bearing</span>
                               </div>
                           </div>
                       </div>`;
@@ -822,15 +825,11 @@
       function getStatusClass(block) {
         const bearing = Number(block.bearing) || 0;
         if (!block.totalScans && bearing === 0 && !(Number(block.nonbearing) || 0) && !(Number(block.nonViable) || 0)) return "none";
-        if (bearing >= 80) return "good";
-        if (bearing >= 60) return "warn";
-        return "crit";
+        return window.clientThresholds.classify(block);
       }
 
       function getBarColor(bearing) {
-        if (bearing >= 80) return "var(--green)";
-        if (bearing >= 60) return "var(--amber)";
-        return "var(--red)";
+        return window.clientThresholds.bearingColor(bearing);
       }
 
       function statusBadge(status) {

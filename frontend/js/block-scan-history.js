@@ -71,6 +71,16 @@ window.blockScanHistory = (function () {
         return { date: date, count: bearing + nonBearing };
     }
 
+    function latestPlantCount(history, cycleId) {
+        let latest = null;
+        (history || []).forEach(function (entry) {
+            if (cycleId && entry.data.cycleId !== cycleId) return;
+            const result = completedPlantCount(entry.data);
+            if (result && (!latest || result.date > latest.date)) latest = result;
+        });
+        return latest ? latest.count : 0;
+    }
+
     async function loadLatestPlantCounts(blockIds, userId, cycleIdsByBlock) {
         const ids = new Set((blockIds || []).filter(Boolean).map(String));
         if (!ids.size) return new Map();
@@ -655,6 +665,7 @@ window.blockScanHistory = (function () {
         renderTrend: renderTrend,
         assignedCycle: assignedCycle,
         latestCompletedResult: latestCompletedResult,
+        latestPlantCount: latestPlantCount,
         cycleCompletedAtMs: cycleCompletedAtMs,
         assignCycleDisplayNumbers: assignCycleDisplayNumbers,
         renderCycles: renderCycles,

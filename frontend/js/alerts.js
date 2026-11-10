@@ -34,8 +34,8 @@
     let activeAlertFilter = 'crit';
     let thresholds = {
         bearing:    { watch: 75, critical: 60 },
-        nonbearing: { watch: 18, critical: 25 },
-        discolored: { watch: 10, critical: 15 },
+        nonbearing: { watch: 30, critical: 50 },
+        discolored: { watch: 15, critical: 25 },
     };
 
     // ═══════════════════════════════════════════════════════════
@@ -73,22 +73,7 @@
     // ═══════════════════════════════════════════════════════════
 
     async function loadThresholds() {
-        try {
-            const doc = await firebase.firestore()
-                .collection('user_settings')
-                .doc(currentUserId)
-                .get();
-            if (doc.exists) {
-                const saved = doc.data().alertThresholds;
-                if (saved) {
-                    if (saved.bearing)    thresholds.bearing    = saved.bearing;
-                    if (saved.nonbearing) thresholds.nonbearing = saved.nonbearing;
-                    if (saved.discolored) thresholds.discolored = saved.discolored;
-                }
-            }
-        } catch (error) {
-            console.error('Error loading thresholds:', error);
-        }
+        thresholds = await window.clientThresholds.load(currentUserId);
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -384,6 +369,12 @@
         const dw  = parseFloat(document.getElementById('t-disco-watch').value);
         const dc  = parseFloat(document.getElementById('t-disco-crit').value);
 
+        const values = [bw, bc, nbw, nbc, dw, dc];
+        if (values.some(value => !Number.isFinite(value) || value < 0 || value > 100)) {
+            utils.showFormError('threshold-form', 'Enter threshold values from 0 to 100');
+            return;
+        }
+
         if (bc >= bw) {
             utils.showFormError('threshold-form', 'Bearing critical must be lower than watch threshold');
             return;
@@ -404,33 +395,13 @@
         };
 
         try {
-            await firebase.firestore()
-                .collection('user_settings')
-                .doc(currentUserId)
-                .set({ alertThresholds: updated }, { merge: true });
-
-            thresholds = updated;
+            thresholds = await window.clientThresholds.save(currentUserId, updated);
             window.closeThresholdModal();
-
-            const cachedBlocks = window.pvCache && window.pvCache.get('blocks');
-            if (cachedBlocks) {
-                renderThresholds({
-                    forEach: fn => cachedBlocks.forEach(item => fn({ id: item.id, data: () => item._data })),
-                    size: cachedBlocks.length,
-                    _cached: true,
-                });
-            } else {
-                const blocksSnapshot = await firebase.firestore()
-                    .collection('blocks')
-                    .where('userId', '==', currentUserId)
-                    .get();
-                renderThresholds(blocksSnapshot);
-            }
-
+            renderThresholds();
             utils.showToast('Thresholds saved!', 'success');
         } catch (error) {
             console.error('Error saving thresholds:', error);
-            utils.showFormError('threshold-form', 'Failed to save thresholds. Please try again.');
+            utils.showFormError('threshold-form', 'Failed to save thresholds: ' + (error.message || 'Please try again.'));
         }
     };
 

@@ -9,6 +9,37 @@ service cloud.firestore {
       allow delete: if request.auth != null;  // Authenticated users can delete
     }
 
+    // Per-account preferences, including editable alert thresholds.
+    match /user_settings/{userId} {
+      function validPair(pair, bearingRate) {
+        return pair is map
+          && pair.keys().hasAll(['watch', 'critical'])
+          && pair.keys().hasOnly(['watch', 'critical'])
+          && pair.watch is number
+          && pair.critical is number
+          && pair.watch >= 0 && pair.watch <= 100
+          && pair.critical >= 0 && pair.critical <= 100
+          && (bearingRate ? pair.critical < pair.watch : pair.critical > pair.watch);
+      }
+
+      function validThresholdSettings() {
+        let thresholds = request.resource.data.alertThresholds;
+        return request.resource.data.keys().hasOnly(['alertThresholds'])
+          && thresholds is map
+          && thresholds.keys().hasAll(['bearing', 'nonbearing', 'discolored'])
+          && thresholds.keys().hasOnly(['bearing', 'nonbearing', 'discolored'])
+          && validPair(thresholds.bearing, true)
+          && validPair(thresholds.nonbearing, false)
+          && validPair(thresholds.discolored, false);
+      }
+
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow create, update: if request.auth != null
+        && request.auth.uid == userId
+        && validThresholdSettings();
+      allow delete: if false;
+    }
+
 
     // Scheduled Scans
     match /scheduled_scans/{docId} {

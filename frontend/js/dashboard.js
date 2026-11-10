@@ -30,6 +30,7 @@
             return;
         }
 
+        await window.clientThresholds.load(currentUser.uid);
         await loadDashboardData();
     };
 
@@ -253,7 +254,7 @@
         let rowsHTML = '';
 
         blocksData.forEach((block, index) => {
-            const statusClass = getStatusClass(block.bearing);
+            const statusClass = getStatusClass(block);
             const barColor = getBarColor(block.bearing);
 
             const blockName = block.name || `Block ${index + 1}`;
@@ -492,16 +493,16 @@
         return `<span class="status-badge status-badge-${statusClass}">${labels[statusClass] || 'Unknown'}</span>`;
     }
 
-    function getStatusClass(bearing) {
-        if (bearing >= 75) return 'healthy';
-        if (bearing >= 60) return 'warning';
-        return 'critical';
+    function getStatusClass(block) {
+        if (!block.totalScans && !(Number(block.bearing) || 0) &&
+            !(Number(block.nonBearing) || 0) && !(Number(block.discolored) || 0)) return 'critical';
+        const status = window.clientThresholds.classify(block);
+        return status === 'good' ? 'healthy' : status === 'warn' ? 'warning' : 'critical';
     }
 
     function getBarColor(bearing) {
-        if (bearing >= 75) return '#4caf78';
-        if (bearing >= 60) return '#e6a817';
-        return '#d94f4f';
+        const color = window.clientThresholds.bearingColor(bearing);
+        return color === 'var(--green)' ? '#4caf78' : color === 'var(--amber)' ? '#e6a817' : '#d94f4f';
     }
 
     function formatNumber(num) {
