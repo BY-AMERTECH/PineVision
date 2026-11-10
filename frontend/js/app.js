@@ -90,6 +90,7 @@ const app = (function() {
     // ========================================
 
     const SIDEBAR_COLLAPSED_KEY = 'pinewatch_sidebar_collapsed';
+    const accountAvatarUrls = new Map();
 
     /**
      * Restore sidebar collapsed state from localStorage
@@ -289,16 +290,7 @@ const app = (function() {
         const menuEmailEl = topbar.querySelector('.topbar-account-menu-email');
 
         if (avatarEl) {
-            renderAccountAvatar(avatarEl, initials, null);
-            if (session.uid && window.firebase && firebase.firestore) {
-                firebase.firestore().collection('users').doc(session.uid).get().then(function (snapshot) {
-                    if (!snapshot.exists) return;
-                    const currentUrl = snapshot.data().avatarUrl;
-                    if (currentUrl && !avatarEl.dataset.avatarLocalChange) renderAccountAvatar(avatarEl, initials, currentUrl);
-                }).catch(function () {
-                    // The initials remain visible when profile data is unavailable.
-                });
-            }
+            loadAccountAvatar(avatarEl, session);
         }
         if (nameEl) nameEl.textContent = displayName;
         if (roleEl) roleEl.textContent = roleLabel;
@@ -322,6 +314,27 @@ const app = (function() {
             element.textContent = initials;
         };
         element.appendChild(image);
+    }
+
+    function loadAccountAvatar(element, session) {
+        if (!element || !session) return Promise.resolve();
+        const displayName = session.fullName || session.username;
+        const initials = getInitials(displayName);
+        renderAccountAvatar(element, initials, null);
+        if (!session.uid || !window.firebase || !firebase.firestore) return Promise.resolve();
+
+        let avatarRequest = accountAvatarUrls.get(session.uid);
+        if (!avatarRequest) {
+            avatarRequest = firebase.firestore().collection('users').doc(session.uid).get()
+                .then(function (snapshot) {
+                    return snapshot.exists ? snapshot.data().avatarUrl || null : null;
+                })
+                .catch(function () { return null; });
+            accountAvatarUrls.set(session.uid, avatarRequest);
+        }
+        return avatarRequest.then(function (url) {
+            if (url && !element.dataset.avatarLocalChange) renderAccountAvatar(element, initials, url);
+        });
     }
 
     /**
@@ -432,7 +445,10 @@ const app = (function() {
         reload,
         toggleSidebar,
         initTopbar,
-        handleTopbarLogout
+        handleTopbarLogout,
+        loadAccountAvatar,
+        getInitials,
+        renderAccountAvatar
     };
 })();
 
