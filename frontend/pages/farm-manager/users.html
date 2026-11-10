@@ -1908,6 +1908,7 @@
               : "Never";
             var isSel = selectedIds.indexOf(u.id) !== -1;
             var isDisabled = u.status === "disabled";
+            var isFarmManager = u.role === "farm_manager";
             var toggleTitle = isDisabled ? "Enable Account" : "Disable Account";
             var toggleIcon = isDisabled
               ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
@@ -1924,6 +1925,7 @@
               u.id +
               '" ' +
               (isSel ? "checked" : "") +
+              (isFarmManager ? " disabled title=\"Farm Manager accounts are view-only\"" : "") +
               ' onchange="toggleRow(this)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--green);">' +
               "</td>" +
               "<td onclick=\"openDetail('" +
@@ -1974,12 +1976,12 @@
               "')\">" +
               '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>' +
               "</button>" +
-              '<button class="tbl-btn" title="Edit Field Operator" onclick="openEdit(\'' +
+              '<button class="tbl-btn" title="' + (isFarmManager ? "Farm Manager accounts are view-only" : "Edit Field Operator") + '"' + (isFarmManager ? " disabled" : "") + ' onclick="openEdit(\'' +
               u.id +
               "')\">" +
               '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' +
               "</button>" +
-              '<button class="tbl-btn amber" title="Reset Password" onclick="openResetPassword(\'' +
+              '<button class="tbl-btn amber" title="' + (isFarmManager ? "Farm Manager accounts are view-only" : "Reset Password") + '"' + (isFarmManager ? " disabled" : "") + ' onclick="openResetPassword(\'' +
               u.id +
               "')\">" +
               '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>' +
@@ -1987,8 +1989,8 @@
               '<button class="tbl-btn ' +
               (isDisabled ? "" : "danger") +
               '" title="' +
-              toggleTitle +
-              '" onclick="toggleStatus(\'' +
+              (isFarmManager ? "Farm Manager accounts are view-only" : toggleTitle) +
+              '"' + (isFarmManager ? " disabled" : "") + ' onclick="toggleStatus(\'' +
               u.id +
               "')\">" +
               toggleIcon +
@@ -2000,12 +2002,13 @@
         }
         document.getElementById("users-tbody").innerHTML = tbody;
 
+        var selectablePage = page.filter(function (u) { return u.role !== "farm_manager"; });
         var allSel =
-          page.length > 0 &&
-          page.every(function (u) {
+          selectablePage.length > 0 &&
+          selectablePage.every(function (u) {
             return selectedIds.indexOf(u.id) !== -1;
           });
-        var anySel = page.some(function (u) {
+        var anySel = selectablePage.some(function (u) {
           return selectedIds.indexOf(u.id) !== -1;
         });
         var sa = document.getElementById("select-all");
@@ -2089,6 +2092,7 @@
         var s0 = (currentPage - 1) * PAGE_SIZE;
         filtered
           .slice(s0, Math.min(s0 + PAGE_SIZE, filtered.length))
+          .filter(function (u) { return u.role !== "farm_manager"; })
           .forEach(function (u) {
             var idx = selectedIds.indexOf(u.id);
             if (checked && idx === -1) selectedIds.push(u.id);
@@ -2109,7 +2113,7 @@
         var page = filtered.slice(
           s0,
           Math.min(s0 + PAGE_SIZE, filtered.length),
-        );
+        ).filter(function (u) { return u.role !== "farm_manager"; });
         var sa = document.getElementById("select-all");
         sa.checked =
           page.length > 0 &&
@@ -2160,7 +2164,7 @@
         for (var i = 0; i < ids.length; i++) {
           var id = ids[i];
           var u = ALL_USERS.filter(function (x) { return x.id === id; })[0];
-          if (!u || u.role === "admin") continue;
+          if (!u || u.role === "admin" || u.role === "farm_manager") continue;
 
           try {
             if (action === "activate" || action === "disable") {
@@ -2210,6 +2214,11 @@
           }
 
           const userData = userDoc.data();
+
+          if (userData.role === "farm_manager") {
+            utils.showToast("Farm Manager accounts are view-only", "error");
+            return;
+          }
 
           // Farm Managers cannot modify Super Admin accounts
           if (userData.role === "admin") {
@@ -2393,6 +2402,9 @@
             ).hide();
             openResetPassword(activeUserId);
           };
+          var managerTarget = u.role === "farm_manager";
+          document.getElementById("detail-edit-btn").disabled = managerTarget;
+          document.getElementById("detail-reset-btn").disabled = managerTarget;
 
           new bootstrap.Modal(
             document.getElementById("userDetailModal"),
@@ -2438,6 +2450,11 @@
           }
 
           const u = userDoc.data();
+
+          if (u.role === "farm_manager") {
+            utils.showToast("Farm Manager accounts are view-only", "error");
+            return;
+          }
           u.id = userDoc.id;
 
           editingId = id;
@@ -2665,6 +2682,11 @@
           }
 
           const u = userDoc.data();
+
+          if (u.role === "farm_manager") {
+            utils.showToast("Farm Manager accounts are view-only", "error");
+            return;
+          }
 
           // Farm Managers cannot reset Super Admin passwords
           if (u.role === "admin") {

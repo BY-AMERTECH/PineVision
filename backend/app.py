@@ -484,6 +484,8 @@ def fm_update_user(user_id):
             return jsonify({'error': 'User not found'}), 404
         if target.to_dict().get('role') == 'admin':
             return jsonify({'error': 'Farm Managers cannot modify Super Admin accounts'}), 403
+        if target.to_dict().get('role') == 'farm_manager':
+            return jsonify({'error': 'Farm Managers cannot modify Farm Manager accounts'}), 403
 
         data = request.json
         if data.get('role') == 'admin':
@@ -524,6 +526,8 @@ def fm_delete_user(user_id):
             return jsonify({'error': 'User not found'}), 404
         if target.to_dict().get('role') == 'admin':
             return jsonify({'error': 'Farm Managers cannot delete Super Admin accounts'}), 403
+        if target.to_dict().get('role') == 'farm_manager':
+            return jsonify({'error': 'Farm Managers cannot delete Farm Manager accounts'}), 403
 
         try:
             auth.delete_user(user_id)
@@ -549,6 +553,8 @@ def fm_reset_password(user_id):
             return jsonify({'error': 'User not found'}), 404
         if target.to_dict().get('role') == 'admin':
             return jsonify({'error': 'Farm Managers cannot reset Super Admin passwords'}), 403
+        if target.to_dict().get('role') == 'farm_manager':
+            return jsonify({'error': 'Farm Managers cannot reset Farm Manager passwords'}), 403
 
         data = request.json
         auth.update_user(user_id, password=data['newPassword'])
@@ -570,6 +576,8 @@ def fm_toggle_status(user_id):
             return jsonify({'error': 'User not found'}), 404
         if user_doc.to_dict().get('role') == 'admin':
             return jsonify({'error': 'Farm Managers cannot modify Super Admin account status'}), 403
+        if user_doc.to_dict().get('role') == 'farm_manager':
+            return jsonify({'error': 'Farm Managers cannot modify Farm Manager account status'}), 403
 
         data = request.get_json(silent=True) or {}
         requested_status = data.get('status')

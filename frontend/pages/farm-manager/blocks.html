@@ -1436,7 +1436,7 @@
         content.innerHTML = '<div class="scan-history-empty">Loading history…</div>';
         try {
           const results = await Promise.all([
-            blockScanHistory.load(block.id, block.userId, true),
+            blockScanHistory.load(block.id, null, true),
             loadCropCycleRecords(block),
           ]);
           if (selectedBlockHistoryTab === "cycles") {
@@ -1464,10 +1464,10 @@
         const block = findBlock(currentActionBlockId);
         if (!block) return;
         return Promise.all([
-          blockScanHistory.load(block.id, block.userId, true),
+          blockScanHistory.load(block.id, null, true),
           loadCropCycleRecords(block),
         ]).then(function (results) {
-          return blockScanHistory.download(block, block.userId, results[0], results[1], button);
+          return blockScanHistory.download(block, null, results[0], results[1], button);
         }).catch(function (error) {
           console.error("❌ Error preparing history export:", error);
           utils.showToast("Could not prepare history export. Please try again.", "error");

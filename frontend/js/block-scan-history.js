@@ -5,13 +5,13 @@ window.blockScanHistory = (function () {
     const cache = new Map();
 
     function load(blockId, userId, refresh) {
-        if (!blockId || !userId) return Promise.reject(new Error('Missing block or account context'));
+        if (!blockId) return Promise.reject(new Error('Missing block context'));
         const key = JSON.stringify([blockId, userId]);
         if (refresh || !cache.has(key)) {
-            const pending = firebase.firestore().collection('scans')
-                .where('blockId', '==', blockId)
-                .where('userId', '==', userId)
-                .get()
+            let query = firebase.firestore().collection('scans')
+                .where('blockId', '==', blockId);
+            if (userId) query = query.where('userId', '==', userId);
+            const pending = query.get()
                 .then(function (snapshot) {
                     const history = [];
                     snapshot.forEach(function (doc) {
