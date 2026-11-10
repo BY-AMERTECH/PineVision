@@ -528,7 +528,7 @@
             <div class="nav-section-title">Monitoring</div>
             <ul class="nav-links">
               <li>
-                <a href="users.html" class="nav-link" data-tooltip="Operators">
+                <a href="users.html" class="nav-link" data-tooltip="Field Operators">
                   <span class="nav-link-icon"
                     ><img
                       src="/frontend/assets/icons/nav-users.svg"
@@ -536,7 +536,7 @@
                       width="18"
                       height="18"
                   /></span>
-                  <span class="nav-link-text">Operators</span>
+                  <span class="nav-link-text">Field Operators</span>
                 </a>
               </li>
               <li>
@@ -748,7 +748,7 @@
               <input
                 type="text"
                 id="fb-search-input"
-                placeholder="Search by Block ID, section or operator…"
+                placeholder="Search by Block ID, section or field operator…"
                 oninput="filterAndRender()"
               />
             </div>
@@ -763,7 +763,7 @@
               <option value="">All Sections</option>
             </select>
             <select class="fb-filter-select" id="fb-operator-filter" onchange="filterAndRender()">
-              <option value="">All Operators</option>
+              <option value="">All Field Operators</option>
             </select>
             <select class="fb-filter-select" id="fb-sort-select" onchange="filterAndRender()">
               <option value="blockid-asc">Block ID A→Z</option>
@@ -841,7 +841,7 @@
             </div>
 
             <p class="form-hint">
-              Changes save directly to this block's record. The assigned operator and scan history are not affected.
+              Changes save directly to this block's record. The assigned field operator and scan history are not affected.
             </p>
           </div>
           <div class="modal-footer">
@@ -999,7 +999,7 @@
           '<option value="">All Sections</option>' +
           sections.map((s) => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("");
         operatorSelect.innerHTML =
-          '<option value="">All Operators</option>' +
+          '<option value="">All Field Operators</option>' +
           operators.map((o) => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join("");
 
         sectionSelect.value = currentSection;
@@ -1107,7 +1107,7 @@
                 </svg>
               </div>
               <div class="fb-empty-title">No Fruit Blocks Yet</div>
-              <div class="fb-empty-text">No operator accounts have created a Fruit Block yet. Blocks will appear here as soon as one is added.</div>
+              <div class="fb-empty-text">No field operator accounts have created a Fruit Block yet. Blocks will appear here as soon as one is added.</div>
             </div>`;
           return;
         }

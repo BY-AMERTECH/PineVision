@@ -262,7 +262,7 @@
             <div class="nav-section-title">Monitoring</div>
             <ul class="nav-links">
               <li>
-                <a href="users.html" class="nav-link" data-tooltip="Operators">
+                <a href="users.html" class="nav-link" data-tooltip="Field Operators">
                   <span class="nav-link-icon"
                     ><img
                       src="/frontend/assets/icons/nav-users.svg"
@@ -270,7 +270,7 @@
                       width="18"
                       height="18"
                   /></span>
-                  <span class="nav-link-text">Operators</span>
+                  <span class="nav-link-text">Field Operators</span>
                 </a>
               </li>
               <li>
@@ -516,9 +516,9 @@
               </div>
               <div class="col-sm-6 col-lg-3">
                 <div class="filter-field">
-                  <label class="filter-field-label" for="rp-filter-operator">Operator</label>
+                  <label class="filter-field-label" for="rp-filter-operator">Field Operator</label>
                   <select id="rp-filter-operator" class="filter-select">
-                    <option value="all">All Operators</option>
+                    <option value="all">All Field Operators</option>
                   </select>
                 </div>
               </div>
@@ -796,7 +796,7 @@
 
         const operators = Array.from(new Set(operatorBlocks.map((b) => b.operatorName).filter(Boolean))).sort();
         operatorSelect.innerHTML =
-          '<option value="all">All Operators</option>' +
+          '<option value="all">All Field Operators</option>' +
           operators.map((o) => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join("");
 
         blockSelect.value = currentBlock || "all";
@@ -845,7 +845,7 @@
 
         document.getElementById("report-title-text").textContent = "Farm Performance Report";
         document.getElementById("report-subtitle-text").textContent =
-          parts.length ? parts.join(" · ") : "All blocks · All operators · All statuses";
+          parts.length ? parts.join(" · ") : "All blocks · All field operators · All statuses";
 
         renderMetrics(blocks, scansInRange);
         renderTable(blocks);
@@ -866,7 +866,7 @@
           [
             "Block",
             "Section",
-            "Operator",
+            "Field Operator",
             "Days After Flowering",
             "Area (ha)",
             "Estimated Plant Count",
@@ -922,7 +922,7 @@
           utils.buildMetricCard("Avg Non-Bearing", utils.formatPercent(avgNonbearing), "of selected blocks", "amber") +
           utils.buildMetricCard("Avg Non-Viable", utils.formatPercent(avgNonViable), "of selected blocks", "yellow") +
           utils.buildMetricCard("Total Area", totalArea.toFixed(1) + " ha", "selected area coverage", "") +
-          utils.buildMetricCard("Unique Operators", new Set(blocks.map((b) => b.operatorName)).size, "flying selected blocks", "");
+          utils.buildMetricCard("Unique Field Operators", new Set(blocks.map((b) => b.operatorName)).size, "flying selected blocks", "");
       }
 
       function renderTable(blocks) {
@@ -948,7 +948,7 @@
           '<col class="c-block"><col class="c-section"><col class="c-operator"><col class="c-daf"><col class="c-area"><col class="c-bearing"><col class="c-nonbearing"><col class="c-nonviable"><col class="c-status">' +
           "</colgroup>" +
           "<thead><tr>" +
-          "<th>Block</th><th>Section</th><th>Operator</th><th>DAF</th><th>Area</th><th>Bearing</th><th>Non-Bearing</th><th>Non-Viable</th><th>Status</th>" +
+          "<th>Block</th><th>Section</th><th>Field Operator</th><th>DAF</th><th>Area</th><th>Bearing</th><th>Non-Bearing</th><th>Non-Viable</th><th>Status</th>" +
           "</tr></thead><tbody>";
 
         blocks.forEach(function (block) {

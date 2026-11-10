@@ -558,7 +558,7 @@
                 <a
                   href="users.html"
                   class="nav-link active"
-                  data-tooltip="Operators"
+                  data-tooltip="Field Operators"
                 >
                   <span class="nav-link-icon"
                     ><img
@@ -567,7 +567,7 @@
                       width="18"
                       height="18"
                   /></span>
-                  <span class="nav-link-text">Operators</span>
+                  <span class="nav-link-text">Field Operators</span>
                 </a>
               </li>
               <li>
@@ -923,7 +923,7 @@
                   id="filter-user"
                   onchange="applyFilters()"
                 >
-                  <option value="">All Operators</option>
+                  <option value="">All Field Operators</option>
                 </select>
               </div>
               <div class="col-lg col-md-4 col-sm-6">
@@ -1017,7 +1017,7 @@
                       >
                     </th>
                     <th style="width: 130px" onclick="sortTable('user')">
-                      Operator<span class="sort-arrow" id="sort-user">↕</span>
+                      Field Operator<span class="sort-arrow" id="sort-user">↕</span>
                     </th>
                     <th style="width: 130px" onclick="sortTable('action')">
                       Action<span class="sort-arrow" id="sort-action">↕</span>
@@ -1187,7 +1187,7 @@
           action.startsWith("update_user") ||
           action.startsWith("create_user")
         )
-          return "Operator Management";
+          return "Field Operator Management";
         if (action.startsWith("view_dashboard")) return "Dashboard";
         if (action.startsWith("view_blocks")) return "Blocks";
         if (action.startsWith("view_scans")) return "Scan Operations";
@@ -1626,12 +1626,12 @@
           logout: "← Logout",
           login_failed: "✕ Failed Login",
           view_dashboard: "👁 Dashboard",
-          view_users: "👁 Operators",
+          view_users: "👁 Field Operators",
           view_blocks: "👁 Blocks",
           view_scan: "👁 Scan",
           view_alerts: "👁 Alerts",
-          update_user: "✎ Update Operator",
-          create_user: "+ Create Operator",
+          update_user: "✎ Update Field Operator",
+          create_user: "+ Create Field Operator",
           upload_scan: "↑ Upload Scan",
           generate_report: "⊞ Report",
         };
@@ -1722,7 +1722,7 @@
               log.details +
               "</span>",
           ) +
-          '<div class="det-section">Operator &amp; Session</div>' +
+          '<div class="det-section">Field Operator &amp; Session</div>' +
           detRow("Username", "<strong>" + log.user + "</strong>") +
           detRow(
             "Role",
@@ -1730,7 +1730,7 @@
               ? '<span style="color:var(--amber);font-weight:var(--font-weight-medium);">Administrator</span>'
               : log.user === "unknown"
                 ? '<span style="color:var(--red);">Unknown / Unauthenticated</span>'
-                : "Operator",
+                : "Field Operator",
           ) +
           detRow("IP Address", ipHtml) +
           detRow(
@@ -1792,7 +1792,7 @@
           [
             "ID",
             "Timestamp",
-            "Operator",
+            "Field Operator",
             "Role",
             "Action",
             "Module",
