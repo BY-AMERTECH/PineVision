@@ -330,6 +330,28 @@
         padding: var(--space-lg);
         box-shadow: var(--shadow-sm);
       }
+      .timeline-panel {
+        display: flex;
+        flex-direction: column;
+        height: clamp(24rem, 55dvh, 40rem);
+        min-height: 0;
+      }
+      .timeline-panel #timeline-list {
+        flex: 1;
+        max-height: none;
+        min-height: 0;
+      }
+      .sessions-panel {
+        display: flex;
+        flex-direction: column;
+        height: clamp(24rem, 55dvh, 40rem);
+        min-height: 0;
+      }
+      .sessions-panel #sessions-list {
+        flex: 1;
+        max-height: none;
+        min-height: 0;
+      }
       .side-panel-header {
         display: flex;
         justify-content: space-between;
@@ -1011,24 +1033,9 @@
           <!-- Charts Row (3 panels, Bootstrap grid) -->
           <div class="row g-3 mb-4 align-items-stretch" id="charts-row"></div>
 
-          <!-- Bottom Row: Timeline (left) + Recent Activity & Sessions (right) -->
-          <div class="row g-3 mb-4 align-items-stretch">
-            <!-- Left: Activity Timeline -->
-            <div class="col-lg-7 d-flex">
-              <div class="side-panel w-100">
-                <div class="side-panel-header">
-                  <span class="side-panel-title">Activity Timeline</span>
-                  <span class="side-panel-badge" id="timeline-count"
-                    >0 events</span
-                  >
-                </div>
-                <div class="timeline card-scroll-region" id="timeline-list" tabindex="0" role="region" aria-label="Activity timeline"></div>
-              </div>
-            </div>
-
-            <!-- Right: Recent Activity + Active Sessions stacked -->
-            <div class="col-lg-5 d-flex flex-column gap-3">
-              <!-- Recent Activity table (5 rows) -->
+          <!-- Recent Activity -->
+          <div class="row g-3 mb-4">
+            <div class="col-12">
               <div class="tcard" style="margin-bottom: 0">
                 <div class="thead-row">
                   <h3 class="thead-title">Recent Activity</h3>
@@ -1051,9 +1058,25 @@
                   </table>
                 </div>
               </div>
+            </div>
+          </div>
 
-              <!-- Active Sessions -->
-              <div class="side-panel flex-grow-1">
+          <!-- Activity Timeline and Active Sessions share one row and height. -->
+          <div class="row g-3 mb-4 align-items-stretch">
+            <div class="col-lg-7 d-flex">
+              <div class="side-panel timeline-panel w-100">
+                <div class="side-panel-header">
+                  <span class="side-panel-title">Activity Timeline</span>
+                  <span class="side-panel-badge" id="timeline-count"
+                    >0 events</span
+                  >
+                </div>
+                <div class="timeline card-scroll-region" id="timeline-list" tabindex="0" role="region" aria-label="Activity timeline"></div>
+              </div>
+            </div>
+
+            <div class="col-lg-5 d-flex">
+              <div class="side-panel sessions-panel w-100">
                 <div class="side-panel-header">
                   <span class="side-panel-title">Active Sessions</span>
                   <span class="side-panel-badge" id="session-count"
@@ -1642,30 +1665,21 @@
 
       /* ── Timeline ──────────────────────────────────────────────── */
       function renderTimeline() {
-        var important = allLogs
-          .filter(function (l) {
-            return (
-              l.status === "error" ||
-              l.action.startsWith("update") ||
-              l.action.startsWith("upload") ||
-              l.action.startsWith("generate") ||
-              l.action === "login" ||
-              l.action === "logout" ||
-              l.action === "login_failed"
-            );
-          });
+        // Reuse the full recent activity feed here so the timeline shows the
+        // same complete 50-event window as the rest of the Audit Logs page.
+        var timelineEvents = allLogs;
 
         document.getElementById("timeline-count").textContent =
-          important.length + " events";
+          timelineEvents.length + " events";
 
-        if (!important.length) {
+        if (!timelineEvents.length) {
           document.getElementById("timeline-list").innerHTML =
             '<p style="font-size:var(--font-size-xs);color:var(--color-text-tertiary);margin:0;">No events to display.</p>';
           return;
         }
 
         var html = "";
-        important.forEach(function (log) {
+        timelineEvents.forEach(function (log) {
           var ts = new Date(log.timestamp);
           var timeStr = ts.toLocaleString("en-US", {
             month: "short",
