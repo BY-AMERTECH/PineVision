@@ -934,13 +934,15 @@
         };
       }
 
-      /* ── Map a monitoring_alerts doc (crop-health threshold alerts,
-       * written by the backend's check_thresholds_and_create_alerts())
-       * into the same row shape as mapAlert() above, so the existing
-       * table/detail/filter code renders both kinds of alert without
-       * changes. This collection was previously never read here — the
-       * page only ever showed failed-login events under "Alerts". ── */
-      var BLOCKS_BY_ID = {}; // blockId -> blockName, for crop-alert labels
+      /* ── Map crop-health threshold alerts into the shared alert row shape,
+       * including the field operator who owns the related block. ── */
+      var BLOCKS_BY_ID = {}; // blockId -> name and owner, for crop-alert labels
+
+      function escapeHtml(value) {
+        return String(value == null ? "" : value).replace(/[&<>"']/g, function (char) {
+          return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char];
+        });
+      }
 
       function mapMonitoringAlert(doc) {
         var d = doc.data();
@@ -954,7 +956,8 @@
         if (sev === "critical") sev = "crit";
         if (sev === "warning") sev = "warn";
 
-        var blockLabel = BLOCKS_BY_ID[d.blockId] || d.blockId || "Unknown block";
+        var block = BLOCKS_BY_ID[d.blockId];
+        var blockLabel = block ? block.name : d.blockId || "Unknown block";
 
         return {
           id: doc.id,
@@ -962,10 +965,9 @@
           severity: sev,
           type: "crop_health",
           title: d.title || "Crop Health Alert",
-          // No account-level actions (Suspend/Reset Password) make sense for
-          // a crop alert, so leave user as "unknown" — the existing template
-          // already hides those buttons for a.user === "unknown".
-          user: "unknown",
+          // Resolve the field operator from the block owner. Crop alerts still
+          // do not expose account actions in the detail view.
+          user: block ? block.ownerName || "unknown" : "unknown",
           ip: "—",
           device: blockLabel,
           timestamp: ts,
@@ -975,11 +977,23 @@
       }
 
       function loadBlocksForAlerts() {
-        return db.collection("blocks").limit(500).get()
-          .then(function (snap) {
+        return Promise.all([
+          db.collection("blocks").limit(500).get(),
+          db.collection("users").get(),
+        ])
+          .then(function (results) {
+            var usersById = {};
+            results[1].forEach(function (doc) {
+              var user = doc.data() || {};
+              usersById[doc.id] = user.fullName || user.username || user.email || "";
+            });
             var map = {};
-            snap.forEach(function (doc) {
-              map[doc.id] = (doc.data() || {}).blockName || doc.id;
+            results[0].forEach(function (doc) {
+              var block = doc.data() || {};
+              map[doc.id] = {
+                name: block.blockName || doc.id,
+                ownerName: usersById[block.userId] || "",
+              };
             });
             BLOCKS_BY_ID = map;
           })
@@ -1364,7 +1378,7 @@
             "</td>" +
             '<td style="min-width:180px;">' +
             '<div style="font-weight:var(--font-weight-medium);font-size:var(--font-size-sm);line-height:1.3;">' +
-            a.title +
+            escapeHtml(a.title) +
             "</div>" +
             '<span class="type-tag">' +
             typeLabel +
@@ -1378,16 +1392,16 @@
             initials +
             "</div>" +
             '<span class="user-cell-name">' +
-            a.user +
+            escapeHtml(a.user) +
             "</span>" +
             "</div>" +
             "</td>" +
             '<td class="d-hide-md" style="max-width:200px;">' +
             '<div style="font-size:var(--font-size-xs);color:var(--color-text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' +
-            a.device +
+            escapeHtml(a.device) +
             "</div>" +
             '<div style="font-size:10px;font-family:var(--font-mono);color:var(--color-text-tertiary);">' +
-            a.ip +
+            escapeHtml(a.ip) +
             "</div>" +
             "</td>" +
             '<td class="d-hide-sm" style="font-size:11px;font-family:var(--font-mono);color:var(--color-text-secondary);white-space:nowrap;">' +
@@ -1473,14 +1487,14 @@
             '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' +
             "Mark as Resolved</button>";
         }
-        if (a.user !== "unknown") {
+        if (a.source !== "monitoring" && a.user !== "unknown") {
           actionsHtml +=
             '<button class="oc-action-btn oc-danger" onclick="suspendUser(\'' +
             a.user +
             "')\">" +
             '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>' +
             "Suspend Field Operator (" +
-            a.user +
+            escapeHtml(a.user) +
             ")</button>";
           actionsHtml +=
             '<button class="oc-action-btn oc-amber" onclick="resetPassword(\'' +
@@ -1508,20 +1522,20 @@
           '<div class="det-section">' + (a.source === "monitoring" ? "Source" : "Access Information") + "</div>" +
           (a.source === "monitoring"
             ? '<div class="det-row"><span class="det-label">Block</span><span class="det-value">' +
-              a.device +
+              escapeHtml(a.device) +
               "</span></div>"
             : '<div class="det-row"><span class="det-label">Field Operator Account</span><span class="det-value">' +
-              a.user +
+              escapeHtml(a.user) +
               "</span></div>" +
               '<div class="det-row"><span class="det-label">IP Address</span><span class="det-value det-mono">' +
-              a.ip +
+              escapeHtml(a.ip) +
               "</span></div>" +
               '<div class="det-row"><span class="det-label">Device</span><span class="det-value">' +
-              a.device +
+              escapeHtml(a.device) +
               "</span></div>") +
           '<div class="det-section">Description</div>' +
           '<p style="font-size:var(--font-size-sm);color:var(--color-text-primary);line-height:1.6;margin:0;">' +
-          a.details +
+          escapeHtml(a.details) +
           "</p>" +
           secNotice +
           '<div class="det-section">Actions</div>' +
