@@ -546,8 +546,8 @@ def fm_create_user():
 
 @app.route('/api/fm/users/<user_id>', methods=['PUT'])
 def fm_update_user(user_id):
-    """Farm Manager: update a user — cannot update Super Admin accounts or promote to admin."""
-    _, err = _verify_farm_manager_token()
+    """Farm Managers may update their own profile, not another manager's."""
+    caller, err = _verify_farm_manager_token()
     if err:
         return err
 
@@ -557,12 +557,14 @@ def fm_update_user(user_id):
             return jsonify({'error': 'User not found'}), 404
         if target.to_dict().get('role') == 'admin':
             return jsonify({'error': 'Farm Managers cannot modify Super Admin accounts'}), 403
-        if target.to_dict().get('role') == 'farm_manager':
-            return jsonify({'error': 'Farm Managers cannot modify Farm Manager accounts'}), 403
+        if target.to_dict().get('role') == 'farm_manager' and user_id != caller['uid']:
+            return jsonify({'error': 'Farm Managers cannot modify another Farm Manager account'}), 403
 
-        data = request.json
+        data = request.get_json(silent=True) or {}
         if data.get('role') == 'admin':
             return jsonify({'error': 'Farm Managers cannot assign the Super Admin role'}), 403
+        if user_id == caller['uid'] and data.get('status') == 'disabled':
+            return jsonify({'error': 'You cannot disable your own account'}), 403
 
         auth.update_user(
             user_id,
@@ -615,8 +617,8 @@ def fm_delete_user(user_id):
 
 @app.route('/api/fm/users/<user_id>/reset-password', methods=['POST'])
 def fm_reset_password(user_id):
-    """Farm Manager: reset password — cannot reset Super Admin passwords."""
-    _, err = _verify_farm_manager_token()
+    """Farm Managers may reset their own password, not another manager's."""
+    caller, err = _verify_farm_manager_token()
     if err:
         return err
 
@@ -626,8 +628,8 @@ def fm_reset_password(user_id):
             return jsonify({'error': 'User not found'}), 404
         if target.to_dict().get('role') == 'admin':
             return jsonify({'error': 'Farm Managers cannot reset Super Admin passwords'}), 403
-        if target.to_dict().get('role') == 'farm_manager':
-            return jsonify({'error': 'Farm Managers cannot reset Farm Manager passwords'}), 403
+        if target.to_dict().get('role') == 'farm_manager' and user_id != caller['uid']:
+            return jsonify({'error': 'Farm Managers cannot reset another Farm Manager password'}), 403
 
         data = request.json
         auth.update_user(user_id, password=data['newPassword'])
@@ -638,8 +640,8 @@ def fm_reset_password(user_id):
 
 @app.route('/api/fm/users/<user_id>/toggle-status', methods=['POST'])
 def fm_toggle_status(user_id):
-    """Farm Manager: toggle user status — cannot toggle Super Admin accounts."""
-    _, err = _verify_farm_manager_token()
+    """Farm Managers can toggle client accounts but cannot disable themselves."""
+    caller, err = _verify_farm_manager_token()
     if err:
         return err
 
@@ -649,8 +651,8 @@ def fm_toggle_status(user_id):
             return jsonify({'error': 'User not found'}), 404
         if user_doc.to_dict().get('role') == 'admin':
             return jsonify({'error': 'Farm Managers cannot modify Super Admin account status'}), 403
-        if user_doc.to_dict().get('role') == 'farm_manager':
-            return jsonify({'error': 'Farm Managers cannot modify Farm Manager account status'}), 403
+        if user_doc.to_dict().get('role') == 'farm_manager' and user_id != caller['uid']:
+            return jsonify({'error': 'Farm Managers cannot modify another Farm Manager account'}), 403
 
         data = request.get_json(silent=True) or {}
         requested_status = data.get('status')
@@ -662,6 +664,9 @@ def fm_toggle_status(user_id):
         else:
             current_status = user_doc.to_dict().get('status', 'active')
             new_status = 'disabled' if current_status == 'active' else 'active'
+
+        if user_id == caller['uid'] and new_status == 'disabled':
+            return jsonify({'error': 'You cannot disable your own account'}), 403
 
         auth.update_user(user_id, disabled=(new_status == 'disabled'))
         db.collection('users').document(user_id).update({
