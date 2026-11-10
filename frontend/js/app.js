@@ -156,7 +156,7 @@ const app = (function() {
     const ROLE_LABELS = {
         'admin': 'Super Admin',
         'farm_manager': 'Farm Manager',
-        'client': 'Operator'
+        'client': 'Field Operator'
     };
 
     // Inline icon paths, reused from the page-specific icons that used to
@@ -201,8 +201,8 @@ const app = (function() {
         'alerts': {
             icon: 'bell',
             client: { title: 'Alerts', subtitle: 'Active flags, resolved issues, and threshold reference' },
-            farm_manager: { title: 'Account Alerts', subtitle: 'Security notifications and operator access events across all platform accounts' },
-            admin: { title: 'Account Alerts', subtitle: 'Security notifications and operator access events across all platform accounts' }
+            farm_manager: { title: 'Account Alerts', subtitle: 'Security notifications and field operator access events across all platform accounts' },
+            admin: { title: 'Account Alerts', subtitle: 'Security notifications and field operator access events across all platform accounts' }
         },
         'settings': {
             icon: 'cog',
@@ -220,7 +220,7 @@ const app = (function() {
         },
         'users': {
             icon: 'users',
-            default: { title: 'Operator Management', subtitle: 'Monitor, manage and configure operator accounts and access levels' }
+            default: { title: 'Field Operator Management', subtitle: 'Monitor, manage and configure field operator accounts and access levels' }
         },
         'activity': {
             icon: 'activity',
@@ -228,7 +228,7 @@ const app = (function() {
         },
         'auditlogs': {
             icon: 'audit',
-            default: { title: 'Audit Logs', subtitle: 'Complete record of all system activity, access events, and operator actions' }
+            default: { title: 'Audit Logs', subtitle: 'Complete record of all system activity, access events, and field operator actions' }
         }
     };
 

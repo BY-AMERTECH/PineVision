@@ -88,7 +88,7 @@
                 console.log(`Final blockName: ${blockName}`);
 
                 // Get user name if userId exists
-                let operatorName = 'Unknown Operator';
+                let operatorName = 'Unknown Field Operator';
                 if (data.userId) {
                     try {
                         const userDoc = await firebase.firestore()
@@ -96,7 +96,7 @@
                             .doc(data.userId)
                             .get();
                         if (userDoc.exists) {
-                            operatorName = userDoc.data().fullName || userDoc.data().displayName || 'Operator';
+                            operatorName = userDoc.data().fullName || userDoc.data().displayName || 'Field Operator';
                         }
                     } catch (err) {
                         console.warn('Could not fetch user name:', err);
@@ -328,7 +328,7 @@
                 </div>
                 <div class="sstats">
                     <span>Estimated Plants: <strong>${formatNumber(scan.total)}</strong></span>
-                    <span>Operator: ${scan.operator}</span>
+                    <span>Field Operator: ${scan.operator}</span>
                     <span>Timestamp: <strong>${scan.time}</strong></span>
                     <span>Duration: <strong>${scan.duration}</strong></span>
                     <span>Block Name: <strong>${scan.blockName || 'N/A'}</strong></span>

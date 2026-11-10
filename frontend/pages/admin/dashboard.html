@@ -408,7 +408,7 @@
             <div class="nav-section-title">Monitoring</div>
             <ul class="nav-links">
               <li>
-                <a href="users.html" class="nav-link" data-tooltip="Operators">
+                <a href="users.html" class="nav-link" data-tooltip="Field Operators">
                   <span class="nav-link-icon"
                     ><img
                       src="/frontend/assets/icons/nav-users.svg"
@@ -416,7 +416,7 @@
                       width="18"
                       height="18"
                   /></span>
-                  <span class="nav-link-text">Operators</span>
+                  <span class="nav-link-text">Field Operators</span>
                 </a>
               </li>
               <li>
@@ -737,7 +737,7 @@
                       <path d="M16 3.13a4 4 0 0 1 0 7.75" />
                     </svg>
                   </span>
-                  Operator Statistics
+                  Field Operator Statistics
                 </h3>
                 <a href="users.html" class="btn btn-navigation btn-sm"
                   ><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg> Manage <svg class="btn-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a>
@@ -1034,14 +1034,14 @@
 
         var cards = [
           {
-            label: "Total Operators",
+            label: "Total Field Operators",
             value: clients,
             sub: activeOps + " active",
             color: "green",
             icon: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
           },
           {
-            label: "Active Operators",
+            label: "Active Field Operators",
             value: activeOps,
             sub: "of " + clients + " users",
             color: "",
@@ -1244,7 +1244,7 @@
             color: "#d94f4f",
           },
           {
-            label: "Operator Activity",
+            label: "Field Operator Activity",
             value: String(todaySessions),
             sub: '<span class="up">↑ active today</span>',
             data: sessionData,
@@ -1443,7 +1443,7 @@
                 ? '<span class="badge" style="background:var(--red-bg);color:var(--red);"><span class="bdot" style="background:var(--red-mid);"></span>Super Admin</span>'
                 : user.role === "farm_manager"
                   ? '<span class="badge" style="background:var(--amber-bg);color:var(--amber);"><span class="bdot" style="background:var(--amber-mid);"></span>Farm Manager</span>'
-                  : '<span class="badge" style="background:var(--surf2);color:var(--muted);"><span class="bdot" style="background:var(--muted);"></span>Operator</span>';
+                  : '<span class="badge" style="background:var(--surf2);color:var(--muted);"><span class="bdot" style="background:var(--muted);"></span>Field Operator</span>';
             html +=
               "<tr>" +
               "<td><strong>" +

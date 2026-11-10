@@ -625,7 +625,7 @@
             } else if (userData.lastName) {
               fullName = userData.lastName;
             } else {
-              fullName = userData.email || "Operator";
+              fullName = userData.email || "Field Operator";
             }
 
             // Get role
@@ -633,7 +633,7 @@
             const roleLabels = {
               admin: "Super Admin",
               farm_manager: "Farm Manager",
-              client: "Operator",
+              client: "Field Operator",
             };
             const roleLabel = roleLabels[role] || role;
 
@@ -644,12 +644,12 @@
             // Update sidebar user info
             updateSidebarUserInfo(fullName, roleLabel);
 
-            console.log("✅ Operator info loaded:", fullName, role);
+            console.log("✅ Field Operator info loaded:", fullName, role);
           } else {
-            console.warn("⚠️ Operator document not found");
+            console.warn("⚠️ Field Operator document not found");
             document.getElementById("current-username").textContent =
-              currentUser.email || "Operator";
-            document.getElementById("current-role").textContent = "Operator";
+              currentUser.email || "Field Operator";
+            document.getElementById("current-role").textContent = "Field Operator";
           }
         } catch (error) {
           console.error("❌ Error loading account info:", error);

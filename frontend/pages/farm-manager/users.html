@@ -18,7 +18,7 @@
         } catch (e) {}
       })();
     </script>
-    <title>Operator Management - PineVision</title>
+    <title>Field Operator Management - PineVision</title>
     <link rel="apple-touch-icon" sizes="180x180" href="/assets/images/pinevision-touch-icon.png" />
     <link rel="stylesheet" href="../../bootstrap/css/bootstrap.min.css" />
     <link rel="stylesheet" href="../../css/tokens.css" />
@@ -625,7 +625,7 @@
                 <a
                   href="users.html"
                   class="nav-link active"
-                  data-tooltip="Operators"
+                  data-tooltip="Field Operators"
                 >
                   <span class="nav-link-icon"
                     ><img
@@ -634,7 +634,7 @@
                       width="18"
                       height="18"
                   /></span>
-                  <span class="nav-link-text">Operators</span>
+                  <span class="nav-link-text">Field Operators</span>
                 </a>
               </li>
               <li>
@@ -892,7 +892,7 @@
                   <line x1="12" y1="5" x2="12" y2="19" />
                   <line x1="5" y1="12" x2="19" y2="12" />
                 </svg>
-                Add Operator
+                Add Field Operator
               </button>
             </div>
           </div>
@@ -1045,7 +1045,7 @@
                   >
                     <option value="">All Roles</option>
                     <option value="farm_manager">Farm Manager</option>
-                    <option value="client">Operator</option>
+                    <option value="client">Field Operator</option>
                   </select>
                   <select
                     class="filter-select"
@@ -1092,7 +1092,7 @@
                 </div>
 
                 <!-- Table -->
-                <div class="twrap card-scroll-region" tabindex="0" role="region" aria-label="Operator accounts">
+                <div class="twrap card-scroll-region" tabindex="0" role="region" aria-label="Field Operator accounts">
                   <table class="users-table">
                     <thead>
                       <tr>
@@ -1110,7 +1110,7 @@
                           />
                         </th>
                         <th class="sort-header" onclick="applySort('name')">
-                          Operator
+                          Field Operator
                           <span class="sort-arrow active" id="sort-name"
                             >↑</span
                           >
@@ -1174,7 +1174,7 @@
                 color: var(--color-text-primary);
               "
             >
-              Operator Details
+              Field Operator Details
             </h5>
             <button
               type="button"
@@ -1233,7 +1233,7 @@
               type="button"
               class="btn btn-primary btn-sm"
               id="detail-edit-btn"
-            ><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L9 17l-4 1 1-4z"/></svg> Edit Operator</button>
+            ><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L9 17l-4 1 1-4z"/></svg> Edit Field Operator</button>
           </div>
         </div>
       </div>
@@ -1264,7 +1264,7 @@
                 color: var(--color-text-primary);
               "
             >
-              Add New Operator
+              Add New Field Operator
             </h5>
             <button
               type="button"
@@ -1361,7 +1361,7 @@
               <div>
                 <label class="cf-label">Role / Access Level</label>
                 <select class="cf-input" id="f-role">
-                  <option value="client">Operator</option>
+                  <option value="client">Field Operator</option>
                   <option value="farm_manager">Farm Manager</option>
                 </select>
               </div>
@@ -1429,7 +1429,7 @@
               type="button"
               class="btn btn-primary btn-sm"
               onclick="saveUser()"
-            ><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12l4 4v12a2 2 0 0 1-2 2zM17 21v-8H7v8M7 3v5h8"/></svg> Save Operator</button>
+            ><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12l4 4v12a2 2 0 0 1-2 2zM17 21v-8H7v8M7 3v5h8"/></svg> Save Field Operator</button>
           </div>
         </div>
       </div>
@@ -1652,7 +1652,7 @@
           window.initPage();
           btn.disabled = false;
           icon.classList.remove("spinning");
-          utils.showToast("Operator data refreshed", "success");
+          utils.showToast("Field Operator data refreshed", "success");
         }, 600);
       }
 
@@ -1698,16 +1698,16 @@
 
         var cards = [
           {
-            label: "Total Operators",
+            label: "Total Field Operators",
             value: total,
-            sub: "Registered operator accounts",
+            sub: "Registered field operator accounts",
             color: "green",
             trend: "fl",
             trendTxt: "All time",
             icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
           },
           {
-            label: "Active Operators",
+            label: "Active Field Operators",
             value: active,
             sub: "Accounts with active access",
             color: "green",
@@ -1820,7 +1820,7 @@
       function roleBadge(role) {
         if (role === "farm_manager")
           return '<span class="badge" style="background:var(--amber-bg);color:var(--amber);"><span class="bdot" style="background:var(--amber-mid);"></span>Farm Manager</span>';
-        return '<span class="badge" style="background:var(--color-background-secondary);color:var(--color-text-secondary);"><span class="bdot" style="background:var(--color-text-tertiary);"></span>Operator</span>';
+        return '<span class="badge" style="background:var(--color-background-secondary);color:var(--color-text-secondary);"><span class="bdot" style="background:var(--color-text-tertiary);"></span>Field Operator</span>';
       }
 
       function renderTable() {
@@ -1868,7 +1868,7 @@
         var page = filtered.slice(s0, s1);
 
         document.getElementById("result-count").textContent =
-          total + " operator" + (total !== 1 ? "s" : "");
+          total + " field operator" + (total !== 1 ? "s" : "");
 
         ["name", "role", "lastlogin"].forEach(function (col) {
           var el = document.getElementById("sort-" + col);
@@ -1890,7 +1890,7 @@
             '<tr><td colspan="7" style="text-align:center;padding:var(--space-4xl);">' +
             '<div class="empty-state" style="padding:0;">' +
             '<div class="empty-state-icon" style="margin-bottom:var(--space-lg);"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>' +
-            '<div class="empty-state-title">No operators found</div>' +
+            '<div class="empty-state-title">No field operators found</div>' +
             '<div class="empty-state-text">Try adjusting your search or filters</div>' +
             "</div></td></tr>";
         } else {
@@ -1974,7 +1974,7 @@
               "')\">" +
               '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>' +
               "</button>" +
-              '<button class="tbl-btn" title="Edit Operator" onclick="openEdit(\'' +
+              '<button class="tbl-btn" title="Edit Field Operator" onclick="openEdit(\'' +
               u.id +
               "')\">" +
               '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' +
@@ -2021,8 +2021,8 @@
         var s1 = Math.min(currentPage * PAGE_SIZE, total);
         document.getElementById("pag-info").textContent =
           total === 0
-            ? "0 operators"
-            : "Showing " + s0 + "–" + s1 + " of " + total + " operators";
+            ? "0 field operators"
+            : "Showing " + s0 + "–" + s1 + " of " + total + " field operators";
 
         var html = "";
         html +=
@@ -2147,7 +2147,7 @@
           !confirm(
             "Permanently delete " +
               count +
-              " operator" +
+              " field operator" +
               (count !== 1 ? "s" : "") +
               "? This cannot be undone.",
           )
@@ -2189,7 +2189,7 @@
             : action === "disable"
               ? "disabled"
               : "deleted";
-        var msg = results.ok + " operator" + (results.ok !== 1 ? "s" : "") + " " + label;
+        var msg = results.ok + " field operator" + (results.ok !== 1 ? "s" : "") + " " + label;
         if (results.fail > 0) msg += " (" + results.fail + " failed)";
         utils.showToast(msg, results.fail > 0 ? "error" : "success");
       }
@@ -2205,7 +2205,7 @@
             .get();
 
           if (!userDoc.exists) {
-            utils.showToast("Operator not found", "error");
+            utils.showToast("Field Operator not found", "error");
             return;
           }
 
@@ -2247,7 +2247,7 @@
                 role: cuData.role,
                 details:
                   (newStatus === "disabled" ? "Disabled" : "Enabled") +
-                  " operator: " +
+                  " field operator: " +
                   userData.fullName,
               });
             }
@@ -2265,12 +2265,12 @@
           await loadUsersFromBackend();
         } catch (error) {
           console.error("Error toggling user status:", error);
-          utils.showToast("Failed to update operator status", "error");
+          utils.showToast("Failed to update field operator status", "error");
         }
       }
 
       function exportUsers() {
-        utils.showToast("Preparing operator export…", "success");
+        utils.showToast("Preparing field operator export…", "success");
       }
 
       // ── Operator Detail Modal ────────────────────────────────────────────────
@@ -2284,7 +2284,7 @@
             .get();
 
           if (!userDoc.exists) {
-            utils.showToast("Operator not found", "error");
+            utils.showToast("Field Operator not found", "error");
             return;
           }
 
@@ -2365,7 +2365,7 @@
             '<div style="padding:var(--space-md);background:var(--color-background-secondary);border-radius:var(--radius-md);">' +
             '<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Role</div>' +
             '<div style="font-size:var(--font-size-sm);font-weight:var(--font-weight-medium);color:var(--color-text-primary);">' +
-            (u.role === "farm_manager" ? "Farm Manager" : "Regular Operator") +
+            (u.role === "farm_manager" ? "Farm Manager" : "Regular Field Operator") +
             "</div>" +
             "</div>" +
             '<div style="padding:var(--space-md);background:var(--color-background-secondary);border-radius:var(--radius-md);">' +
@@ -2398,15 +2398,15 @@
             document.getElementById("userDetailModal"),
           ).show();
         } catch (error) {
-          console.error("Error loading operator details:", error);
-          utils.showToast("Failed to load operator details", "error");
+          console.error("Error loading field operator details:", error);
+          utils.showToast("Failed to load field operator details", "error");
         }
       }
 
       // ── Add / Edit Modal ─────────────────────────────────────────────────
       function openAddUserModal() {
         editingId = null;
-        document.getElementById("add-modal-title").textContent = "Add New Operator";
+        document.getElementById("add-modal-title").textContent = "Add New Field Operator";
         document.getElementById("f-fullname").value = "";
         document.getElementById("f-username").value = "";
         document.getElementById("f-email").value = "";
@@ -2433,7 +2433,7 @@
             .get();
 
           if (!userDoc.exists) {
-            utils.showToast("Operator not found", "error");
+            utils.showToast("Field Operator not found", "error");
             return;
           }
 
@@ -2484,8 +2484,8 @@
 
           new bootstrap.Modal(document.getElementById("addUserModal")).show();
         } catch (error) {
-          console.error("Error loading operator for edit:", error);
-          utils.showToast("Failed to load operator", "error");
+          console.error("Error loading field operator for edit:", error);
+          utils.showToast("Failed to load field operator", "error");
         }
       }
 
@@ -2522,7 +2522,7 @@
               return;
             }
           } catch (e) {
-                err.textContent = "Failed to verify operator permissions.";
+                err.textContent = "Failed to verify field operator permissions.";
             err.style.display = "block";
             return;
           }
@@ -2540,7 +2540,7 @@
           return;
         }
         if (!editingId && !pw) {
-              err.textContent = "Password is required for new operators.";
+              err.textContent = "Password is required for new field operators.";
           err.style.display = "block";
           return;
         }
@@ -2595,14 +2595,14 @@
                   status: "success",
                   email: cuData.email,
                   role: cuData.role,
-                  details: "Updated operator: " + fn,
+                  details: "Updated field operator: " + fn,
                 });
               }
             } catch (logError) {
               console.error("Failed to log edit activity:", logError);
             }
 
-            utils.showToast("Operator updated successfully", "success");
+            utils.showToast("Field Operator updated successfully", "success");
           } else {
             // CREATE — check username uniqueness before calling API
             const usernameCheck = await firebase
@@ -2627,7 +2627,7 @@
               permissions: [],
             });
 
-            utils.showToast("Operator created successfully", "success");
+            utils.showToast("Field Operator created successfully", "success");
           }
 
           bootstrap.Modal.getInstance(
@@ -2643,7 +2643,7 @@
           ) {
             err.textContent = "Email address is already in use";
           } else {
-              err.textContent = error.message || "Failed to save operator";
+              err.textContent = error.message || "Failed to save field operator";
           }
           err.style.display = "block";
         }
@@ -2660,7 +2660,7 @@
             .get();
 
           if (!userDoc.exists) {
-            utils.showToast("Operator not found", "error");
+            utils.showToast("Field Operator not found", "error");
             return;
           }
 
@@ -2685,7 +2685,7 @@
           ).show();
         } catch (error) {
           console.error("Error loading user for password reset:", error);
-          utils.showToast("Failed to load operator", "error");
+          utils.showToast("Failed to load field operator", "error");
         }
       }
 
@@ -2713,7 +2713,7 @@
             .doc(resetPwUserId)
             .get();
 
-          if (!userDoc.exists) throw new Error("Operator not found");
+          if (!userDoc.exists) throw new Error("Field Operator not found");
           const userData = userDoc.data();
 
           // Use backend API — Admin SDK sets the password directly
