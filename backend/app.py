@@ -443,34 +443,46 @@ def get_crop_cycle_history():
         block_doc = db.collection('blocks').document(block_id).get()
         if not block_doc.exists:
             return jsonify({'error': 'Block not found'}), 404
-        owner_id = (block_doc.to_dict() or {}).get('userId')
-        if not owner_id:
-            return jsonify({'error': 'Block owner could not be resolved'}), 404
-
         cycles = []
-        # Filter the owner after the block-only query to avoid requiring a new
-        # composite index for staff history reads.
+        # The blockId association is the authoritative link. Older cycle
+        # records may not have a userId, so filtering by the current block
+        # owner's userId would silently hide valid history.
         query = db.collection('cropCycles').where('blockId', '==', block_id)
         for cycle_doc in query.stream():
             data = cycle_doc.to_dict() or {}
-            if data.get('userId') != owner_id:
-                continue
+
+            def timestamp_ms(value):
+                if value is None:
+                    return None
+                if hasattr(value, 'timestamp'):
+                    return int(value.timestamp() * 1000)
+                if isinstance(value, (int, float)):
+                    return int(value)
+                return None
+
+            def json_value(value):
+                if value is None or isinstance(value, (str, int, float, bool)):
+                    return value
+                if hasattr(value, 'isoformat'):
+                    return value.isoformat()
+                return str(value)
+
             cycles.append({
                 'id': cycle_doc.id,
-                'status': data.get('status'),
-                'planted': data.get('planted'),
-                'forcingDate': data.get('forcingDate'),
-                'startDate': data.get('startDate'),
-                'daf': data.get('daf'),
+                'status': json_value(data.get('status')),
+                'planted': json_value(data.get('planted')),
+                'forcingDate': json_value(data.get('forcingDate')),
+                'startDate': json_value(data.get('startDate')),
+                'daf': json_value(data.get('daf')),
                 'legacy': bool(data.get('legacy', False)),
-                'createdAtMs': int(data['createdAt'].timestamp() * 1000) if data.get('createdAt') else None,
-                'startedAtMs': int(data['startedAt'].timestamp() * 1000) if data.get('startedAt') else None,
-                'completedAtMs': int(data['completedAt'].timestamp() * 1000) if data.get('completedAt') else None,
+                'createdAtMs': timestamp_ms(data.get('createdAt')),
+                'startedAtMs': timestamp_ms(data.get('startedAt')),
+                'completedAtMs': timestamp_ms(data.get('completedAt')),
             })
         return jsonify({'cycles': cycles}), 200
     except Exception as exc:
-        print(f"❌ Failed to load crop cycle history for {block_id}: {exc}")
-        return jsonify({'error': 'Could not load crop cycle history'}), 500
+        app.logger.exception("Failed to load crop cycle history for %s", block_id)
+        return jsonify({'error': f'Could not load crop cycle history: {type(exc).__name__}: {exc}'}), 500
 
 @app.route('/api/fm/users', methods=['GET'])
 def fm_get_users():

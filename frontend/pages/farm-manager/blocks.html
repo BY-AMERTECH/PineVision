@@ -1414,8 +1414,10 @@
         const response = await fetch("/api/history/crop-cycles?block_id=" + encodeURIComponent(block.id), {
           headers: { Authorization: "Bearer " + token },
         });
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.error || "Could not load crop cycles");
+        const payload = await response.json().catch(function () { return {}; });
+        if (!response.ok) {
+          throw new Error((payload.error || "Could not load crop cycles") + " (HTTP " + response.status + ")");
+        }
         return blockScanHistory.assignCycleDisplayNumbers(payload.cycles || []).reverse();
       }
 
@@ -1437,13 +1439,20 @@
         try {
           const results = await Promise.all([
             blockScanHistory.load(block.id, null, true),
-            loadCropCycleRecords(block),
+            loadCropCycleRecords(block).catch(function (error) {
+              console.error("❌ Error loading crop cycle records:", error);
+              return null;
+            }),
           ]);
+          if (selectedBlockHistoryTab === "cycles" && results[1] === null) {
+            content.innerHTML = '<div class="scan-history-empty">Couldn’t load crop cycle history. Check the browser console for the request error. Scan History is still available.</div>';
+            return;
+          }
           if (selectedBlockHistoryTab === "cycles") {
             blockScanHistory.renderCycles(results[1], results[0], content, block.activeCycleId, viewBlockCycleScans);
             return;
           }
-          blockScanHistory.render(results[0], content, block, selectedBlockCycleId, selectedLegacyCycleCutoff, results[1]);
+          blockScanHistory.render(results[0], content, block, selectedBlockCycleId, selectedLegacyCycleCutoff, results[1] || []);
           if (selectedBlockCycleId) {
             content.insertAdjacentHTML("afterbegin", '<button type="button" class="btn btn-sm btn-secondary history-back-button" onclick="selectBlockHistoryTab(\'cycles\')">← All crop cycles</button>');
           }
@@ -1465,7 +1474,10 @@
         if (!block) return;
         return Promise.all([
           blockScanHistory.load(block.id, null, true),
-          loadCropCycleRecords(block),
+          loadCropCycleRecords(block).catch(function (error) {
+            console.error("❌ Error loading crop cycles for history export:", error);
+            return [];
+          }),
         ]).then(function (results) {
           return blockScanHistory.download(block, null, results[0], results[1], button);
         }).catch(function (error) {
