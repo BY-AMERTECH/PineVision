@@ -167,6 +167,19 @@ window.blockScanHistory = (function () {
         });
     }
 
+    function formatDateOnly(value) {
+        if (!value) return 'Not recorded';
+        let date;
+        if (value instanceof Date) date = value;
+        else if (value && typeof value.toDate === 'function') date = value.toDate();
+        else if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+            const parts = value.split('-').map(Number);
+            date = new Date(parts[0], parts[1] - 1, parts[2]);
+        } else date = new Date(value);
+        if (!date || !Number.isFinite(date.getTime())) return 'Not recorded';
+        return date.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+    }
+
     function formatElapsed(start, end) {
         if (!start || !end || end < start) return null;
         const seconds = Math.round((end - start) / 1000);
@@ -202,10 +215,14 @@ window.blockScanHistory = (function () {
         return null;
     }
 
-    function detailMarkup(entry) {
+    function detailMarkup(entry, cycle) {
         const data = entry.data;
         const end = data.endTime && typeof data.endTime.toDate === 'function' ? data.endTime.toDate() : null;
         const details = [['Scan date', formatDateTime(entry.date)]];
+        details.push(['Planting date', formatDateOnly(data.plantedAtScan || cycle && cycle.planted)]);
+        details.push(['Forcing date', formatDateOnly(data.forcingDateAtScan || cycle && cycle.forcingDate)]);
+        const daf = data.dafAtScan == null ? cycle && cycle.daf : data.dafAtScan;
+        details.push(['DAF', daf == null ? 'Not recorded' : String(daf)]);
         const elapsed = formatElapsed(entry.date, end);
         if (elapsed) details.push(['Elapsed scan time', elapsed]);
         return `<details class="scan-history-details"><summary>View scan details</summary><dl>${details.map(function (item) {
@@ -242,7 +259,7 @@ window.blockScanHistory = (function () {
             <div class="scan-history-cycle ${cycle || data.cycleId ? '' : 'is-unassigned'}">Crop cycle: ${escapeHtml(cycleLabel)}</div>
             ${latestCount}
             ${classes ? `<div class="scan-history-breakdown" aria-label="Plant classification counts">${classes}</div>` : ''}
-            ${detailMarkup(entry)}
+            ${detailMarkup(entry, cycle)}
         </article>`;
     }
 
@@ -558,7 +575,7 @@ window.blockScanHistory = (function () {
 
     function workbookBlob(history, block, cycles) {
         const scanRows = [[
-            'Scan reference', 'Crop Cycle', 'Block ID', 'Block name at scan', 'Section at scan', 'Area at scan',
+            'Scan reference', 'Crop Cycle', 'Block ID', 'Section at scan', 'Block Area (ha)',
             'Planting date at scan', 'Forcing date at scan', 'DAF at scan', 'Account',
             'Start date (UTC)', 'End date (UTC)', 'Duration (seconds)',
             'Bearing detections', 'Non-bearing detections', 'Non-viable detections',
@@ -576,10 +593,11 @@ window.blockScanHistory = (function () {
             if (cycle) scanCounts.set(cycle.id, (scanCounts.get(cycle.id) || 0) + 1);
             scanRows.push([
                 scanReference(entry), cycle ? 'Cycle ' + cycle.displayNumber : 'Unassigned', blockReference,
-                d.blockNameAtScan || 'Not recorded', sectionValue(d.sectionAtScan),
-                d.areaAtScan == null ? 'Not recorded' : d.areaAtScan,
-                d.plantedAtScan || 'Not recorded', d.forcingDateAtScan || 'Not recorded',
-                d.dafAtScan == null ? 'Not recorded' : d.dafAtScan,
+                sectionValue(d.sectionAtScan),
+                block.area == null ? 'Not recorded' : block.area,
+                d.plantedAtScan || cycle && cycle.planted || 'Not recorded',
+                d.forcingDateAtScan || cycle && cycle.forcingDate || 'Not recorded',
+                d.dafAtScan == null ? cycle && cycle.daf != null ? cycle.daf : 'Not recorded' : d.dafAtScan,
                 block.accountName || block.registeredBy || 'N/A',
                 entry.date.toISOString().slice(0, 10), end ? end.toISOString().slice(0, 10) : 'N/A',
                 end && end >= entry.date ? Math.round((end - entry.date) / 1000) : 'N/A',
@@ -588,12 +606,12 @@ window.blockScanHistory = (function () {
             ]);
         });
 
-        const cycleRows = [['Crop Cycle', 'Block name for cycle', 'Section for cycle', 'Area for cycle', 'Planting Date', 'Forcing Date', 'DAF', 'Start Date', 'Completed Date', 'Scan Count', 'Latest Scan']];
+        const cycleRows = [['Crop Cycle', 'Section for cycle', 'Area for cycle', 'Planting Date', 'Forcing Date', 'DAF', 'Start Date', 'Completed Date', 'Scan Count', 'Latest Scan']];
         cycles.slice().sort(function (a, b) { return a.displayNumber - b.displayNumber; }).forEach(function (cycle) {
             const cycleScans = orderedHistory.filter(function (entry) { return assignedCycle(entry, cycles) === cycle; });
             const latest = cycleScans.length ? cycleScans[cycleScans.length - 1].date.toISOString() : '';
             cycleRows.push([
-                'Cycle ' + cycle.displayNumber, cycle.blockName || 'Not recorded', sectionValue(cycle.section),
+                'Cycle ' + cycle.displayNumber, sectionValue(cycle.section),
                 cycle.area == null ? 'Not recorded' : cycle.area,
                 cycle.planted || 'Unavailable', cycle.forcingDate || 'Unavailable', cycle.daf == null ? 'Unavailable' : cycle.daf,
                 cycle.startDate || 'Unavailable', timestamp(cycle.completedAtMs == null ? cycle.completedAt : cycle.completedAtMs) || 'Unavailable', scanCounts.get(cycle.id) || 0, latest || 'Unavailable',
