@@ -52,6 +52,7 @@
             blocksData = [];
             blocksSnapshot.forEach(doc => {
                 const data = doc.data();
+                if (data.isDeleted === true) return;
                 blocksData.push({
                     id: doc.id,
                     activeCycleId: data.activeCycleId || null,

@@ -55,6 +55,52 @@ def get_firestore_client():
     return _db
 
 
+def set_block_archived(block_id: str, user_id: str, archived: bool) -> None:
+    """Archive or restore an owned block without changing its document ID/history."""
+    db = get_firestore_client()
+    ref = db.collection('blocks').document(block_id)
+    snapshot = ref.get()
+    if not snapshot.exists or snapshot.to_dict().get('userId') != user_id:
+        raise LookupError('Block not found')
+    data = snapshot.to_dict()
+    if archived and data.get('isDeleted') is True:
+        raise ValueError('Block is already archived')
+    if not archived and data.get('isDeleted') is not True:
+        raise ValueError('Block is not archived')
+    ref.update({
+        'isDeleted': archived,
+        'deletedAt': firestore.SERVER_TIMESTAMP if archived else None,
+    })
+
+
+def permanently_delete_archived_block(block_id: str, user_id: str) -> None:
+    """Delete an archived block and its operational records; preserve audit logs."""
+    db = get_firestore_client()
+    ref = db.collection('blocks').document(block_id)
+    snapshot = ref.get()
+    if not snapshot.exists or snapshot.to_dict().get('userId') != user_id:
+        raise LookupError('Block not found')
+    if snapshot.to_dict().get('isDeleted') is not True:
+        raise ValueError('Only archived blocks can be permanently deleted')
+
+    # These top-level collections use blockId references. Keep activity_logs as
+    # the audit trail; historical scan/crop-cycle records are retained until
+    # this explicit permanent-delete action.
+    for collection_name in ('cropCycles', 'scans', 'monitoring_alerts'):
+        batch = db.batch()
+        pending = 0
+        for doc in db.collection(collection_name).where('blockId', '==', block_id).stream():
+            batch.delete(doc.reference)
+            pending += 1
+            if pending == 400:
+                batch.commit()
+                batch = db.batch()
+                pending = 0
+        if pending:
+            batch.commit()
+    ref.delete()
+
+
 # ═══════════════════════════════════════════════════════════════════════
 # OPTIMIZED: BATCH WRITE — replaces two separate round-trips with one
 # ═══════════════════════════════════════════════════════════════════════
@@ -133,6 +179,8 @@ def update_detection_batch(
             block_data = block_doc.to_dict() or {}
             if scan_data.get('blockId') != block_id:
                 return
+            if block_data.get('isDeleted') is True:
+                return
             if scan_data.get('cycleId') == block_data.get('activeCycleId'):
                 transaction.update(block_ref, block_update)
 
@@ -174,7 +222,10 @@ def create_scan_session(block_id: str, user_id: str) -> Optional[str]:
     try:
         db = get_firestore_client()
         block_doc = db.collection('blocks').document(block_id).get()
-        active_cycle_id = block_doc.to_dict().get('activeCycleId') if block_doc.exists else None
+        if not block_doc.exists or block_doc.to_dict().get('isDeleted') is True:
+            print(f"⚠️ Cannot create a scan for missing or archived block: {block_id}")
+            return None
+        active_cycle_id = block_doc.to_dict().get('activeCycleId')
         scan_ref = db.collection('scans').document()
         scan_ref.set({
             'blockId':         block_id,
@@ -308,6 +359,8 @@ def complete_scan_session(
             scan_data = scan_doc.to_dict() or {}
             block_data = block_doc.to_dict() or {}
             if scan_data.get('blockId') != block_id:
+                return
+            if block_data.get('isDeleted') is True:
                 return
             if scan_data.get('cycleId') == block_data.get('activeCycleId'):
                 transaction.update(block_ref, block_update)

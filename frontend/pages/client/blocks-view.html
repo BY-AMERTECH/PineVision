@@ -885,16 +885,16 @@
     <div id="delete-block-modal" class="modal">
       <div class="modal-content" style="max-width: 420px">
         <div class="modal-header">
-          <h2 class="modal-title">Delete Block</h2>
+          <h2 class="modal-title">Move Block to Archive</h2>
           <button class="modal-close" onclick="closeDeleteModal()">
             &times;
           </button>
         </div>
         <div class="modal-body">
           <p style="font-size:var(--font-size-sm);color:var(--color-text-secondary);margin:0;">
-            Are you sure you want to delete
+            Move
             <strong id="delete-block-name" style="color:var(--color-text-primary);"></strong>?
-            This cannot be undone.
+            The block and its crop cycle and scan history will be kept in Archive until you permanently delete it.
           </p>
         </div>
         <div class="modal-footer">
@@ -988,6 +988,11 @@
           }
 
           const blockData = blockDoc.data();
+
+          if (blockData.isDeleted === true) {
+            window.location.href = "archive.html";
+            return;
+          }
 
           // A client may only view/edit their own blocks — the block id in
           // the URL is not itself proof of ownership, so verify it here
@@ -1687,25 +1692,27 @@
         utils.hideModal("delete-block-modal");
       }
 
-      function handleDeleteBlock() {
+      async function handleDeleteBlock() {
         if (!currentBlock) return;
-        firebase
-          .firestore()
-          .collection("blocks")
-          .doc(currentBlock.id)
-          .delete()
-          .then(function () {
-            closeDeleteModal();
-            utils.showToast("Block deleted.", "success");
-            setTimeout(function () {
-              window.location.href = "blocks.html";
-            }, 800);
-          })
-          .catch(function (err) {
-            console.error("❌ Failed to delete block:", err);
-            closeDeleteModal();
-            utils.showToast("Failed to delete block. Please try again.", "error");
+        const confirmButton = document.querySelector('#delete-block-modal .btn-primary');
+        if (confirmButton?.disabled) return;
+        if (confirmButton) confirmButton.disabled = true;
+        try {
+          const token = await firebase.auth().currentUser.getIdToken();
+          const response = await fetch("/api/client/blocks/" + encodeURIComponent(currentBlock.id) + "/archive", {
+            method: "POST", headers: { Authorization: "Bearer " + token }
           });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error || "Failed to archive block");
+          closeDeleteModal();
+          utils.showToast("Block moved to Archive.", "success");
+          setTimeout(function () { window.location.href = "blocks.html"; }, 500);
+        } catch (err) {
+          console.error("❌ Failed to archive block:", err);
+          if (confirmButton) confirmButton.disabled = false;
+          closeDeleteModal();
+          utils.showToast(err.message || "Failed to archive block. Please try again.", "error");
+        }
       }
 
     </script>

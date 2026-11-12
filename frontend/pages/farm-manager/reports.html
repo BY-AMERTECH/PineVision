@@ -663,6 +663,7 @@
               BLOCKS_RAW = [];
               snap.forEach(function (doc) {
                 const d = doc.data();
+                if (d.isDeleted === true) return;
                 BLOCKS_RAW.push({
                   id: doc.id,
                   activeCycleId: d.activeCycleId || null,

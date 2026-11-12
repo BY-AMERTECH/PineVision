@@ -937,6 +937,7 @@
           ALL_BLOCKS = [];
           blocksSnap.forEach(function (doc) {
             const d = doc.data();
+            if (d.isDeleted === true) return;
             const operator = USERS_BY_ID[d.userId];
 
             ALL_BLOCKS.push({

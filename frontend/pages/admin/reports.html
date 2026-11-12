@@ -443,6 +443,7 @@
               BLOCKS_BY_ID = {};
               snap.forEach(function (doc) {
                 const d = doc.data();
+                if (d.isDeleted === true) return;
                 BLOCKS_BY_ID[doc.id] = {
                   blockName: d.blockName || d.blockId || doc.id,
                   section: d.section || "",

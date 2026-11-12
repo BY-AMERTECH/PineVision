@@ -680,6 +680,7 @@
 
           blocksSnapshot.forEach(function (doc) {
             const blockData = doc.data();
+            if (blockData.isDeleted === true) return;
             ALL_BLOCKS.push({
               id: doc.id,
               activeCycleId: blockData.activeCycleId || null,

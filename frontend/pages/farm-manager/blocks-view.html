@@ -595,6 +595,10 @@
           });
 
           const d = blockDoc.data();
+          if (d.isDeleted === true) {
+            window.location.href = "blocks.html";
+            return;
+          }
           currentBlock = {
             id: blockDoc.id,
             activeCycleId: d.activeCycleId || null,

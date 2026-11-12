@@ -109,6 +109,11 @@ def check_thresholds_and_create_alerts(
 
     db = get_firestore_client()
 
+    block_doc = db.collection('blocks').document(block_id).get()
+    if not block_doc.exists or (block_doc.to_dict() or {}).get('isDeleted') is True:
+        print(f"⚠️ Skipping threshold alerts for missing or archived block: {block_id}")
+        return
+
     thresholds = {
         'bearing':    {'watch': 75,  'critical': 60},
         'nonbearing': {'watch': 18,  'critical': 25},

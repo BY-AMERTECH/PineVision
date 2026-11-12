@@ -22,6 +22,9 @@ import requests
 
 from drone_conn.routes import drone_bp
 from drone_conn.live_socket import init_live_socket, socketio
+from drone_conn.firebase_client import (
+    set_block_archived, permanently_delete_archived_block,
+)
 
 # Absolute path to the frontend folder (one level up from backend/)
 FRONTEND = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'frontend'))
@@ -162,6 +165,57 @@ def api_test():
         'status': 'success',
         'firebase': 'connected' if db else 'disconnected'
     }), 200
+
+
+@app.route('/api/client/blocks/<block_id>/archive', methods=['POST'])
+def archive_client_block(block_id):
+    decoded, error = _verify_client_token()
+    if error:
+        return error
+    try:
+        set_block_archived(block_id, decoded['uid'], True)
+        return jsonify({'success': True}), 200
+    except LookupError as exc:
+        return jsonify({'error': str(exc)}), 404
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 409
+    except Exception as exc:
+        print(f"❌ Failed to archive block: {exc}")
+        return jsonify({'error': 'Failed to archive block'}), 500
+
+
+@app.route('/api/client/blocks/<block_id>/restore', methods=['POST'])
+def restore_client_block(block_id):
+    decoded, error = _verify_client_token()
+    if error:
+        return error
+    try:
+        set_block_archived(block_id, decoded['uid'], False)
+        return jsonify({'success': True}), 200
+    except LookupError as exc:
+        return jsonify({'error': str(exc)}), 404
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 409
+    except Exception as exc:
+        print(f"❌ Failed to restore block: {exc}")
+        return jsonify({'error': 'Failed to restore block'}), 500
+
+
+@app.route('/api/client/blocks/<block_id>/permanent', methods=['DELETE'])
+def permanently_delete_client_block(block_id):
+    decoded, error = _verify_client_token()
+    if error:
+        return error
+    try:
+        permanently_delete_archived_block(block_id, decoded['uid'])
+        return jsonify({'success': True}), 200
+    except LookupError as exc:
+        return jsonify({'error': str(exc)}), 404
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 409
+    except Exception as exc:
+        print(f"❌ Failed to permanently delete block: {exc}")
+        return jsonify({'error': 'Permanent deletion was incomplete. Retry from Archive.'}), 500
 
 
 @app.route('/api/client/alert-thresholds', methods=['GET', 'PUT'])

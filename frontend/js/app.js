@@ -52,11 +52,35 @@ const app = (function() {
         // Set active link based on current page
         setActivePage();
 
+        // Keep the client-only account management links together without
+        // duplicating the Settings link in the page templates.
+        if (session.role === 'client') {
+            initClientManagementNavigation();
+            setActivePage();
+        }
+
         // Mobile sidebar toggle
         setupMobileSidebar();
 
         // Restore sidebar collapsed state from localStorage
         initSidebarCollapse();
+    }
+
+    function initClientManagementNavigation() {
+        const settingsLink = document.querySelector('.sidebar-nav a[href="settings.html"]');
+        const fieldSection = Array.from(document.querySelectorAll('.sidebar-nav .nav-section'))
+            .find(section => /field operations/i.test(section.querySelector('.nav-section-title')?.textContent || ''));
+        if (!settingsLink || !fieldSection || document.querySelector('.client-management-section')) return;
+        const management = document.createElement('div');
+        management.className = 'nav-section client-management-section';
+        management.innerHTML = '<div class="nav-section-title">Management</div><ul class="nav-links"></ul>';
+        const list = management.querySelector('.nav-links');
+        const settingsItem = settingsLink.closest('li');
+        if (settingsItem) list.appendChild(settingsItem);
+        const archiveItem = document.createElement('li');
+        archiveItem.innerHTML = '<a href="archive.html" class="nav-link"><span class="nav-link-icon"><img src="/frontend/assets/icons/nav-archive.svg" alt="Archive" width="20"></span><span class="nav-link-text">Archive</span></a>';
+        list.appendChild(archiveItem);
+        fieldSection.parentNode.insertBefore(management, fieldSection.nextSibling);
     }
 
     /**
@@ -166,6 +190,7 @@ const app = (function() {
     const TOPBAR_ICONS = {
         dashboard: '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>',
         leaf: '<path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>',
+        archive: '<path d="M3 4h18v4H3z"/><path d="M5 8v12h14V8"/><path d="M9 12h6"/><path d="m10 15 2 2 2-2"/>',
         clipboard: '<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>',
         bell: '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
         cog: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
@@ -194,6 +219,10 @@ const app = (function() {
         'blocks-view': {
             icon: 'leaf',
             default: { title: 'Block Detail', subtitle: 'Detailed condition and history for an individual fruit block' }
+        },
+        'archive': {
+            icon: 'archive',
+            client: { title: 'Archive', subtitle: 'Restore or permanently delete archived blocks' }
         },
         'scans': {
             icon: 'clipboard',
