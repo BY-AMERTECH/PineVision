@@ -106,6 +106,9 @@
       }
 
       .info-card-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
         font-size: var(--font-size-xs);
         font-weight: var(--font-weight-semibold);
         color: var(--muted);
@@ -114,6 +117,20 @@
         margin-bottom: var(--space-md);
         padding-bottom: var(--space-sm);
         border-bottom: var(--border-width-thin) solid var(--border);
+      }
+
+      .info-card-title svg,
+      .section-title-icon {
+        width: 16px;
+        height: 16px;
+        flex: 0 0 16px;
+        color: var(--green);
+      }
+
+      .thead-title {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
       }
 
       .stat-row {
@@ -694,7 +711,7 @@
               style="padding: var(--space-md) var(--space-xl)"
             >
               <div class="d-flex align-items-center gap-3">
-                <span class="thead-title">History</span>
+                <span class="thead-title"><svg class="section-title-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 2.64-6.36L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>History</span>
                 <span class="trend-view-hint">View scans and crop cycles</span>
               </div>
               <div class="d-flex align-items-center gap-2 trend-actions">
@@ -1204,7 +1221,7 @@
         document.getElementById("field-info-row").innerHTML = `
             <div class="col-md-6">
                 <div class="info-card">
-                    <div class="info-card-title">General Details</div>
+                    <div class="info-card-title"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg><span>General Details</span></div>
                     <div class="stat-row">
                         <span class="stat-label">Block ID</span>
                         <span class="stat-value">${block.blockName || block.blockId}</span>
@@ -1222,14 +1239,14 @@
             </div>
             <div class="col-md-6">
                 <div class="info-card">
-                    <div class="info-card-title">Crop &amp; Growth Details</div>
+                    <div class="info-card-title"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span>Crop &amp; Growth Details</span></div>
                     <div class="stat-row">
                         <span class="stat-label">Planting Date</span>
-                        <span class="stat-value">${block.planted}</span>
+                        <span class="stat-value">${formatDateValue(block.planted)}</span>
                     </div>
                     <div class="stat-row">
                         <span class="stat-label">Forcing Date</span>
-                        <span class="stat-value">${block.forcingDate}</span>
+                        <span class="stat-value">${formatDateValue(block.forcingDate)}</span>
                     </div>
                     <div class="stat-row">
                         <span class="stat-label">Growth Stage (DAF)</span>
@@ -1252,7 +1269,7 @@
 
         document.getElementById("condition-breakdown").innerHTML = `
         <div class="thead-row">
-            <span class="thead-title">Fruit Condition Breakdown</span>
+            <span class="thead-title"><svg class="section-title-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v9h9"/><path d="M20.5 15A9 9 0 1 1 9 3.5"/></svg>Fruit Condition Breakdown</span>
         </div>
         <div class="twrap">
             <table class="fruit-breakdown-table">
@@ -1374,6 +1391,29 @@
 
       function formatArea(area) {
         return area + " ha";
+      }
+
+      function formatDateValue(value) {
+        if (!value) return "—";
+        let date;
+        if (value && typeof value.toDate === "function") {
+          date = value.toDate();
+        } else if (value instanceof Date) {
+          date = value;
+        } else if (typeof value === "string") {
+          const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+          date = match
+            ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+            : new Date(value);
+        } else {
+          date = new Date(value);
+        }
+        if (Number.isNaN(date.getTime())) return String(value);
+        return date.toLocaleDateString("en-US", {
+          month: "long",
+          day: "2-digit",
+          year: "numeric",
+        });
       }
 
       // ── Trend Modal — live bearing-rate history from this block's scans ──
