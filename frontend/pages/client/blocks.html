@@ -143,11 +143,19 @@
       }
 
       .bcard-number {
-        font-size: var(--font-size-xs);
+        font-size: var(--font-size-xl);
+        color: var(--color-text-primary);
+        font-weight: var(--font-weight-bold);
+        text-transform: none;
+        letter-spacing: normal;
+      }
+
+      .bcard-daf {
+        font-size: var(--font-size-md);
+        font-weight: var(--font-weight-medium);
         color: var(--muted);
-        font-weight: var(--font-weight-semibold);
-        text-transform: uppercase;
-        letter-spacing: 0.07em;
+        margin: var(--space-xs) 0;
+        line-height: 1.25;
       }
 
       .bcard-meta {
@@ -691,6 +699,7 @@
 
               // Latest scan data
               stage: blockData.stage || blockData.blockName || "Plant Crop",
+              daf: blockData.daf != null && Number.isFinite(Number(blockData.daf)) ? Number(blockData.daf) : null,
               bearing: blockData.bearingPercent || 0,
               nonbearing: blockData.nonBearingPercent || 0,
               plants: blockData.totalPineapples || 0,
@@ -794,7 +803,7 @@
                               <div class="bcard-header">
                                   <div>
                                       <div class="bcard-number">${block.blockName || "BLOCK " + block.blockId}</div>
-                                      <div class="bcard-stage">${block.stage}</div>
+                                      <div class="bcard-daf">${block.daf === null ? "DAF unavailable" : formatNumber(block.daf) + " DAF"}</div>
                                       <div class="bcard-meta">
                                           ${block.section} &middot; ${formatArea(block.area)}
                                           <div>${utils.recentScanBadge(block.lastScanned)}</div>
@@ -949,6 +958,9 @@
             blockId: blockRef.id,
             userId: currentUser.uid,
             status: "active",
+            blockName: formData.blockId,
+            section: formData.section,
+            area: area,
             planted: formData.planted,
             forcingDate: formData.forcingDate,
             daf: parseInt(formData.daf),

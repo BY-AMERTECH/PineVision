@@ -558,7 +558,8 @@ window.blockScanHistory = (function () {
 
     function workbookBlob(history, block, cycles) {
         const scanRows = [[
-            'Scan reference', 'Crop Cycle', 'Block ID', 'Block name', 'Section', 'Account',
+            'Scan reference', 'Crop Cycle', 'Block ID', 'Block name at scan', 'Section at scan', 'Area at scan',
+            'Planting date at scan', 'Forcing date at scan', 'DAF at scan', 'Account',
             'Start date (UTC)', 'End date (UTC)', 'Duration (seconds)',
             'Bearing detections', 'Non-bearing detections', 'Non-viable detections',
             'Estimated plant count',
@@ -575,7 +576,11 @@ window.blockScanHistory = (function () {
             if (cycle) scanCounts.set(cycle.id, (scanCounts.get(cycle.id) || 0) + 1);
             scanRows.push([
                 scanReference(entry), cycle ? 'Cycle ' + cycle.displayNumber : 'Unassigned', blockReference,
-                block.blockName || blockReference, sectionValue(block.section), block.accountName || block.registeredBy || 'N/A',
+                d.blockNameAtScan || 'Not recorded', sectionValue(d.sectionAtScan),
+                d.areaAtScan == null ? 'Not recorded' : d.areaAtScan,
+                d.plantedAtScan || 'Not recorded', d.forcingDateAtScan || 'Not recorded',
+                d.dafAtScan == null ? 'Not recorded' : d.dafAtScan,
+                block.accountName || block.registeredBy || 'N/A',
                 entry.date.toISOString().slice(0, 10), end ? end.toISOString().slice(0, 10) : 'N/A',
                 end && end >= entry.date ? Math.round((end - entry.date) / 1000) : 'N/A',
                 bearing ?? 'N/A', nonBearing ?? 'N/A', metric(d, 'nonViable') ?? 'N/A',
@@ -583,12 +588,14 @@ window.blockScanHistory = (function () {
             ]);
         });
 
-        const cycleRows = [['Crop Cycle', 'Section', 'Planting Date', 'Forcing Date', 'Start Date', 'Completed Date', 'Scan Count', 'Latest Scan']];
+        const cycleRows = [['Crop Cycle', 'Block name for cycle', 'Section for cycle', 'Area for cycle', 'Planting Date', 'Forcing Date', 'DAF', 'Start Date', 'Completed Date', 'Scan Count', 'Latest Scan']];
         cycles.slice().sort(function (a, b) { return a.displayNumber - b.displayNumber; }).forEach(function (cycle) {
             const cycleScans = orderedHistory.filter(function (entry) { return assignedCycle(entry, cycles) === cycle; });
             const latest = cycleScans.length ? cycleScans[cycleScans.length - 1].date.toISOString() : '';
             cycleRows.push([
-                'Cycle ' + cycle.displayNumber, sectionValue(block.section), cycle.planted || 'Unavailable', cycle.forcingDate || 'Unavailable',
+                'Cycle ' + cycle.displayNumber, cycle.blockName || 'Not recorded', sectionValue(cycle.section),
+                cycle.area == null ? 'Not recorded' : cycle.area,
+                cycle.planted || 'Unavailable', cycle.forcingDate || 'Unavailable', cycle.daf == null ? 'Unavailable' : cycle.daf,
                 cycle.startDate || 'Unavailable', timestamp(cycle.completedAtMs == null ? cycle.completedAt : cycle.completedAtMs) || 'Unavailable', scanCounts.get(cycle.id) || 0, latest || 'Unavailable',
             ]);
         });

@@ -1568,11 +1568,11 @@
             if (oldCycleRef) {
               const prior = await tx.get(oldCycleRef);
               if (!prior.exists) throw new Error("The active cycle record is missing. Refresh and try again.");
-              tx.update(oldCycleRef, {status:"completed", completedAt:now});
+              tx.update(oldCycleRef, {status:"completed", completedAt:now, blockName:data.blockName || null, section:data.section || null, area:data.area ?? null});
             } else {
-              tx.set(legacyCycleRef, {blockId:currentBlock.id,userId:currentUserId,status:"completed",planted:data.planted || null,forcingDate:data.forcingDate || null,daf:Number.isSafeInteger(Number(data.daf)) ? Number(data.daf) : null,startDate:data.planted || null,completedAt:now,createdAt:now,legacy:true});
+              tx.set(legacyCycleRef, {blockId:currentBlock.id,userId:currentUserId,status:"completed",blockName:data.blockName || null,section:data.section || null,area:data.area ?? null,planted:data.planted || null,forcingDate:data.forcingDate || null,daf:Number.isSafeInteger(Number(data.daf)) ? Number(data.daf) : null,startDate:data.planted || null,completedAt:now,createdAt:now,legacy:true});
             }
-            tx.set(newCycleRef, {blockId:currentBlock.id,userId:currentUserId,status:"active",planted:planted,forcingDate:forcingDate,daf:daf,startDate:planted,startedAt:now,createdAt:now});
+            tx.set(newCycleRef, {blockId:currentBlock.id,userId:currentUserId,status:"active",blockName:data.blockName || null,section:data.section || null,area:data.area ?? null,planted:planted,forcingDate:forcingDate,daf:daf,startDate:planted,startedAt:now,createdAt:now});
             tx.update(blockRef, {activeCycleId:newCycleRef.id,planted:planted,forcingDate:forcingDate,daf:daf,bearingPercent:0,nonBearingPercent:0,nonViable:0,totalPineapples:0,totalScans:0,estimatedBearing:0,estimatedNonBearing:0,detectionCoverage:0,lastScanned:firebase.firestore.FieldValue.delete(),lastUpdate:now});
           });
           closeNewCycleModal();
@@ -1688,7 +1688,7 @@
             if (!cycleDoc.exists || cycle.blockId !== currentBlock.id || cycle.userId !== currentUserId || cycle.status !== "active") {
               throw new Error("The active crop cycle could not be verified. Refresh and try again.");
             }
-            tx.update(cycleRef, { planted: planted, forcingDate: forcingDate, daf: daf });
+            tx.update(cycleRef, { blockName: blockName, section: section, area: area, planted: planted, forcingDate: forcingDate, daf: daf });
           }
 
           tx.update(blockRef, {
