@@ -182,6 +182,13 @@
         margin-bottom: var(--space-xs);
       }
 
+      .bcard-estimated-count {
+        display: block;
+        margin-top: var(--space-sm);
+        font-size: var(--font-size-sm);
+        color: var(--color-text-secondary);
+      }
+
       .bcard-foot {
         display: flex;
         flex-wrap: wrap;
@@ -817,12 +824,13 @@
                               <div class="bcard-bar-section">
                                   <div class="bcard-bar-label">Bearing rate</div>
                                   ${buildInlineBar(block.bearing, barColorVal)}
+                                  <span class="bcard-estimated-count">Estimated Plant Count: ${block.estimatedTotalPlantCount === null ? "Unavailable" : formatNumber(block.estimatedTotalPlantCount)}</span>
                               </div>
 
                               <div class="bcard-foot">
-                                  <span class="bcard-foot-stat">Estimated Plant Count: ${block.estimatedTotalPlantCount === null ? "Unavailable" : formatNumber(block.estimatedTotalPlantCount)}</span>
-                                  <span class="bcard-foot-stat" style="color: ${nonViableColor};">${formatPercent(block.nonViable)} non-viable</span>
+                                  <span class="bcard-foot-stat" style="color: ${barColorVal};">${formatPercent(Number(block.bearing) || 0)} bearing</span>
                                   <span class="bcard-foot-stat" style="color: ${nonbearingColor};">${formatPercent(block.nonbearing)} non-bearing</span>
+                                  <span class="bcard-foot-stat" style="color: ${nonViableColor};">${formatPercent(block.nonViable)} non-viable</span>
                               </div>
                           </div>
                       </div>`;
