@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <link rel="icon" type="image/svg+xml" href="../../assets/images/pinevision-logo.svg" />
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
@@ -17,10 +18,8 @@
         } catch (e) {}
       })();
     </script>
-    <title>User Management - PineVision</title>
-    <link rel="icon" type="image/x-icon" href="/frontend/assets/images/pinevision-favicon.ico" />
-    <link rel="icon" type="image/webp" sizes="64x64" href="/frontend/assets/images/pinevision-favicon.webp" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/frontend/assets/images/pinevision-touch-icon.png" />
+    <title>Field Operator Management - PineVision</title>
+    <link rel="apple-touch-icon" sizes="180x180" href="/assets/images/pinevision-touch-icon.png" />
     <link rel="stylesheet" href="../../bootstrap/css/bootstrap.min.css" />
     <link rel="stylesheet" href="../../css/tokens.css" />
     <link rel="stylesheet" href="../../css/layout.css" />
@@ -565,7 +564,7 @@
         <div class="sidebar-brand">
           <div class="sidebar-logo">
             <img
-              src="/frontend/assets/images/pinevision-transparent-logo.svg"
+              src="/assets/images/pinevision-transparent-logo.svg"
               alt="PineVision"
               class="sidebar-logo-img" width="56" height="56"
             />
@@ -608,7 +607,7 @@
                 >
                   <span class="nav-link-icon"
                     ><img
-                      src="/frontend/assets/icons/nav-dashboard.svg"
+                      src="/assets/icons/nav-dashboard.svg"
                       alt=""
                       width="18"
                       height="18"
@@ -626,16 +625,16 @@
                 <a
                   href="users.html"
                   class="nav-link active"
-                  data-tooltip="Users"
+                  data-tooltip="Field Operators"
                 >
                   <span class="nav-link-icon"
                     ><img
-                      src="/frontend/assets/icons/nav-users.svg"
+                      src="/assets/icons/nav-users.svg"
                       alt=""
                       width="18"
                       height="18"
                   /></span>
-                  <span class="nav-link-text">Users</span>
+                  <span class="nav-link-text">Field Operators</span>
                 </a>
               </li>
               <li>
@@ -646,7 +645,7 @@
                 >
                   <span class="nav-link-icon"
                     ><img
-                      src="/frontend/assets/icons/nav-clipboard.svg"
+                      src="/assets/icons/nav-clipboard.svg"
                       alt=""
                       width="18"
                       height="18"
@@ -662,7 +661,7 @@
                 >
                   <span class="nav-link-icon"
                     ><img
-                      src="/frontend/assets/icons/nav-leaf.svg"
+                      src="/assets/icons/nav-leaf.svg"
                       alt=""
                       width="18"
                       height="18"
@@ -684,7 +683,7 @@
                 >
                   <span class="nav-link-icon"
                     ><img
-                      src="/frontend/assets/icons/nav-flights.svg"
+                      src="/assets/icons/nav-flights.svg"
                       alt=""
                       width="18"
                       height="18"
@@ -696,7 +695,7 @@
                 <a href="alerts.html" class="nav-link" data-tooltip="Account Alerts">
                   <span class="nav-link-icon"
                     ><img
-                      src="/frontend/assets/icons/nav-bell.svg"
+                      src="/assets/icons/nav-bell.svg"
                       alt=""
                       width="18"
                       height="18"
@@ -713,7 +712,7 @@
                 <a href="reports.html" class="nav-link" data-tooltip="Reports">
                   <span class="nav-link-icon"
                     ><img
-                      src="/frontend/assets/icons/nav-reports.svg"
+                      src="/assets/icons/nav-reports.svg"
                       alt=""
                       width="18"
                       height="18"
@@ -735,7 +734,7 @@
                 >
                   <span class="nav-link-icon"
                     ><img
-                      src="/frontend/assets/icons/nav-cog.svg"
+                      src="/assets/icons/nav-cog.svg"
                       alt=""
                       width="18"
                       height="18"
@@ -893,7 +892,7 @@
                   <line x1="12" y1="5" x2="12" y2="19" />
                   <line x1="5" y1="12" x2="19" y2="12" />
                 </svg>
-                Add User
+                Add Field Operator
               </button>
             </div>
           </div>
@@ -903,7 +902,7 @@
 
           <!-- Main Layout -->
           <div class="users-layout">
-            <!-- Left: User Table -->
+            <!-- Left: Operator Table -->
             <div class="users-main">
               <div class="tcard" style="margin-bottom: 0">
                 <!-- Bulk Action Bar -->
@@ -1046,7 +1045,7 @@
                   >
                     <option value="">All Roles</option>
                     <option value="farm_manager">Farm Manager</option>
-                    <option value="client">User</option>
+                    <option value="client">Field Operator</option>
                   </select>
                   <select
                     class="filter-select"
@@ -1093,7 +1092,7 @@
                 </div>
 
                 <!-- Table -->
-                <div class="twrap card-scroll-region" tabindex="0" role="region" aria-label="User accounts">
+                <div class="twrap card-scroll-region" tabindex="0" role="region" aria-label="Field Operator accounts">
                   <table class="users-table">
                     <thead>
                       <tr>
@@ -1111,7 +1110,7 @@
                           />
                         </th>
                         <th class="sort-header" onclick="applySort('name')">
-                          User
+                          Field Operator
                           <span class="sort-arrow active" id="sort-name"
                             >↑</span
                           >
@@ -1148,7 +1147,7 @@
       </main>
     </div>
 
-    <!-- User Detail Modal -->
+    <!-- Operator Detail Modal -->
     <div
       class="modal fade bs-modal"
       id="userDetailModal"
@@ -1175,7 +1174,7 @@
                 color: var(--color-text-primary);
               "
             >
-              User Details
+              Field Operator Details
             </h5>
             <button
               type="button"
@@ -1234,13 +1233,13 @@
               type="button"
               class="btn btn-primary btn-sm"
               id="detail-edit-btn"
-            ><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L9 17l-4 1 1-4z"/></svg> Edit User</button>
+            ><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L9 17l-4 1 1-4z"/></svg> Edit Field Operator</button>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Add / Edit User Modal -->
+    <!-- Add / Edit Operator Modal -->
     <div
       class="modal fade bs-modal"
       id="addUserModal"
@@ -1265,7 +1264,7 @@
                 color: var(--color-text-primary);
               "
             >
-              Add New User
+              Add New Field Operator
             </h5>
             <button
               type="button"
@@ -1362,7 +1361,7 @@
               <div>
                 <label class="cf-label">Role / Access Level</label>
                 <select class="cf-input" id="f-role">
-                  <option value="client">User</option>
+                  <option value="client">Field Operator</option>
                   <option value="farm_manager">Farm Manager</option>
                 </select>
               </div>
@@ -1430,7 +1429,7 @@
               type="button"
               class="btn btn-primary btn-sm"
               onclick="saveUser()"
-            ><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12l4 4v12a2 2 0 0 1-2 2zM17 21v-8H7v8M7 3v5h8"/></svg> Save User</button>
+            ><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12l4 4v12a2 2 0 0 1-2 2zM17 21v-8H7v8M7 3v5h8"/></svg> Save Field Operator</button>
           </div>
         </div>
       </div>
@@ -1536,6 +1535,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 
+    <script src="../../js/backend-config.js"></script>
     <script src="../../js/auth.js"></script>
     <script src="../../js/data.js"></script>
     <script src="../../js/utils.js"></script>
@@ -1556,6 +1556,7 @@
       var activeUserId = null;
       var editingId = null;
       var resetPwUserId = null;
+      var currentFarmManagerId = null;
 
       // Load users from Firestore — Farm Managers never see admin accounts
       async function loadUsersFromBackend() {
@@ -1581,7 +1582,7 @@
               email: userData.email,
               role: userData.role,
               status: userData.status,
-              createdAt: userData.createdAt || new Date().toISOString(),
+              createdAt: userData.createdAt || null,
               lastLogin: userData.lastLogin
                 ? userData.lastLogin.toDate().toISOString()
                 : null,
@@ -1611,6 +1612,7 @@
 
       async function apiCall(method, path, body) {
         const token = await getAuthToken();
+        const apiBase = (window.PINEVISION_API_BASE || "").replace(/\/$/, "");
         const options = {
           method: method,
           headers: {
@@ -1619,7 +1621,7 @@
           },
         };
         if (body !== undefined) options.body = JSON.stringify(body);
-        const resp = await fetch(path, options);
+        const resp = await fetch(apiBase + path, options);
         const data = await resp.json();
         if (!resp.ok) throw new Error(data.error || "Request failed");
         return data;
@@ -1627,6 +1629,8 @@
 
       // ── Init ─────────────────────────────────────────────────────────────
       window.initPage = function () {
+        const session = auth.getSession();
+        currentFarmManagerId = session ? session.uid : null;
         loadUsersFromBackend();
         updateTimestamp();
       };
@@ -1651,11 +1655,19 @@
           window.initPage();
           btn.disabled = false;
           icon.classList.remove("spinning");
-          utils.showToast("User data refreshed", "success");
+          utils.showToast("Field Operator data refreshed", "success");
         }, 600);
       }
 
       // ── Metrics ──────────────────────────────────────────────────────────
+      function parseCreatedAt(value) {
+        if (!value) return null;
+        const date = typeof value.toDate === "function"
+          ? value.toDate()
+          : value instanceof Date ? value : new Date(value);
+        return Number.isFinite(date.getTime()) ? date : null;
+      }
+
       function renderMetrics() {
         var total = ALL_USERS.length;
         var active = ALL_USERS.filter(function (u) {
@@ -1669,7 +1681,8 @@
         }).length;
         var now = new Date();
         var newMonth = ALL_USERS.filter(function (u) {
-          var d = new Date(u.createdAt);
+          var d = parseCreatedAt(u.createdAt);
+          if (!d) return false;
           return (
             d.getMonth() === now.getMonth() &&
             d.getFullYear() === now.getFullYear()
@@ -1688,7 +1701,7 @@
 
         var cards = [
           {
-            label: "Total Users",
+            label: "Total Accounts",
             value: total,
             sub: "Registered accounts",
             color: "green",
@@ -1697,7 +1710,7 @@
             icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
           },
           {
-            label: "Active Users",
+            label: "Total Active Accounts",
             value: active,
             sub: "Accounts with active access",
             color: "green",
@@ -1810,7 +1823,7 @@
       function roleBadge(role) {
         if (role === "farm_manager")
           return '<span class="badge" style="background:var(--amber-bg);color:var(--amber);"><span class="bdot" style="background:var(--amber-mid);"></span>Farm Manager</span>';
-        return '<span class="badge" style="background:var(--color-background-secondary);color:var(--color-text-secondary);"><span class="bdot" style="background:var(--color-text-tertiary);"></span>User</span>';
+        return '<span class="badge" style="background:var(--color-background-secondary);color:var(--color-text-secondary);"><span class="bdot" style="background:var(--color-text-tertiary);"></span>Field Operator</span>';
       }
 
       function renderTable() {
@@ -1858,7 +1871,7 @@
         var page = filtered.slice(s0, s1);
 
         document.getElementById("result-count").textContent =
-          total + " user" + (total !== 1 ? "s" : "");
+          total + " field operator" + (total !== 1 ? "s" : "");
 
         ["name", "role", "lastlogin"].forEach(function (col) {
           var el = document.getElementById("sort-" + col);
@@ -1880,7 +1893,7 @@
             '<tr><td colspan="7" style="text-align:center;padding:var(--space-4xl);">' +
             '<div class="empty-state" style="padding:0;">' +
             '<div class="empty-state-icon" style="margin-bottom:var(--space-lg);"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>' +
-            '<div class="empty-state-title">No users found</div>' +
+            '<div class="empty-state-title">No field operators found</div>' +
             '<div class="empty-state-text">Try adjusting your search or filters</div>' +
             "</div></td></tr>";
         } else {
@@ -1898,6 +1911,9 @@
               : "Never";
             var isSel = selectedIds.indexOf(u.id) !== -1;
             var isDisabled = u.status === "disabled";
+            var isFarmManager = u.role === "farm_manager";
+            var isCurrentFarmManager = isFarmManager && u.id === currentFarmManagerId;
+            var isOtherFarmManager = isFarmManager && !isCurrentFarmManager;
             var toggleTitle = isDisabled ? "Enable Account" : "Disable Account";
             var toggleIcon = isDisabled
               ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
@@ -1914,6 +1930,7 @@
               u.id +
               '" ' +
               (isSel ? "checked" : "") +
+              (isFarmManager ? " disabled title=\"Use row actions to manage your own account\"" : "") +
               ' onchange="toggleRow(this)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--green);">' +
               "</td>" +
               "<td onclick=\"openDetail('" +
@@ -1964,12 +1981,12 @@
               "')\">" +
               '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>' +
               "</button>" +
-              '<button class="tbl-btn" title="Edit User" onclick="openEdit(\'' +
+              '<button class="tbl-btn" title="' + (isOtherFarmManager ? "Other Farm Manager accounts are protected" : "Edit Account") + '"' + (isOtherFarmManager ? " disabled" : "") + ' onclick="openEdit(\'' +
               u.id +
               "')\">" +
               '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' +
               "</button>" +
-              '<button class="tbl-btn amber" title="Reset Password" onclick="openResetPassword(\'' +
+              '<button class="tbl-btn amber" title="' + (isOtherFarmManager ? "Other Farm Manager accounts are protected" : "Reset Password") + '"' + (isOtherFarmManager ? " disabled" : "") + ' onclick="openResetPassword(\'' +
               u.id +
               "')\">" +
               '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>' +
@@ -1977,8 +1994,8 @@
               '<button class="tbl-btn ' +
               (isDisabled ? "" : "danger") +
               '" title="' +
-              toggleTitle +
-              '" onclick="toggleStatus(\'' +
+              (isCurrentFarmManager ? "You cannot disable your own account" : isOtherFarmManager ? "Other Farm Manager accounts are protected" : toggleTitle) +
+              '"' + (isFarmManager ? " disabled" : "") + ' onclick="toggleStatus(\'' +
               u.id +
               "')\">" +
               toggleIcon +
@@ -1990,12 +2007,13 @@
         }
         document.getElementById("users-tbody").innerHTML = tbody;
 
+        var selectablePage = page.filter(function (u) { return u.role !== "farm_manager"; });
         var allSel =
-          page.length > 0 &&
-          page.every(function (u) {
+          selectablePage.length > 0 &&
+          selectablePage.every(function (u) {
             return selectedIds.indexOf(u.id) !== -1;
           });
-        var anySel = page.some(function (u) {
+        var anySel = selectablePage.some(function (u) {
           return selectedIds.indexOf(u.id) !== -1;
         });
         var sa = document.getElementById("select-all");
@@ -2011,8 +2029,8 @@
         var s1 = Math.min(currentPage * PAGE_SIZE, total);
         document.getElementById("pag-info").textContent =
           total === 0
-            ? "0 users"
-            : "Showing " + s0 + "–" + s1 + " of " + total + " users";
+            ? "0 field operators"
+            : "Showing " + s0 + "–" + s1 + " of " + total + " field operators";
 
         var html = "";
         html +=
@@ -2079,6 +2097,7 @@
         var s0 = (currentPage - 1) * PAGE_SIZE;
         filtered
           .slice(s0, Math.min(s0 + PAGE_SIZE, filtered.length))
+          .filter(function (u) { return u.role !== "farm_manager"; })
           .forEach(function (u) {
             var idx = selectedIds.indexOf(u.id);
             if (checked && idx === -1) selectedIds.push(u.id);
@@ -2099,7 +2118,7 @@
         var page = filtered.slice(
           s0,
           Math.min(s0 + PAGE_SIZE, filtered.length),
-        );
+        ).filter(function (u) { return u.role !== "farm_manager"; });
         var sa = document.getElementById("select-all");
         sa.checked =
           page.length > 0 &&
@@ -2137,7 +2156,7 @@
           !confirm(
             "Permanently delete " +
               count +
-              " user" +
+              " field operator" +
               (count !== 1 ? "s" : "") +
               "? This cannot be undone.",
           )
@@ -2150,7 +2169,7 @@
         for (var i = 0; i < ids.length; i++) {
           var id = ids[i];
           var u = ALL_USERS.filter(function (x) { return x.id === id; })[0];
-          if (!u || u.role === "admin") continue;
+          if (!u || u.role === "admin" || (u.role === "farm_manager" && u.id !== currentFarmManagerId)) continue;
 
           try {
             if (action === "activate" || action === "disable") {
@@ -2179,7 +2198,7 @@
             : action === "disable"
               ? "disabled"
               : "deleted";
-        var msg = results.ok + " user" + (results.ok !== 1 ? "s" : "") + " " + label;
+        var msg = results.ok + " field operator" + (results.ok !== 1 ? "s" : "") + " " + label;
         if (results.fail > 0) msg += " (" + results.fail + " failed)";
         utils.showToast(msg, results.fail > 0 ? "error" : "success");
       }
@@ -2195,11 +2214,20 @@
             .get();
 
           if (!userDoc.exists) {
-            utils.showToast("User not found", "error");
+            utils.showToast("Field Operator not found", "error");
             return;
           }
 
           const userData = userDoc.data();
+
+          if (userData.role === "farm_manager" && id !== currentFarmManagerId) {
+            utils.showToast("You cannot modify another Farm Manager account", "error");
+            return;
+          }
+          if (id === currentFarmManagerId) {
+            utils.showToast("You cannot disable your own account", "error");
+            return;
+          }
 
           // Farm Managers cannot modify Super Admin accounts
           if (userData.role === "admin") {
@@ -2237,7 +2265,7 @@
                 role: cuData.role,
                 details:
                   (newStatus === "disabled" ? "Disabled" : "Enabled") +
-                  " user: " +
+                  " field operator: " +
                   userData.fullName,
               });
             }
@@ -2255,15 +2283,15 @@
           await loadUsersFromBackend();
         } catch (error) {
           console.error("Error toggling user status:", error);
-          utils.showToast("Failed to update user status", "error");
+          utils.showToast("Failed to update field operator status", "error");
         }
       }
 
       function exportUsers() {
-        utils.showToast("Preparing user export…", "success");
+        utils.showToast("Preparing field operator export…", "success");
       }
 
-      // ── User Detail Modal ────────────────────────────────────────────────
+      // ── Operator Detail Modal ────────────────────────────────────────────────
       async function openDetail(id) {
         try {
           // Fetch user from Firestore
@@ -2274,7 +2302,7 @@
             .get();
 
           if (!userDoc.exists) {
-            utils.showToast("User not found", "error");
+            utils.showToast("Field Operator not found", "error");
             return;
           }
 
@@ -2355,7 +2383,7 @@
             '<div style="padding:var(--space-md);background:var(--color-background-secondary);border-radius:var(--radius-md);">' +
             '<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Role</div>' +
             '<div style="font-size:var(--font-size-sm);font-weight:var(--font-weight-medium);color:var(--color-text-primary);">' +
-            (u.role === "farm_manager" ? "Farm Manager" : "Regular User") +
+            (u.role === "farm_manager" ? "Farm Manager" : "Regular Field Operator") +
             "</div>" +
             "</div>" +
             '<div style="padding:var(--space-md);background:var(--color-background-secondary);border-radius:var(--radius-md);">' +
@@ -2383,25 +2411,29 @@
             ).hide();
             openResetPassword(activeUserId);
           };
+          var protectedManagerTarget = u.role === "farm_manager" && id !== currentFarmManagerId;
+          document.getElementById("detail-edit-btn").disabled = protectedManagerTarget;
+          document.getElementById("detail-reset-btn").disabled = protectedManagerTarget;
 
           new bootstrap.Modal(
             document.getElementById("userDetailModal"),
           ).show();
         } catch (error) {
-          console.error("Error loading user details:", error);
-          utils.showToast("Failed to load user details", "error");
+          console.error("Error loading field operator details:", error);
+          utils.showToast("Failed to load field operator details", "error");
         }
       }
 
       // ── Add / Edit Modal ─────────────────────────────────────────────────
       function openAddUserModal() {
         editingId = null;
-        document.getElementById("add-modal-title").textContent = "Add New User";
+        document.getElementById("add-modal-title").textContent = "Add New Field Operator";
         document.getElementById("f-fullname").value = "";
         document.getElementById("f-username").value = "";
         document.getElementById("f-email").value = "";
         document.getElementById("f-role").value = "client";
         document.getElementById("f-status").value = "active";
+        document.querySelector('#f-status option[value="disabled"]').disabled = false;
         document.getElementById("f-password").value = "";
         document.getElementById("f-confirm-password").value = "";
         document.getElementById("f-password-label").textContent = "Password";
@@ -2423,11 +2455,16 @@
             .get();
 
           if (!userDoc.exists) {
-            utils.showToast("User not found", "error");
+            utils.showToast("Field Operator not found", "error");
             return;
           }
 
           const u = userDoc.data();
+
+          if (u.role === "farm_manager" && id !== currentFarmManagerId) {
+            utils.showToast("You cannot modify another Farm Manager account", "error");
+            return;
+          }
           u.id = userDoc.id;
 
           editingId = id;
@@ -2438,6 +2475,8 @@
           document.getElementById("f-email").value = u.email;
           document.getElementById("f-role").value = u.role;
           document.getElementById("f-status").value = u.status;
+          const disabledStatusOption = document.querySelector('#f-status option[value="disabled"]');
+          disabledStatusOption.disabled = u.role === "farm_manager" && id === currentFarmManagerId;
           document.getElementById("f-password").value = "";
           document.getElementById("f-confirm-password").value = "";
           document.getElementById("f-password-label").textContent =
@@ -2474,8 +2513,8 @@
 
           new bootstrap.Modal(document.getElementById("addUserModal")).show();
         } catch (error) {
-          console.error("Error loading user for edit:", error);
-          utils.showToast("Failed to load user", "error");
+          console.error("Error loading field operator for edit:", error);
+          utils.showToast("Failed to load field operator", "error");
         }
       }
 
@@ -2497,7 +2536,7 @@
           return;
         }
 
-        // When editing, verify the target is not a Super Admin
+        // When editing, verify the target account is within this manager's scope.
         if (editingId) {
           try {
             const targetDoc = await firebase
@@ -2511,8 +2550,18 @@
               err.style.display = "block";
               return;
             }
+            if (targetDoc.exists && targetDoc.data().role === "farm_manager" && editingId !== currentFarmManagerId) {
+              err.textContent = "You cannot modify another Farm Manager account.";
+              err.style.display = "block";
+              return;
+            }
+            if (editingId === currentFarmManagerId && st === "disabled") {
+              err.textContent = "You cannot disable your own account.";
+              err.style.display = "block";
+              return;
+            }
           } catch (e) {
-            err.textContent = "Failed to verify user permissions.";
+                err.textContent = "Failed to verify field operator permissions.";
             err.style.display = "block";
             return;
           }
@@ -2530,7 +2579,7 @@
           return;
         }
         if (!editingId && !pw) {
-          err.textContent = "Password is required for new users.";
+              err.textContent = "Password is required for new field operators.";
           err.style.display = "block";
           return;
         }
@@ -2585,14 +2634,14 @@
                   status: "success",
                   email: cuData.email,
                   role: cuData.role,
-                  details: "Updated user: " + fn,
+                  details: "Updated field operator: " + fn,
                 });
               }
             } catch (logError) {
               console.error("Failed to log edit activity:", logError);
             }
 
-            utils.showToast("User updated successfully", "success");
+            utils.showToast("Field Operator updated successfully", "success");
           } else {
             // CREATE — check username uniqueness before calling API
             const usernameCheck = await firebase
@@ -2617,7 +2666,7 @@
               permissions: [],
             });
 
-            utils.showToast("User created successfully", "success");
+            utils.showToast("Field Operator created successfully", "success");
           }
 
           bootstrap.Modal.getInstance(
@@ -2633,7 +2682,7 @@
           ) {
             err.textContent = "Email address is already in use";
           } else {
-            err.textContent = error.message || "Failed to save user";
+              err.textContent = error.message || "Failed to save field operator";
           }
           err.style.display = "block";
         }
@@ -2650,11 +2699,16 @@
             .get();
 
           if (!userDoc.exists) {
-            utils.showToast("User not found", "error");
+            utils.showToast("Field Operator not found", "error");
             return;
           }
 
           const u = userDoc.data();
+
+          if (u.role === "farm_manager" && id !== currentFarmManagerId) {
+            utils.showToast("You cannot modify another Farm Manager account", "error");
+            return;
+          }
 
           // Farm Managers cannot reset Super Admin passwords
           if (u.role === "admin") {
@@ -2675,7 +2729,7 @@
           ).show();
         } catch (error) {
           console.error("Error loading user for password reset:", error);
-          utils.showToast("Failed to load user", "error");
+          utils.showToast("Failed to load field operator", "error");
         }
       }
 
@@ -2703,7 +2757,7 @@
             .doc(resetPwUserId)
             .get();
 
-          if (!userDoc.exists) throw new Error("User not found");
+          if (!userDoc.exists) throw new Error("Field Operator not found");
           const userData = userDoc.data();
 
           // Use backend API — Admin SDK sets the password directly

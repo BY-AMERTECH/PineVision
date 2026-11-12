@@ -14,7 +14,9 @@ var utils = (function() {
      * Get status class based on bearing rate
      */
     function getStatusClass(bearingRate) {
-        const thresholds = window.data.getThresholds();
+        const thresholds = window.clientThresholds
+            ? window.clientThresholds.get()
+            : window.data.getThresholds();
         
         if (bearingRate < thresholds.bearing.critical) {
             return 'crit';
@@ -54,7 +56,9 @@ var utils = (function() {
      * Get bar color based on percentage and thresholds
      */
     function barColor(percentage) {
-        const thresholds = window.data.getThresholds();
+        const thresholds = window.clientThresholds
+            ? window.clientThresholds.get()
+            : window.data.getThresholds();
         
         if (percentage < thresholds.bearing.critical) {
             return 'var(--red-mid)';
@@ -208,7 +212,9 @@ var utils = (function() {
      * Check if value is within watch threshold
      */
     function isWatch(value, metric) {
-        const thresholds = window.data.getThresholds();
+        const thresholds = window.clientThresholds
+            ? window.clientThresholds.get()
+            : window.data.getThresholds();
         
         if (metric === 'bearing') {
             return value >= thresholds.bearing.critical && value < thresholds.bearing.watch;
@@ -223,7 +229,9 @@ var utils = (function() {
      * Check if value is critical
      */
     function isCritical(value, metric) {
-        const thresholds = window.data.getThresholds();
+        const thresholds = window.clientThresholds
+            ? window.clientThresholds.get()
+            : window.data.getThresholds();
         
         if (metric === 'bearing') {
             return value < thresholds.bearing.critical;

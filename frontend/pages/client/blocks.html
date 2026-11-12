@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <link rel="icon" type="image/svg+xml" href="../../assets/images/pinevision-logo.svg" />
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
@@ -18,8 +19,6 @@
       })();
     </script>
     <title>Fruit Blocks - PineVision</title>
-    <link rel="icon" type="image/x-icon" href="/frontend/assets/images/pinevision-favicon.ico" />
-    <link rel="icon" type="image/webp" sizes="64x64" href="/frontend/assets/images/pinevision-favicon.webp" />
     <link rel="apple-touch-icon" sizes="180x180" href="/frontend/assets/images/pinevision-touch-icon.png" />
 
     <!-- CSS: Bootstrap first, then custom overrides -->
@@ -88,8 +87,12 @@
       .filter-bar-actions {
         display: flex;
         align-items: center;
+        gap: var(--space-sm);
         margin-left: auto;
       }
+
+      .filter-bar-actions .form-select { width: auto; min-width: 150px; }
+      .filter-bar-actions .btn { flex: 0 0 auto; white-space: nowrap; }
 
       .filter-group {
         display: flex;
@@ -140,11 +143,19 @@
       }
 
       .bcard-number {
-        font-size: var(--font-size-xs);
+        font-size: var(--font-size-xl);
+        color: var(--color-text-primary);
+        font-weight: var(--font-weight-bold);
+        text-transform: none;
+        letter-spacing: normal;
+      }
+
+      .bcard-daf {
+        font-size: var(--font-size-md);
+        font-weight: var(--font-weight-medium);
         color: var(--muted);
-        font-weight: var(--font-weight-semibold);
-        text-transform: uppercase;
-        letter-spacing: 0.07em;
+        margin: var(--space-xs) 0;
+        line-height: 1.25;
       }
 
       .bcard-meta {
@@ -169,6 +180,13 @@
         text-transform: uppercase;
         letter-spacing: 0.04em;
         margin-bottom: var(--space-xs);
+      }
+
+      .bcard-estimated-count {
+        display: block;
+        margin-top: var(--space-sm);
+        font-size: var(--font-size-sm);
+        color: var(--color-text-secondary);
       }
 
       .bcard-foot {
@@ -231,6 +249,9 @@
         .filter-bar {
           gap: var(--space-md);
         }
+        .filter-bar-actions { width: 100%; margin-left: 0; flex-direction: column; align-items: stretch; }
+        .filter-bar-actions .form-select { width: 100%; min-width: 0; }
+        .filter-bar-actions .btn { width: 100%; }
         .block-detail-header {
           gap: var(--space-md);
         }
@@ -489,6 +510,11 @@
                 </button>
               </div>
               <div class="filter-bar-actions">
+                <select id="blocks-sort" class="form-select form-select-sm" aria-label="Sort blocks" onchange="renderBlocks()">
+                  <option value="newest">Newest first</option>
+                  <option value="name">Name A–Z</option>
+                  <option value="bearing-desc">Bearing rate: highest first</option>
+                </select>
                 <button class="btn btn-primary btn-filled" onclick="openAddBlockModal()">
                   <svg
                     width="16"
@@ -630,6 +656,7 @@
 
     <!-- Application JavaScript -->
     <script src="../../js/auth.js"></script>
+    <script src="../../js/client-thresholds.js"></script>
     <script src="../../js/utils.js"></script>
     <script src="../../js/block-scan-history.js"></script>
     <script src="../../js/app.js"></script>
@@ -643,6 +670,8 @@
       let ALL_BLOCKS = [];
 
       window.initPage = async function () {
+        const currentUser = auth.getCurrentUser();
+        await window.clientThresholds.load(currentUser && currentUser.uid);
         await loadBlocksFromFirebase();
         utils.setupModalClose("add-block-modal");
       };
@@ -666,6 +695,7 @@
 
           blocksSnapshot.forEach(function (doc) {
             const blockData = doc.data();
+            if (blockData.isDeleted === true) return;
             ALL_BLOCKS.push({
               id: doc.id,
               activeCycleId: blockData.activeCycleId || null,
@@ -676,6 +706,7 @@
 
               // Latest scan data
               stage: blockData.stage || blockData.blockName || "Plant Crop",
+              daf: blockData.daf != null && Number.isFinite(Number(blockData.daf)) ? Number(blockData.daf) : null,
               bearing: blockData.bearingPercent || 0,
               nonbearing: blockData.nonBearingPercent || 0,
               plants: blockData.totalPineapples || 0,
@@ -685,6 +716,7 @@
               // Metadata
               lastScanned: blockData.lastScanned,
               totalScans: blockData.totalScans || 0,
+              createdAt: blockData.createdAt && blockData.createdAt.toDate ? blockData.createdAt.toDate() : null,
             });
           });
 
@@ -725,7 +757,7 @@
       // ── Render Blocks Grid ───────────────────────────────────────────
 
       function renderBlocks() {
-        let blocks = ALL_BLOCKS;
+        let blocks = ALL_BLOCKS.slice();
         const search = document.getElementById("blocks-search").value.trim().toLowerCase();
         if (search) {
           blocks = blocks.filter(function (block) {
@@ -738,10 +770,17 @@
         // Apply status filter
         if (activeFilters.status !== "all") {
           blocks = blocks.filter(function (b) {
-            const statusClass = getStatusClass(b.bearing);
+            const statusClass = getStatusClass(b);
             return statusClass === activeFilters.status;
           });
         }
+
+        const sort = document.getElementById("blocks-sort")?.value || "newest";
+        blocks.sort(function (a, b) {
+          if (sort === "name") return String(a.blockName || "").localeCompare(String(b.blockName || ""));
+          if (sort === "bearing-desc") return (b.bearing || 0) - (a.bearing || 0);
+          return (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0);
+        });
 
         const grid = document.getElementById("blocks-grid");
 
@@ -760,10 +799,10 @@
 
         grid.innerHTML = blocks
           .map(function (block) {
-            const statusClass = getStatusClass(block.bearing);
+            const statusClass = getStatusClass(block);
             const barColorVal = getBarColor(block.bearing);
-            const nonViableColor =
-              block.nonViable > 10 ? "var(--red)" : "var(--amber)";
+            const nonViableColor = window.clientThresholds.metricColor("discolored", block.nonViable);
+            const nonbearingColor = window.clientThresholds.metricColor("nonbearing", block.nonbearing);
 
             return `
                       <div class="col">
@@ -771,7 +810,7 @@
                               <div class="bcard-header">
                                   <div>
                                       <div class="bcard-number">${block.blockName || "BLOCK " + block.blockId}</div>
-                                      <div class="bcard-stage">${block.stage}</div>
+                                      <div class="bcard-daf">${block.daf === null ? "DAF unavailable" : formatNumber(block.daf) + " DAF"}</div>
                                       <div class="bcard-meta">
                                           ${block.section} &middot; ${formatArea(block.area)}
                                           <div>${utils.recentScanBadge(block.lastScanned)}</div>
@@ -785,12 +824,13 @@
                               <div class="bcard-bar-section">
                                   <div class="bcard-bar-label">Bearing rate</div>
                                   ${buildInlineBar(block.bearing, barColorVal)}
+                                  <span class="bcard-estimated-count">Estimated Plant Count: ${block.estimatedTotalPlantCount === null ? "Unavailable" : formatNumber(block.estimatedTotalPlantCount)}</span>
                               </div>
 
                               <div class="bcard-foot">
-                                  <span class="bcard-foot-stat">Estimated Plant Count: ${block.estimatedTotalPlantCount === null ? "Unavailable" : formatNumber(block.estimatedTotalPlantCount)}</span>
+                                  <span class="bcard-foot-stat" style="color: ${barColorVal};">${formatPercent(Number(block.bearing) || 0)} bearing</span>
+                                  <span class="bcard-foot-stat" style="color: ${nonbearingColor};">${formatPercent(block.nonbearing)} non-bearing</span>
                                   <span class="bcard-foot-stat" style="color: ${nonViableColor};">${formatPercent(block.nonViable)} non-viable</span>
-                                  <span class="bcard-foot-stat" style="color: var(--amber);">${formatPercent(block.nonbearing)} non-bearing</span>
                               </div>
                           </div>
                       </div>`;
@@ -800,21 +840,19 @@
 
       // ── Helper Functions ─────────────────────────────────────────────
 
-      function getStatusClass(bearing) {
-        if (bearing >= 80) return "good";
-        if (bearing >= 60) return "warn";
-        return "crit";
+      function getStatusClass(block) {
+        const bearing = Number(block.bearing) || 0;
+        if (!block.totalScans && bearing === 0 && !(Number(block.nonbearing) || 0) && !(Number(block.nonViable) || 0)) return "none";
+        return window.clientThresholds.classify(block);
       }
 
       function getBarColor(bearing) {
-        if (bearing >= 80) return "var(--green)";
-        if (bearing >= 60) return "var(--amber)";
-        return "var(--red)";
+        return window.clientThresholds.bearingColor(bearing);
       }
 
       function statusBadge(status) {
-        const labels = { good: "Healthy", warn: "Watch", crit: "Critical" };
-        const colors = { good: "good", warn: "warn", crit: "crit" };
+        const labels = { good: "Healthy", warn: "Watch", crit: "Critical", none: "No Scan Data" };
+        const colors = { good: "good", warn: "warn", crit: "crit", none: "secondary" };
         return (
           '<span class="badge ' +
           colors[status] +
@@ -913,10 +951,10 @@
             // Initial values
             stage: formData.daf + " DAF",
             daf: parseInt(formData.daf),
-            bearingPercent: 0.01,
-            nonBearingPercent: 0.01,
+              bearingPercent: 0,
+              nonBearingPercent: 0,
             totalPineapples: 0,
-            nonViable: 0.01,
+              nonViable: 0,
 
             // Metadata
             planted: formData.planted,
@@ -928,6 +966,9 @@
             blockId: blockRef.id,
             userId: currentUser.uid,
             status: "active",
+            blockName: formData.blockId,
+            section: formData.section,
+            area: area,
             planted: formData.planted,
             forcingDate: formData.forcingDate,
             daf: parseInt(formData.daf),

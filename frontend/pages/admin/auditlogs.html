@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <link rel="icon" type="image/svg+xml" href="../../assets/images/pinevision-logo.svg" />
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
@@ -18,8 +19,6 @@
       })();
     </script>
     <title>Audit Logs - PineVision</title>
-    <link rel="icon" type="image/x-icon" href="/frontend/assets/images/pinevision-favicon.ico" />
-    <link rel="icon" type="image/webp" sizes="64x64" href="/frontend/assets/images/pinevision-favicon.webp" />
     <link rel="apple-touch-icon" sizes="180x180" href="/frontend/assets/images/pinevision-touch-icon.png" />
     <link rel="stylesheet" href="../../bootstrap/css/bootstrap.min.css" />
     <link rel="stylesheet" href="../../css/tokens.css" />
@@ -270,7 +269,7 @@
         color: var(--red);
       }
 
-      /* ─── User Cell ───────────────────────────────────────────── */
+      /* ─── Operator Cell ───────────────────────────────────────────── */
       .log-avatar {
         width: 26px;
         height: 26px;
@@ -733,7 +732,7 @@
             <div class="nav-section-title">Monitoring</div>
             <ul class="nav-links">
               <li>
-                <a href="users.html" class="nav-link" data-tooltip="Users">
+                <a href="users.html" class="nav-link" data-tooltip="Field Operators">
                   <span class="nav-link-icon"
                     ><img
                       src="/frontend/assets/icons/nav-users.svg"
@@ -741,7 +740,7 @@
                       width="18"
                       height="18"
                   /></span>
-                  <span class="nav-link-text">Users</span>
+                  <span class="nav-link-text">Field Operators</span>
                 </a>
               </li>
               <li>
@@ -1028,7 +1027,7 @@
                     <thead>
                       <tr>
                         <th style="width: 145px">Timestamp</th>
-                        <th style="width: 120px">User</th>
+                        <th style="width: 120px">Field Operator</th>
                         <th>Action</th>
                       </tr>
                     </thead>
@@ -1090,6 +1089,7 @@
       var EXTENDED_LOGS = [];
 
       var ACTIVE_SESSIONS = [];
+      var SESSION_LOGS = [];
 
       /* ── State ─────────────────────────────────────────────────── */
       var allLogs = [];
@@ -1107,6 +1107,33 @@
             .orderBy("timestamp", "desc")
             .limit(50)
             .get();
+
+          // Session status must use the complete login/logout history rather
+          // than only the 50 rows shown in the recent activity window.
+          const sessionSnapshot = await firebase
+            .firestore()
+            .collection("activity_logs")
+            .where("action", "in", ["login", "logout"])
+            .get();
+          SESSION_LOGS = [];
+          sessionSnapshot.forEach(function (doc) {
+            const data = doc.data();
+            const rawTimestamp = data.timestamp;
+            const sessionDate = rawTimestamp && typeof rawTimestamp.toDate === "function"
+              ? rawTimestamp.toDate()
+              : rawTimestamp ? new Date(rawTimestamp) : null;
+            if (!sessionDate || !Number.isFinite(sessionDate.getTime())) return;
+            SESSION_LOGS.push({
+              user: data.user || data.email || "unknown",
+              userId: data.userId || null,
+              email: data.email || null,
+              role: data.role || "client",
+              action: data.action,
+              status: data.status || "success",
+              device: data.device || "Unknown",
+              timestamp: sessionDate.toISOString(),
+            });
+          });
 
           EXTENDED_LOGS = [];
           var idCounter = 1;
@@ -1165,6 +1192,7 @@
         } catch (error) {
           console.error("❌ Error loading activity logs:", error);
           allLogs = [];
+          SESSION_LOGS = [];
           updateTimestamp();
           loadStats();
           loadCharts();
@@ -1182,12 +1210,12 @@
           action === "logout"
         )
           return "Authentication";
-        if (action.startsWith("view_user")) return "User Management";
+        if (action.startsWith("view_user")) return "Field Operator Management";
         if (
           action.startsWith("update_user") ||
           action.startsWith("create_user")
         )
-          return "User Management";
+          return "Field Operator Management";
         if (action.startsWith("view_dashboard")) return "Dashboard";
         if (action.startsWith("view_blocks")) return "Blocks";
         if (action.startsWith("view_scans")) return "Scan Operations";
@@ -1254,8 +1282,6 @@
             l.action.startsWith("delete")
           );
         }).length;
-        var activeSess = ACTIVE_SESSIONS.length;
-
         var colorMap = {
           green: { fg: "var(--green)", bg: "var(--green-bg)" },
           amber: { fg: "var(--amber)", bg: "var(--amber-bg)" },
@@ -1287,15 +1313,6 @@
             icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
           },
           {
-            label: "Active Sessions",
-            value: activeSess,
-            sub: "Currently online",
-            color: activeSess > 0 ? "green" : "",
-            trend: activeSess > 0 ? "up" : "fl",
-            trendTxt: activeSess > 0 ? "Live now" : "No sessions",
-            icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>',
-          },
-          {
             label: "Login Attempts",
             value: loginAttempts,
             sub: "Auth events logged",
@@ -1311,7 +1328,7 @@
           var cm = colorMap[c.color] || colorMap[""];
           var arrow = c.trend === "up" ? "↑" : c.trend === "dn" ? "↓" : "→";
           html +=
-            '<div class="col-xl-3 col-lg-3 col-md-6 col-sm-6 d-flex">' +
+            '<div class="col-xl-4 col-lg-4 col-md-6 col-sm-6 d-flex">' +
             '<div class="mc h-100 w-100 ' +
             c.color +
             '">' +
@@ -1595,12 +1612,12 @@
           logout: "← Logout",
           login_failed: "✕ Failed Login",
           view_dashboard: "👁 Dashboard",
-          view_users: "👁 Users",
+          view_users: "👁 Field Operators",
           view_blocks: "👁 Blocks",
           view_scan: "👁 Scan",
           view_alerts: "👁 Alerts",
-          update_user: "✎ Update User",
-          create_user: "+ Create User",
+          update_user: "✎ Update Field Operator",
+          create_user: "+ Create Field Operator",
           upload_scan: "↑ Upload Scan",
           generate_report: "⊞ Report",
         };
@@ -1675,9 +1692,8 @@
       }
 
       /* ── Sessions ──────────────────────────────────────────────── */
-      // Derived from real login/logout events already present in the
-      // loaded activity_logs window (allLogs), rather than a fabricated
-      // single-row session with an invented IP. For each user, the most
+      // Derived from the full login/logout history, separately from the
+      // limited recent activity list. For each user, the most
       // recent auth event is checked: a "login" with no later "logout"
       // in the window is treated as still signed in. The signed-in admin
       // themselves is marked "Live"; everyone else is shown honestly as
@@ -1686,15 +1702,16 @@
       function renderSessions() {
         var currentUser = auth.getCurrentUser();
 
-        var authEvents = allLogs.filter(function (l) {
+        var authEvents = (SESSION_LOGS.length ? SESSION_LOGS : allLogs).filter(function (l) {
           return l.action === "login" || l.action === "logout";
         });
 
         var latestByUser = {};
         authEvents.forEach(function (l) {
-          var existing = latestByUser[l.user];
+          var sessionKey = l.userId || l.email || l.user;
+          var existing = latestByUser[sessionKey];
           if (!existing || new Date(l.timestamp) > new Date(existing.timestamp)) {
-            latestByUser[l.user] = l;
+            latestByUser[sessionKey] = l;
           }
         });
 
@@ -1707,13 +1724,13 @@
           })
           .map(function (l) {
             return {
-              id: l.user + "_" + l.timestamp,
+              id: (l.userId || l.email || l.user) + "_" + l.timestamp,
               user: l.user,
               role: l.role,
               device: l.device && l.device !== "Unknown" ? l.device : "Unknown device",
               login_at: l.timestamp,
               last_active: l.timestamp,
-              isCurrent: !!(currentUser && (l.user === currentUser.username || l.user === currentUser.email)),
+              isCurrent: !!(currentUser && (l.userId === currentUser.uid || l.user === currentUser.username || l.user === currentUser.email)),
             };
           })
           .sort(function (a, b) {
@@ -1725,7 +1742,7 @@
 
         if (!ACTIVE_SESSIONS.length) {
           document.getElementById("sessions-list").innerHTML =
-            '<p style="font-size:var(--font-size-xs);color:var(--color-text-tertiary);margin:0;">No login activity in the recent audit log.</p>';
+            '<p style="font-size:var(--font-size-xs);color:var(--color-text-tertiary);margin:0;">No open login sessions found.</p>';
           return;
         }
 
@@ -1873,7 +1890,7 @@
               log.details +
               "</span>",
           ) +
-          '<div class="det-section">User & Session</div>' +
+          '<div class="det-section">Field Operator & Session</div>' +
           detRow("Username", "<strong>" + log.user + "</strong>") +
           detRow(
             "Role",
@@ -1881,7 +1898,7 @@
               ? '<span style="color:var(--amber);font-weight:var(--font-weight-medium);">Administrator</span>'
               : log.user === "unknown"
                 ? '<span style="color:var(--red);">Unknown / Unauthenticated</span>'
-                : "User",
+                : "Field Operator",
           ) +
           detRow("IP Address", ipHtml) +
           detRow(

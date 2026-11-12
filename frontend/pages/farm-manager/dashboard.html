@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <link rel="icon" type="image/svg+xml" href="../../assets/images/pinevision-logo.svg" />
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
@@ -18,8 +19,6 @@
       })();
     </script>
     <title>Farm Manager Dashboard - PineVision</title>
-    <link rel="icon" type="image/x-icon" href="/frontend/assets/images/pinevision-favicon.ico" />
-    <link rel="icon" type="image/webp" sizes="64x64" href="/frontend/assets/images/pinevision-favicon.webp" />
     <link rel="apple-touch-icon" sizes="180x180" href="/frontend/assets/images/pinevision-touch-icon.png" />
     <link rel="stylesheet" href="../../bootstrap/css/bootstrap.min.css" />
     <link rel="stylesheet" href="../../css/tokens.css" />
@@ -557,7 +556,7 @@
             <div class="nav-section-title">Monitoring</div>
             <ul class="nav-links">
               <li>
-                <a href="users.html" class="nav-link" data-tooltip="Users">
+                <a href="users.html" class="nav-link" data-tooltip="Field Operators">
                   <span class="nav-link-icon"
                     ><img
                       src="/frontend/assets/icons/nav-users.svg"
@@ -565,7 +564,7 @@
                       width="18"
                       height="18"
                   /></span>
-                  <span class="nav-link-text">Users</span>
+                  <span class="nav-link-text">Field Operators</span>
                 </a>
               </li>
               <li>
@@ -884,7 +883,7 @@
             </section>
           </div>
 
-          <!-- Bottom: Alerts + Users -->
+          <!-- Bottom: Alerts + Operators -->
           <div class="bottom-grid">
             <div class="tcard" style="margin-bottom: 0">
               <div class="thead-row">
@@ -932,7 +931,7 @@
                       <path d="M16 3.13a4 4 0 0 1 0 7.75" />
                     </svg>
                   </span>
-                  User Statistics
+                  Accounts Statistics
                 </h3>
                 <a href="users.html" class="btn btn-navigation btn-sm"
                   ><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg> Manage <svg class="btn-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a>
@@ -941,7 +940,7 @@
                 <table>
                   <thead>
                     <tr>
-                      <th>Username</th>
+                      <th>Field Operator</th>
                       <th>Role</th>
                       <th>Status</th>
                       <th>Last Login</th>
@@ -1348,7 +1347,7 @@
             labels: buckets.map(function (x) { return x.label; }),
             datasets: [
               { label: "Bearing", data: buckets.map(function (x) { return x.bearing; }), backgroundColor: "#4caf78", borderColor: "#4caf78", borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, fill: false },
-              { label: "Non-Bearing", data: buckets.map(function (x) { return x.nonBearing; }), backgroundColor: "#e6a817", borderColor: "#e6a817", borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, fill: false },
+              { label: "Non-Bearing", data: buckets.map(function (x) { return x.nonBearing; }), backgroundColor: "#b7791f", borderColor: "#b7791f", borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, fill: false },
               { label: "Non-Viable", data: buckets.map(function (x) { return x.nonViable; }), backgroundColor: "#f0c430", borderColor: "#f0c430", borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, fill: false },
             ],
           },
@@ -1438,14 +1437,14 @@
         }).length;
         var cards = [
           {
-            label: "Total Users",
+            label: "Total Accounts",
             value: clients,
             sub: "Total Registered Accounts",
             color: "green",
             icon: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
           },
           {
-            label: "Active User Accounts",
+            label: "Total Active Accounts",
             value: activeOps,
             sub: "Enabled Accounts",
             color: "",
@@ -1523,7 +1522,7 @@
         var labels = {
           login: "logged in",
           logout: "logged out",
-          view_users: "viewed users",
+          view_users: "viewed field operators",
           view_dashboard: "viewed dashboard",
           login_failed: "login failed",
           view_scan: "viewed a scan",
@@ -1531,7 +1530,7 @@
           view_blocks: "viewed blocks",
           generate_report: "generated report",
           upload_scan: "uploaded scan",
-          update_user: "updated user",
+          update_user: "updated field operator",
           reset_password: "reset password",
           toggle_status: "toggled status",
         };
@@ -1758,7 +1757,7 @@
         var html = "";
         if (dashboardUsers.length === 0) {
           html =
-            '<tr><td colspan="4" style="text-align:center;padding:var(--space-xl);color:var(--color-text-secondary);">No users found</td></tr>';
+            '<tr><td colspan="4" style="text-align:center;padding:var(--space-xl);color:var(--color-text-secondary);">No field operators found</td></tr>';
         } else {
           dashboardUsers.forEach(function (user) {
             var loginStr = user.lastLogin
@@ -1776,7 +1775,7 @@
             var roleBadge =
               user.role === "farm_manager"
                 ? '<span class="badge" style="background:var(--amber-bg);color:var(--amber);"><span class="bdot" style="background:var(--amber-mid);"></span>Farm Manager</span>'
-                : '<span class="badge" style="background:var(--surf2);color:var(--muted);"><span class="bdot" style="background:var(--muted);"></span>User</span>';
+                : '<span class="badge" style="background:var(--surf2);color:var(--muted);"><span class="bdot" style="background:var(--muted);"></span>Field Operator</span>';
             html +=
               "<tr>" +
               "<td><strong>" +

@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <link rel="icon" type="image/svg+xml" href="../../assets/images/pinevision-logo.svg" />
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
@@ -18,8 +19,6 @@
       })();
     </script>
     <title>Account Alerts - PineVision</title>
-    <link rel="icon" type="image/x-icon" href="/frontend/assets/images/pinevision-favicon.ico" />
-    <link rel="icon" type="image/webp" sizes="64x64" href="/frontend/assets/images/pinevision-favicon.webp" />
     <link rel="apple-touch-icon" sizes="180x180" href="/frontend/assets/images/pinevision-touch-icon.png" />
     <link rel="stylesheet" href="../../bootstrap/css/bootstrap.min.css" />
     <link rel="stylesheet" href="../../css/tokens.css" />
@@ -175,7 +174,7 @@
         margin-top: 3px;
       }
 
-      /* ── User Cell ───────────────────────────────────────────────── */
+      /* ── Operator Cell ───────────────────────────────────────────────── */
       .log-avatar {
         width: 26px;
         height: 26px;
@@ -473,7 +472,7 @@
             <div class="nav-section-title">Monitoring</div>
             <ul class="nav-links">
               <li>
-                <a href="users.html" class="nav-link" data-tooltip="Users">
+                <a href="users.html" class="nav-link" data-tooltip="Field Operators">
                   <span class="nav-link-icon"
                     ><img
                       src="/frontend/assets/icons/nav-users.svg"
@@ -481,7 +480,7 @@
                       width="18"
                       height="18"
                   /></span>
-                  <span class="nav-link-text">Users</span>
+                  <span class="nav-link-text">Field Operators</span>
                 </a>
               </li>
               <li>
@@ -542,7 +541,7 @@
                 <a
                   href="alerts.html"
                   class="nav-link active"
-                  data-tooltip="Account Alerts"
+                  data-tooltip="Farm monitoring and account security alerts"
                 >
                   <span class="nav-link-icon"
                     ><img
@@ -551,7 +550,7 @@
                       width="18"
                       height="18"
                   /></span>
-                  <span class="nav-link-text">Account Alerts</span>
+                  <span class="nav-link-text">Alerts</span>
                   <span
                     class="nav-badge"
                     id="nav-badge-alerts"
@@ -771,7 +770,7 @@
               class="filter-pill"
               onclick="setSeverityFilter('warn', this)"
             >
-              Warning
+              Watch
             </button>
             <button
               class="filter-pill"
@@ -802,9 +801,9 @@
               class="filter-input"
               id="user-filter"
               type="text"
-              placeholder="Search user…"
+              placeholder="Search field operator…"
               oninput="applyFilters()"
-              aria-label="Filter by user"
+              aria-label="Filter by field operator"
             />
             <span
               id="alert-count-label"
@@ -935,13 +934,15 @@
         };
       }
 
-      /* ── Map a monitoring_alerts doc (crop-health threshold alerts,
-       * written by the backend's check_thresholds_and_create_alerts())
-       * into the same row shape as mapAlert() above, so the existing
-       * table/detail/filter code renders both kinds of alert without
-       * changes. This collection was previously never read here — the
-       * page only ever showed failed-login events under "Alerts". ── */
-      var BLOCKS_BY_ID = {}; // blockId -> blockName, for crop-alert labels
+      /* ── Map crop-health threshold alerts into the shared alert row shape,
+       * including the field operator who owns the related block. ── */
+      var BLOCKS_BY_ID = {}; // blockId -> name and owner, for crop-alert labels
+
+      function escapeHtml(value) {
+        return String(value == null ? "" : value).replace(/[&<>"']/g, function (char) {
+          return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char];
+        });
+      }
 
       function mapMonitoringAlert(doc) {
         var d = doc.data();
@@ -955,7 +956,8 @@
         if (sev === "critical") sev = "crit";
         if (sev === "warning") sev = "warn";
 
-        var blockLabel = BLOCKS_BY_ID[d.blockId] || d.blockId || "Unknown block";
+        var block = BLOCKS_BY_ID[d.blockId];
+        var blockLabel = block ? block.name : d.blockId || "Unknown block";
 
         return {
           id: doc.id,
@@ -963,10 +965,9 @@
           severity: sev,
           type: "crop_health",
           title: d.title || "Crop Health Alert",
-          // No account-level actions (Suspend/Reset Password) make sense for
-          // a crop alert, so leave user as "unknown" — the existing template
-          // already hides those buttons for a.user === "unknown".
-          user: "unknown",
+          // Resolve the field operator from the block owner. Crop alerts still
+          // do not expose account actions in the detail view.
+          user: block ? block.ownerName || "unknown" : "unknown",
           ip: "—",
           device: blockLabel,
           timestamp: ts,
@@ -976,11 +977,23 @@
       }
 
       function loadBlocksForAlerts() {
-        return db.collection("blocks").limit(500).get()
-          .then(function (snap) {
+        return Promise.all([
+          db.collection("blocks").limit(500).get(),
+          db.collection("users").get(),
+        ])
+          .then(function (results) {
+            var usersById = {};
+            results[1].forEach(function (doc) {
+              var user = doc.data() || {};
+              usersById[doc.id] = user.fullName || user.username || user.email || "";
+            });
             var map = {};
-            snap.forEach(function (doc) {
-              map[doc.id] = (doc.data() || {}).blockName || doc.id;
+            results[0].forEach(function (doc) {
+              var block = doc.data() || {};
+              map[doc.id] = {
+                name: block.blockName || doc.id,
+                ownerName: usersById[block.userId] || "",
+              };
             });
             BLOCKS_BY_ID = map;
           })
@@ -1169,6 +1182,7 @@
             label: "Active Alerts",
             value: totalActive,
             sub: "Requiring attention",
+            info: "Count of active critical and watch alerts that still need attention.",
             color: totalActive > 0 ? "red" : "none",
             icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>',
           },
@@ -1176,13 +1190,15 @@
             label: "Critical",
             value: critCount,
             sub: "Immediate action needed",
+            info: "Active alerts marked critical and needing immediate action.",
             color: critCount > 0 ? "red" : "none",
             icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
           },
           {
-            label: "Warning",
+            label: "Watch",
             value: warnCount,
             sub: "Monitor closely",
+            info: "Active warning-level alerts to monitor.",
             color: warnCount > 0 ? "amber" : "none",
             icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
           },
@@ -1190,6 +1206,7 @@
             label: "Resolved",
             value: resolvedCount,
             sub: "Issues cleared",
+            info: "Alerts marked as resolved.",
             color: "green",
             icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
           },
@@ -1197,6 +1214,7 @@
             label: "Pending Alerts",
             value: pendingCount,
             sub: "Requiring review",
+            info: "All unresolved alerts awaiting review, regardless of severity.",
             color: pendingCount > 0 ? "red" : "none",
             icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 0-3.46 0"/></svg>',
           },
@@ -1206,7 +1224,9 @@
         cards.forEach(function (c) {
           var p = palette[c.color];
           html +=
-            '<div class="mc">' +
+            '<div class="mc" title="' +
+            c.info +
+            '">' +
             '<div class="mc-icon-box" style="background:' +
             p.bg +
             ";color:" +
@@ -1306,9 +1326,9 @@
           '<div class="twrap card-scroll-region" tabindex="0" role="region" aria-label="Account alerts"><table style="table-layout:auto;"><thead><tr>' +
           "<th>Severity</th>" +
           "<th>Alert</th>" +
-          '<th class="d-hide-sm">User</th>' +
+          '<th class="d-hide-sm">Field Operator</th>' +
           '<th class="d-hide-md">Device / IP</th>' +
-          '<th class="d-hide-sm">Detected</th>' +
+          '<th class="d-hide-sm">Timestamp</th>' +
           "<th>Status</th>" +
           "<th>Actions</th>" +
           "</tr></thead><tbody>";
@@ -1318,7 +1338,7 @@
             a.severity === "crit"
               ? '<span class="badge crit"><span class="bdot"></span>Critical</span>'
               : a.severity === "warn"
-                ? '<span class="badge warn"><span class="bdot"></span>Warning</span>'
+                ? '<span class="badge warn"><span class="bdot"></span>Watch</span>'
                 : '<span class="badge good"><span class="bdot"></span>Info</span>';
 
           var statusBadge =
@@ -1358,7 +1378,7 @@
             "</td>" +
             '<td style="min-width:180px;">' +
             '<div style="font-weight:var(--font-weight-medium);font-size:var(--font-size-sm);line-height:1.3;">' +
-            a.title +
+            escapeHtml(a.title) +
             "</div>" +
             '<span class="type-tag">' +
             typeLabel +
@@ -1372,16 +1392,16 @@
             initials +
             "</div>" +
             '<span class="user-cell-name">' +
-            a.user +
+            escapeHtml(a.user) +
             "</span>" +
             "</div>" +
             "</td>" +
             '<td class="d-hide-md" style="max-width:200px;">' +
             '<div style="font-size:var(--font-size-xs);color:var(--color-text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' +
-            a.device +
+            escapeHtml(a.device) +
             "</div>" +
             '<div style="font-size:10px;font-family:var(--font-mono);color:var(--color-text-tertiary);">' +
-            a.ip +
+            escapeHtml(a.ip) +
             "</div>" +
             "</td>" +
             '<td class="d-hide-sm" style="font-size:11px;font-family:var(--font-mono);color:var(--color-text-secondary);white-space:nowrap;">' +
@@ -1443,7 +1463,7 @@
           a.severity === "crit"
             ? '<span class="badge crit"><span class="bdot"></span>Critical</span>'
             : a.severity === "warn"
-              ? '<span class="badge warn"><span class="bdot"></span>Warning</span>'
+              ? '<span class="badge warn"><span class="bdot"></span>Watch</span>'
               : '<span class="badge good"><span class="bdot"></span>Info</span>';
 
         var statusBadge =
@@ -1455,7 +1475,7 @@
 
         var secNotice =
           a.status === "active" && a.severity === "crit"
-            ? '<div class="security-notice">This is a critical security event. Review immediately and take appropriate action to protect platform integrity and user accounts.</div>'
+            ? '<div class="security-notice">This is a critical security event. Review immediately and take appropriate action to protect platform integrity and field operator accounts.</div>'
             : "";
 
         var actionsHtml = '<div class="oc-actions">';
@@ -1467,14 +1487,14 @@
             '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' +
             "Mark as Resolved</button>";
         }
-        if (a.user !== "unknown") {
+        if (a.source !== "monitoring" && a.user !== "unknown") {
           actionsHtml +=
             '<button class="oc-action-btn oc-danger" onclick="suspendUser(\'' +
             a.user +
             "')\">" +
             '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>' +
-            "Suspend User (" +
-            a.user +
+            "Suspend Field Operator (" +
+            escapeHtml(a.user) +
             ")</button>";
           actionsHtml +=
             '<button class="oc-action-btn oc-amber" onclick="resetPassword(\'' +
@@ -1496,26 +1516,26 @@
           '<div class="det-row"><span class="det-label">Status</span><span class="det-value">' +
           statusBadge +
           "</span></div>" +
-          '<div class="det-row"><span class="det-label">Detected</span><span class="det-value det-mono">' +
+          '<div class="det-row"><span class="det-label">Timestamp</span><span class="det-value det-mono">' +
           ts +
           "</span></div>" +
           '<div class="det-section">' + (a.source === "monitoring" ? "Source" : "Access Information") + "</div>" +
           (a.source === "monitoring"
             ? '<div class="det-row"><span class="det-label">Block</span><span class="det-value">' +
-              a.device +
+              escapeHtml(a.device) +
               "</span></div>"
-            : '<div class="det-row"><span class="det-label">User Account</span><span class="det-value">' +
-              a.user +
+            : '<div class="det-row"><span class="det-label">Field Operator Account</span><span class="det-value">' +
+              escapeHtml(a.user) +
               "</span></div>" +
               '<div class="det-row"><span class="det-label">IP Address</span><span class="det-value det-mono">' +
-              a.ip +
+              escapeHtml(a.ip) +
               "</span></div>" +
               '<div class="det-row"><span class="det-label">Device</span><span class="det-value">' +
-              a.device +
+              escapeHtml(a.device) +
               "</span></div>") +
           '<div class="det-section">Description</div>' +
           '<p style="font-size:var(--font-size-sm);color:var(--color-text-primary);line-height:1.6;margin:0;">' +
-          a.details +
+          escapeHtml(a.details) +
           "</p>" +
           secNotice +
           '<div class="det-section">Actions</div>' +
@@ -1578,20 +1598,20 @@
         try {
           var snap = await db.collection("users").where("username", "==", username).limit(1).get();
           if (snap.empty) {
-            utils.showToast('User "' + username + '" not found.', "error");
+            utils.showToast('Field Operator "' + username + '" not found.', "error");
             return;
           }
           await snap.docs[0].ref.update({ status: "disabled" });
-          await logUserAction("toggle_status", "Suspended user: " + username);
+          await logUserAction("toggle_status", "Suspended field operator: " + username);
 
-          utils.showToast('User "' + username + '" has been suspended.', "success");
+          utils.showToast('Field Operator "' + username + '" has been suspended.', "success");
           var oc = bootstrap.Offcanvas.getInstance(
             document.getElementById("detail-offcanvas"),
           );
           if (oc) oc.hide();
         } catch (err) {
           console.error("Failed to suspend user:", err);
-          utils.showToast("Failed to suspend user. Please try again.", "error");
+          utils.showToast("Failed to suspend field operator. Please try again.", "error");
         }
       }
 
@@ -1599,12 +1619,12 @@
         try {
           var snap = await db.collection("users").where("username", "==", username).limit(1).get();
           if (snap.empty) {
-            utils.showToast('User "' + username + '" not found.', "error");
+            utils.showToast('Field Operator "' + username + '" not found.', "error");
             return;
           }
           var userEmail = snap.docs[0].data().email;
           if (!userEmail) {
-            utils.showToast("No email on file for this user.", "error");
+            utils.showToast("No email on file for this field operator.", "error");
             return;
           }
           await firebase.auth().sendPasswordResetEmail(userEmail);

@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <link rel="icon" type="image/svg+xml" href="../../assets/images/pinevision-logo.svg" />
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script>
@@ -15,8 +16,6 @@
       })();
     </script>
     <title>Reports - PineVision</title>
-    <link rel="icon" type="image/x-icon" href="/frontend/assets/images/pinevision-favicon.ico" />
-    <link rel="icon" type="image/webp" sizes="64x64" href="/frontend/assets/images/pinevision-favicon.webp" />
     <link rel="apple-touch-icon" sizes="180x180" href="/frontend/assets/images/pinevision-touch-icon.png" />
     <link rel="stylesheet" href="../../bootstrap/css/bootstrap.min.css" />
     <link rel="stylesheet" href="../../css/tokens.css" />
@@ -263,7 +262,7 @@
             <div class="nav-section-title">Monitoring</div>
             <ul class="nav-links">
               <li>
-                <a href="users.html" class="nav-link" data-tooltip="Users">
+                <a href="users.html" class="nav-link" data-tooltip="Field Operators">
                   <span class="nav-link-icon"
                     ><img
                       src="/frontend/assets/icons/nav-users.svg"
@@ -271,7 +270,7 @@
                       width="18"
                       height="18"
                   /></span>
-                  <span class="nav-link-text">Users</span>
+                  <span class="nav-link-text">Field Operators</span>
                 </a>
               </li>
               <li>
@@ -517,9 +516,9 @@
               </div>
               <div class="col-sm-6 col-lg-3">
                 <div class="filter-field">
-                  <label class="filter-field-label" for="rp-filter-operator">User</label>
+                  <label class="filter-field-label" for="rp-filter-operator">Field Operator</label>
                   <select id="rp-filter-operator" class="filter-select">
-                    <option value="all">All Users</option>
+                    <option value="all">All Field Operators</option>
                   </select>
                 </div>
               </div>
@@ -560,7 +559,7 @@
                 <div class="report-subtitle" id="report-subtitle-text"></div>
               </div>
               <div class="export-actions">
-                <button class="btn-export btn btn-primary" title="Download this report as CSV" onclick="exportReportCSV()"><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg> <span>Export CSV</span></button>
+                <button class="btn-export btn btn-primary" title="Download this report as an Excel workbook" onclick="exportReportExcel()"><svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg> <span>Export Excel</span></button>
               </div>
             </div>
 
@@ -613,7 +612,7 @@
       let BLOCKS_RAW = [];   // [{id, blockName, section, userId, operatorName, ...}]
       let USERS_BY_ID = {};  // userId -> fullName
       let SCANS_RAW = [];    // [{id, blockId, startTime, ...}]
-      let CURRENT_REPORT_BLOCKS = [];  // last filtered set rendered by generateReport(), used by exportReportCSV()
+      let CURRENT_REPORT_BLOCKS = [];  // last filtered set rendered by generateReport(), used by exportReportExcel()
 
       window.initPage = function () {
         const today = new Date();
@@ -644,7 +643,7 @@
               USERS_BY_ID = {};
               snap.forEach(function (doc) {
                 const d = doc.data();
-                USERS_BY_ID[doc.id] = d.fullName || d.username || d.email || doc.id;
+                USERS_BY_ID[doc.id] = d.fullName || d.username || d.email || "Field Operator Not Found";
               });
               rpUsersLoaded = true;
               onDataChanged();
@@ -664,12 +663,13 @@
               BLOCKS_RAW = [];
               snap.forEach(function (doc) {
                 const d = doc.data();
+                if (d.isDeleted === true) return;
                 BLOCKS_RAW.push({
                   id: doc.id,
                   activeCycleId: d.activeCycleId || null,
                   blockName: d.blockName || d.blockId || doc.id,
                   userId: d.userId || "",
-                  section: d.section || "—",
+                  section: d.section && String(d.section).trim() ? String(d.section).trim() : "N/A",
                   area: typeof d.area === "number" ? d.area : parseFloat(d.area) || 0,
                   daf: typeof d.daf === "number" ? d.daf : parseInt(d.daf, 10) || 0,
                   bearing: d.bearingPercent || 0,
@@ -777,6 +777,10 @@
 
       // ── Filter dropdown population ──────────────────────────────
 
+      function getOperatorLabel(block) {
+        return USERS_BY_ID[block.userId] || (block.userId ? "Field Operator Not Found" : "Unassigned");
+      }
+
       function populateFilterOptions() {
         const blockSelect = document.getElementById("rp-filter-block");
         const operatorSelect = document.getElementById("rp-filter-operator");
@@ -784,7 +788,7 @@
         const currentOperator = operatorSelect.value;
 
         const operatorBlocks = BLOCKS_RAW.map(function (b) {
-          return Object.assign({}, b, { operatorName: USERS_BY_ID[b.userId] || b.userId || "Unassigned" });
+          return Object.assign({}, b, { operatorName: getOperatorLabel(b) });
         });
 
         blockSelect.innerHTML =
@@ -797,7 +801,7 @@
 
         const operators = Array.from(new Set(operatorBlocks.map((b) => b.operatorName).filter(Boolean))).sort();
         operatorSelect.innerHTML =
-          '<option value="all">All Users</option>' +
+          '<option value="all">All Field Operators</option>' +
           operators.map((o) => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join("");
 
         blockSelect.value = currentBlock || "all";
@@ -814,7 +818,7 @@
         const dateTo = document.getElementById("rp-date-to").value;
 
         let blocks = BLOCKS_RAW.map(function (b) {
-          return Object.assign({}, b, { operatorName: USERS_BY_ID[b.userId] || b.userId || "Unassigned" });
+          return Object.assign({}, b, { operatorName: getOperatorLabel(b) });
         });
 
         if (blockFilter !== "all") blocks = blocks.filter((b) => b.id === blockFilter);
@@ -846,7 +850,7 @@
 
         document.getElementById("report-title-text").textContent = "Farm Performance Report";
         document.getElementById("report-subtitle-text").textContent =
-          parts.length ? parts.join(" · ") : "All blocks · All users · All statuses";
+          parts.length ? parts.join(" · ") : "All blocks · All field operators · All statuses";
 
         renderMetrics(blocks, scansInRange);
         renderTable(blocks);
@@ -856,11 +860,9 @@
         results.classList.add("visible");
       }
 
-      /* ── Export CSV ────────────────────────────────────────────────
-       * Reuses the same Blob/createObjectURL pattern as
-       * admin/activity.html's exportCSV() — exports the report table
-       * exactly as currently filtered/generated. */
-      function exportReportCSV() {
+      /* ── Export Excel ────────────────────────────────────────────────
+       * Exports the report table exactly as currently filtered/generated. */
+      function exportReportExcel() {
         if (!CURRENT_REPORT_BLOCKS.length) {
           utils.showToast("Generate a report first.", "info");
           return;
@@ -869,9 +871,13 @@
           [
             "Block",
             "Section",
-            "User",
+            "Field Operator",
             "Days After Flowering",
             "Area (ha)",
+            "Estimated Plant Count",
+            "Bearing",
+            "Non-Bearing",
+            "Non-Viable",
             "Bearing %",
             "Non-Bearing %",
             "Non-Viable %",
@@ -880,25 +886,22 @@
         ];
         CURRENT_REPORT_BLOCKS.forEach((block) => {
           rows.push([
-            '"' + (block.blockName || "").replace(/"/g, '""') + '"',
-            '"' + (block.section || "").replace(/"/g, '""') + '"',
-            '"' + (block.operatorName || "").replace(/"/g, '""') + '"',
-            block.daf,
-            block.area,
-            block.bearing.toFixed(1),
-            block.nonbearing.toFixed(1),
-            block.nonViable.toFixed(1),
-            statusLabel(blockStatusClass(block)),
+            block.blockName || "N/A",
+            block.section || "N/A",
+            block.operatorName || "N/A",
+            block.daf || "N/A",
+            block.area || "N/A",
+            block.plants || "N/A",
+            block.plants ? Math.round(block.plants * block.bearing / 100) : "N/A",
+            block.plants ? Math.round(block.plants * block.nonbearing / 100) : "N/A",
+            block.plants ? Math.round(block.plants * block.nonViable / 100) : "N/A",
+            block.plants ? block.bearing.toFixed(1) : "N/A",
+            block.plants ? block.nonbearing.toFixed(1) : "N/A",
+            block.plants ? block.nonViable.toFixed(1) : "N/A",
+            statusLabel(blockStatusClass(block)) || "N/A",
           ]);
         });
-        const csv = rows.map((r) => r.join(",")).join("\n");
-        const blob = new Blob([csv], { type: "text/csv" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "pinevision-report-" + new Date().toISOString().slice(0, 10) + ".csv";
-        a.click();
-        URL.revokeObjectURL(url);
+        blockScanHistory.downloadRowsXlsx(rows, "pinevision-report-" + new Date().toISOString().slice(0, 10) + ".xlsx", "Farm Report");
         utils.showToast("Exported " + CURRENT_REPORT_BLOCKS.length + " block" + (CURRENT_REPORT_BLOCKS.length !== 1 ? "s" : ""), "success");
       }
 
@@ -924,7 +927,7 @@
           utils.buildMetricCard("Avg Non-Bearing", utils.formatPercent(avgNonbearing), "of selected blocks", "amber") +
           utils.buildMetricCard("Avg Non-Viable", utils.formatPercent(avgNonViable), "of selected blocks", "yellow") +
           utils.buildMetricCard("Total Area", totalArea.toFixed(1) + " ha", "selected area coverage", "") +
-          utils.buildMetricCard("Unique Users", new Set(blocks.map((b) => b.operatorName)).size, "flying selected blocks", "");
+          utils.buildMetricCard("Unique Field Operators", new Set(blocks.map((b) => b.userId || b.operatorName)).size, "flying selected blocks", "");
       }
 
       function renderTable(blocks) {
@@ -950,7 +953,7 @@
           '<col class="c-block"><col class="c-section"><col class="c-operator"><col class="c-daf"><col class="c-area"><col class="c-bearing"><col class="c-nonbearing"><col class="c-nonviable"><col class="c-status">' +
           "</colgroup>" +
           "<thead><tr>" +
-          "<th>Block</th><th>Section</th><th>User</th><th>DAF</th><th>Area</th><th>Bearing</th><th>Non-Bearing</th><th>Non-Viable</th><th>Status</th>" +
+          "<th>Block</th><th>Section</th><th>Field Operator</th><th>DAF</th><th>Area</th><th>Bearing</th><th>Non-Bearing</th><th>Non-Viable</th><th>Status</th>" +
           "</tr></thead><tbody>";
 
         blocks.forEach(function (block) {

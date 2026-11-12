@@ -88,7 +88,7 @@
                 console.log(`Final blockName: ${blockName}`);
 
                 // Get user name if userId exists
-                let operatorName = 'Unknown User';
+                let operatorName = 'Unknown Field Operator';
                 if (data.userId) {
                     try {
                         const userDoc = await firebase.firestore()
@@ -96,7 +96,7 @@
                             .doc(data.userId)
                             .get();
                         if (userDoc.exists) {
-                            operatorName = userDoc.data().fullName || userDoc.data().displayName || 'User';
+                            operatorName = userDoc.data().fullName || userDoc.data().displayName || 'Field Operator';
                         }
                     } catch (err) {
                         console.warn('Could not fetch user name:', err);
@@ -131,7 +131,7 @@
                     total: data.total || 0,
                     operator: operatorName,
                     drone: 'DJI Mavic 3 Multispectral',
-                    time: scanDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }),
+                    time: scanDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
                     duration: duration,
                     status: data.status || 'completed',
                     blockId: data.blockId,
@@ -327,12 +327,11 @@
                     </span>
                 </div>
                 <div class="sstats">
-                    <span>Plants: <strong>${formatNumber(scan.total)}</strong></span>
-                    <span>User: ${scan.operator}</span>
-                    <span>Drone: ${scan.drone}</span>
-                    <span>Start: <strong>${scan.time}</strong></span>
+                    <span>Estimated Plants: <strong>${formatNumber(scan.total)}</strong></span>
+                    <span>Field Operator: ${scan.operator}</span>
+                    <span>Timestamp: <strong>${scan.time}</strong></span>
                     <span>Duration: <strong>${scan.duration}</strong></span>
-                    <span>Blocks: <strong>${scan.blockName || 'undefined'}</strong></span>
+                    <span>Block Name: <strong>${scan.blockName || 'N/A'}</strong></span>
                 </div>
             </div>
         </div>

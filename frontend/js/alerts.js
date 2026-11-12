@@ -34,8 +34,8 @@
     let activeAlertFilter = 'crit';
     let thresholds = {
         bearing:    { watch: 75, critical: 60 },
-        nonbearing: { watch: 18, critical: 25 },
-        discolored: { watch: 10, critical: 15 },
+        nonbearing: { watch: 30, critical: 50 },
+        discolored: { watch: 15, critical: 25 },
     };
 
     // ═══════════════════════════════════════════════════════════
@@ -73,22 +73,7 @@
     // ═══════════════════════════════════════════════════════════
 
     async function loadThresholds() {
-        try {
-            const doc = await firebase.firestore()
-                .collection('user_settings')
-                .doc(currentUserId)
-                .get();
-            if (doc.exists) {
-                const saved = doc.data().alertThresholds;
-                if (saved) {
-                    if (saved.bearing)    thresholds.bearing    = saved.bearing;
-                    if (saved.nonbearing) thresholds.nonbearing = saved.nonbearing;
-                    if (saved.discolored) thresholds.discolored = saved.discolored;
-                }
-            }
-        } catch (error) {
-            console.error('Error loading thresholds:', error);
-        }
+        thresholds = await window.clientThresholds.load(currentUserId);
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -157,6 +142,7 @@
                     block:       blockMap[data.blockId] || 'Unknown Block',
                     detectedDate: formatDate(detectedDate),
                     title:       data.title       || 'Alert',
+                    threshold:   alertThreshold(data.title || '', data.severity || 'warn'),
                     description: data.description || '',
                     resolved:    data.resolved    || false,
                     resolvedDate: resolvedDate ? formatDate(resolvedDate) : null,
@@ -232,6 +218,7 @@
         const cls        = alert.severity;
         const badgeClass = cls === 'ok' ? 'good' : cls;
         const badgeLabel = cls === 'ok' ? 'Resolved' : cls === 'crit' ? 'Critical' : 'Watch';
+        const conciseDescription = String(alert.description || '').replace(/\s*[—–-]\s*(?:below|above)\s+(?:critical|watch)\s+threshold\s+of\s+[\d.]+%\.?/i, '').trim();
 
         const footParts = [];
         if (alert.resolvedDate) {
@@ -250,12 +237,12 @@
         <div class="alert-box ${cls}">
             <div class="alert-top">
                 <div class="alert-top-left">
-                    <div class="alert-meta-row">${alert.block} &middot; ${alert.detectedDate}</div>
+                    <div class="alert-meta-row"><strong class="alert-block-name">${alert.block}</strong><span class="alert-timestamp">Timestamp · ${alert.detectedDate}</span></div>
                     <span class="alert-title ${cls}">${alert.title}</span>
                 </div>
                 <span class="badge ${badgeClass}"><span class="bdot"></span>${badgeLabel}</span>
             </div>
-            <div class="alert-body">${alert.description}</div>
+            <div class="alert-body">${conciseDescription}${alert.threshold ? `<div class="alert-threshold-chip">Threshold · ${alert.threshold}</div>` : ''}</div>
             ${(footParts.length || resolveButton) ? `<div class="alert-foot">
                 <div class="alert-foot-items">${footParts.join('')}</div>
                 ${resolveButton}
@@ -263,55 +250,36 @@
         </div>`;
     }
 
+    function alertThreshold(title, severity) {
+        const level = severity === 'critical' || severity === 'crit' ? 'critical' : 'watch';
+        const lower = title.toLowerCase();
+        if (lower.includes('non-bearing')) return `above ${thresholds.nonbearing[level]}%`;
+        if (lower.includes('non-viable')) return `above ${thresholds.discolored[level]}%`;
+        if (lower.includes('bearing rate')) return `below ${thresholds.bearing[level]}%`;
+        return '';
+    }
+
     // ═══════════════════════════════════════════════════════════
-    // RENDER THRESHOLDS — accepts pre-fetched blocks snapshot
+    // RENDER THRESHOLDS
     // ═══════════════════════════════════════════════════════════
 
-    function renderThresholds(blocksSnapshot) {
-        // Uses the blocksSnapshot already fetched in loadAlertsFromFirestore().
-        // No additional Firestore request needed.
+    function renderThresholds() {
         try {
-            let totalBearing = 0, totalNonbearing = 0, totalDiscolored = 0, count = 0;
-
-            blocksSnapshot.forEach(doc => {
-                const data = doc.data();
-                totalBearing    += data.bearingPercent    || 0;
-                totalNonbearing += data.nonBearingPercent || 0;
-                totalDiscolored += data.nonViable         || 0;
-                count++;
-            });
-
-            const avg = v => count > 0 ? v / count : 0;
-            const avgBearing    = avg(totalBearing);
-            const avgNonbearing = avg(totalNonbearing);
-            const avgDiscolored = avg(totalDiscolored);
-
-            const colorMap = { good: 'var(--green)', warn: 'var(--amber)', crit: 'var(--red)' };
-
             const rows = [
                 {
                     metric:  'Bearing rate',
                     watch:   `Below ${thresholds.bearing.watch}%`,
                     crit:    `Below ${thresholds.bearing.critical}%`,
-                    current: avgBearing,
-                    status:  avgBearing < thresholds.bearing.critical ? 'crit'
-                           : avgBearing < thresholds.bearing.watch    ? 'warn' : 'good',
                 },
                 {
                     metric:  'Non-bearing rate',
                     watch:   `Above ${thresholds.nonbearing.watch}%`,
                     crit:    `Above ${thresholds.nonbearing.critical}%`,
-                    current: avgNonbearing,
-                    status:  avgNonbearing > thresholds.nonbearing.critical ? 'crit'
-                           : avgNonbearing > thresholds.nonbearing.watch    ? 'warn' : 'good',
                 },
                 {
                     metric:  'Non-Viable rate',
                     watch:   `Above ${thresholds.discolored.watch}%`,
                     crit:    `Above ${thresholds.discolored.critical}%`,
-                    current: avgDiscolored,
-                    status:  avgDiscolored > thresholds.discolored.critical ? 'crit'
-                           : avgDiscolored > thresholds.discolored.watch    ? 'warn' : 'good',
                 },
             ];
 
@@ -320,10 +288,6 @@
                     <td>${r.metric}</td>
                     <td style="font-family:var(--font-mono);color:var(--amber);font-weight:var(--font-weight-medium);">${r.watch}</td>
                     <td style="font-family:var(--font-mono);color:var(--red);font-weight:var(--font-weight-medium);">${r.crit}</td>
-                    <td>
-                        <span style="font-family:var(--font-mono);font-weight:var(--font-weight-medium);color:${colorMap[r.status]};">${formatPercent(r.current)}</span>
-                        &nbsp;${statusBadge(r.status)}
-                    </td>
                 </tr>`).join('');
 
         } catch (error) {
@@ -405,6 +369,12 @@
         const dw  = parseFloat(document.getElementById('t-disco-watch').value);
         const dc  = parseFloat(document.getElementById('t-disco-crit').value);
 
+        const values = [bw, bc, nbw, nbc, dw, dc];
+        if (values.some(value => !Number.isFinite(value) || value < 0 || value > 100)) {
+            utils.showFormError('threshold-form', 'Enter threshold values from 0 to 100');
+            return;
+        }
+
         if (bc >= bw) {
             utils.showFormError('threshold-form', 'Bearing critical must be lower than watch threshold');
             return;
@@ -425,33 +395,13 @@
         };
 
         try {
-            await firebase.firestore()
-                .collection('user_settings')
-                .doc(currentUserId)
-                .set({ alertThresholds: updated }, { merge: true });
-
-            thresholds = updated;
+            thresholds = await window.clientThresholds.save(currentUserId, updated);
             window.closeThresholdModal();
-
-            const cachedBlocks = window.pvCache && window.pvCache.get('blocks');
-            if (cachedBlocks) {
-                renderThresholds({
-                    forEach: fn => cachedBlocks.forEach(item => fn({ id: item.id, data: () => item._data })),
-                    size: cachedBlocks.length,
-                    _cached: true,
-                });
-            } else {
-                const blocksSnapshot = await firebase.firestore()
-                    .collection('blocks')
-                    .where('userId', '==', currentUserId)
-                    .get();
-                renderThresholds(blocksSnapshot);
-            }
-
+            renderThresholds();
             utils.showToast('Thresholds saved!', 'success');
         } catch (error) {
             console.error('Error saving thresholds:', error);
-            utils.showFormError('threshold-form', 'Failed to save thresholds. Please try again.');
+            utils.showFormError('threshold-form', 'Failed to save thresholds: ' + (error.message || 'Please try again.'));
         }
     };
 

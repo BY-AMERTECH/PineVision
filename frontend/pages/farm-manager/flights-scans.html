@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <link rel="icon" type="image/svg+xml" href="../../assets/images/pinevision-logo.svg" />
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script>
@@ -15,8 +16,6 @@
       })();
     </script>
     <title>Flights &amp; Scans - PineVision</title>
-    <link rel="icon" type="image/x-icon" href="/frontend/assets/images/pinevision-favicon.ico" />
-    <link rel="icon" type="image/webp" sizes="64x64" href="/frontend/assets/images/pinevision-favicon.webp" />
     <link rel="apple-touch-icon" sizes="180x180" href="/frontend/assets/images/pinevision-touch-icon.png" />
     <link rel="stylesheet" href="../../bootstrap/css/bootstrap.min.css" />
     <link rel="stylesheet" href="../../css/tokens.css" />
@@ -179,7 +178,7 @@
             <div class="nav-section-title">Monitoring</div>
             <ul class="nav-links">
               <li>
-                <a href="users.html" class="nav-link" data-tooltip="Users">
+                <a href="users.html" class="nav-link" data-tooltip="Field Operators">
                   <span class="nav-link-icon"
                     ><img
                       src="/frontend/assets/icons/nav-users.svg"
@@ -187,7 +186,7 @@
                       width="18"
                       height="18"
                   /></span>
-                  <span class="nav-link-text">Users</span>
+                  <span class="nav-link-text">Field Operators</span>
                 </a>
               </li>
               <li>
@@ -618,6 +617,7 @@
             label: "Total Flights",
             value: rows.length,
             sub: rows.length >= SCANS_LIMIT ? "Most recent " + SCANS_LIMIT : "All sessions",
+            info: "Count of flight sessions currently loaded. The page loads up to the 300 most recent sessions.",
             color: "green",
             icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>',
           },
@@ -625,13 +625,15 @@
             label: "Avg Bearing Rate",
             value: avgBearing === "—" ? "—" : avgBearing + "%",
             sub: "Across scanned sessions",
+            info: "Average bearing rate across loaded flight sessions that have scan data.",
             color: "",
             icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
           },
           {
-            label: "Total Users",
+            label: "Total Field Operators",
             value: uniqueOperators,
-            sub: "Active users",
+            sub: "Active field operators",
+            info: "Number of distinct field operators associated with the loaded flight sessions.",
             color: "",
             icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
           },
@@ -639,6 +641,7 @@
             label: "Blocks Covered",
             value: uniqueBlocks,
             sub: "Distinct blocks",
+            info: "Number of distinct blocks in the loaded flight sessions. Repeat scans of the same block count once.",
             color: "",
             icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>',
           },
@@ -648,7 +651,7 @@
         cards.forEach(function (c) {
           const cm = colorMap[c.color] || colorMap[""];
           html +=
-            '<div class="mc ' + c.color + '">' +
+            '<div class="mc ' + c.color + '" title="' + c.info + '">' +
             '<div class="mc-icon"><div style="width:32px;height:32px;border-radius:var(--radius-sm);background:' + cm.bg +
             ";display:flex;align-items:center;justify-content:center;color:" + cm.fg + ';">' + c.icon + "</div></div>" +
             '<div class="mc-label">' + c.label + "</div>" +
@@ -668,7 +671,7 @@
             '<div class="card"><div class="empty-state">' +
             '<div class="empty-state-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg></div>' +
             '<div class="empty-state-title">No Flights Recorded</div>' +
-            '<div class="empty-state-text">Flight sessions will appear here as soon as a user account logs a scan.</div>' +
+            '<div class="empty-state-text">Flight sessions will appear here as soon as a field operator logs a scan.</div>' +
             "</div></div>";
           return;
         }
@@ -696,7 +699,7 @@
         if (!filteredRows.length) {
           document.getElementById("fs-content").innerHTML =
             '<div class="tcard">' + tableHeader +
-            '<div class="empty-state"><div class="empty-state-title">No flights match your search</div><div class="empty-state-text">Try another block, user, date, status, or bearing value.</div></div></div>';
+            '<div class="empty-state"><div class="empty-state-title">No flights match your search</div><div class="empty-state-text">Try another block, field operator, date, status, or bearing value.</div></div></div>';
           return;
         }
 
@@ -714,7 +717,7 @@
           '<col class="c-date"><col class="c-block"><col class="c-operator"><col class="c-duration"><col class="c-status"><col class="c-bearing">' +
           "</colgroup>" +
           "<thead><tr>" +
-          "<th>Date</th><th>Block</th><th>User</th><th>Duration</th><th>Status</th><th>Bearing</th>" +
+          "<th>Date</th><th>Block</th><th>Field Operator</th><th>Duration</th><th>Status</th><th>Bearing</th>" +
           "</tr></thead><tbody>";
 
         pageData.rows.forEach(function (r) {

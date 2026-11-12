@@ -52,11 +52,35 @@ const app = (function() {
         // Set active link based on current page
         setActivePage();
 
+        // Keep the client-only account management links together without
+        // duplicating the Settings link in the page templates.
+        if (session.role === 'client') {
+            initClientManagementNavigation();
+            setActivePage();
+        }
+
         // Mobile sidebar toggle
         setupMobileSidebar();
 
         // Restore sidebar collapsed state from localStorage
         initSidebarCollapse();
+    }
+
+    function initClientManagementNavigation() {
+        const settingsLink = document.querySelector('.sidebar-nav a[href="settings.html"]');
+        const fieldSection = Array.from(document.querySelectorAll('.sidebar-nav .nav-section'))
+            .find(section => /field operations/i.test(section.querySelector('.nav-section-title')?.textContent || ''));
+        if (!settingsLink || !fieldSection || document.querySelector('.client-management-section')) return;
+        const management = document.createElement('div');
+        management.className = 'nav-section client-management-section';
+        management.innerHTML = '<div class="nav-section-title">Management</div><ul class="nav-links"></ul>';
+        const list = management.querySelector('.nav-links');
+        const settingsItem = settingsLink.closest('li');
+        if (settingsItem) list.appendChild(settingsItem);
+        const archiveItem = document.createElement('li');
+        archiveItem.innerHTML = '<a href="archive.html" class="nav-link"><span class="nav-link-icon"><img src="/frontend/assets/icons/nav-archive.svg" alt="Archive" width="20"></span><span class="nav-link-text">Archive</span></a>';
+        list.appendChild(archiveItem);
+        fieldSection.parentNode.insertBefore(management, fieldSection.nextSibling);
     }
 
     /**
@@ -90,6 +114,7 @@ const app = (function() {
     // ========================================
 
     const SIDEBAR_COLLAPSED_KEY = 'pinewatch_sidebar_collapsed';
+    const accountAvatarUrls = new Map();
 
     /**
      * Restore sidebar collapsed state from localStorage
@@ -156,7 +181,7 @@ const app = (function() {
     const ROLE_LABELS = {
         'admin': 'Super Admin',
         'farm_manager': 'Farm Manager',
-        'client': 'User'
+        'client': 'Field Operator'
     };
 
     // Inline icon paths, reused from the page-specific icons that used to
@@ -165,6 +190,7 @@ const app = (function() {
     const TOPBAR_ICONS = {
         dashboard: '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>',
         leaf: '<path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>',
+        archive: '<path d="M3 4h18v4H3z"/><path d="M5 8v12h14V8"/><path d="M9 12h6"/><path d="m10 15 2 2 2-2"/>',
         clipboard: '<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>',
         bell: '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
         cog: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
@@ -194,6 +220,10 @@ const app = (function() {
             icon: 'leaf',
             default: { title: 'Block Detail', subtitle: 'Detailed condition and history for an individual fruit block' }
         },
+        'archive': {
+            icon: 'archive',
+            client: { title: 'Archive', subtitle: 'Restore or permanently delete archived blocks' }
+        },
         'scans': {
             icon: 'clipboard',
             default: { title: 'Scan Log', subtitle: 'Chronological history of all drone scan sessions' }
@@ -201,8 +231,8 @@ const app = (function() {
         'alerts': {
             icon: 'bell',
             client: { title: 'Alerts', subtitle: 'Active flags, resolved issues, and threshold reference' },
-            farm_manager: { title: 'Account Alerts', subtitle: 'Security notifications and user access events across all platform accounts' },
-            admin: { title: 'Account Alerts', subtitle: 'Security notifications and user access events across all platform accounts' }
+            farm_manager: { title: 'Account Alerts', subtitle: 'Security notifications and field operator access events across all platform accounts' },
+            admin: { title: 'Account Alerts', subtitle: 'Security notifications and field operator access events across all platform accounts' }
         },
         'settings': {
             icon: 'cog',
@@ -220,7 +250,7 @@ const app = (function() {
         },
         'users': {
             icon: 'users',
-            default: { title: 'User Management', subtitle: 'Monitor, manage and configure user accounts and access levels' }
+            default: { title: 'Field Operator Management', subtitle: 'Monitor, manage and configure field operator accounts and access levels' }
         },
         'activity': {
             icon: 'activity',
@@ -228,7 +258,7 @@ const app = (function() {
         },
         'auditlogs': {
             icon: 'audit',
-            default: { title: 'Audit Logs', subtitle: 'Complete record of all system activity, access events, and user actions' }
+            default: { title: 'Audit Logs', subtitle: 'Complete record of all system activity, access events, and field operator actions' }
         }
     };
 
@@ -289,16 +319,7 @@ const app = (function() {
         const menuEmailEl = topbar.querySelector('.topbar-account-menu-email');
 
         if (avatarEl) {
-            renderAccountAvatar(avatarEl, initials, null);
-            if (session.uid && window.firebase && firebase.firestore) {
-                firebase.firestore().collection('users').doc(session.uid).get().then(function (snapshot) {
-                    if (!snapshot.exists) return;
-                    const currentUrl = snapshot.data().avatarUrl;
-                    if (currentUrl && !avatarEl.dataset.avatarLocalChange) renderAccountAvatar(avatarEl, initials, currentUrl);
-                }).catch(function () {
-                    // The initials remain visible when profile data is unavailable.
-                });
-            }
+            loadAccountAvatar(avatarEl, session);
         }
         if (nameEl) nameEl.textContent = displayName;
         if (roleEl) roleEl.textContent = roleLabel;
@@ -322,6 +343,27 @@ const app = (function() {
             element.textContent = initials;
         };
         element.appendChild(image);
+    }
+
+    function loadAccountAvatar(element, session) {
+        if (!element || !session) return Promise.resolve();
+        const displayName = session.fullName || session.username;
+        const initials = getInitials(displayName);
+        renderAccountAvatar(element, initials, null);
+        if (!session.uid || !window.firebase || !firebase.firestore) return Promise.resolve();
+
+        let avatarRequest = accountAvatarUrls.get(session.uid);
+        if (!avatarRequest) {
+            avatarRequest = firebase.firestore().collection('users').doc(session.uid).get()
+                .then(function (snapshot) {
+                    return snapshot.exists ? snapshot.data().avatarUrl || null : null;
+                })
+                .catch(function () { return null; });
+            accountAvatarUrls.set(session.uid, avatarRequest);
+        }
+        return avatarRequest.then(function (url) {
+            if (url && !element.dataset.avatarLocalChange) renderAccountAvatar(element, initials, url);
+        });
     }
 
     /**
@@ -432,7 +474,10 @@ const app = (function() {
         reload,
         toggleSidebar,
         initTopbar,
-        handleTopbarLogout
+        handleTopbarLogout,
+        loadAccountAvatar,
+        getInitials,
+        renderAccountAvatar
     };
 })();
 

@@ -225,12 +225,22 @@ def create_scan_session(block_id: str, user_id: str) -> Optional[str]:
         if not block_doc.exists or block_doc.to_dict().get('isDeleted') is True:
             print(f"⚠️ Cannot create a scan for missing or archived block: {block_id}")
             return None
-        active_cycle_id = block_doc.to_dict().get('activeCycleId')
+        block_data = block_doc.to_dict()
+        active_cycle_id = block_data.get('activeCycleId')
+        scan_snapshot = {
+            'blockNameAtScan': block_data.get('blockName'),
+            'sectionAtScan': block_data.get('section'),
+            'areaAtScan': block_data.get('area'),
+            'plantedAtScan': block_data.get('planted'),
+            'forcingDateAtScan': block_data.get('forcingDate'),
+            'dafAtScan': block_data.get('daf'),
+        }
         scan_ref = db.collection('scans').document()
         scan_ref.set({
             'blockId':         block_id,
             'userId':          user_id,
             'cycleId':         active_cycle_id,
+            **scan_snapshot,
             'status':          'active',
             'startTime':       firestore.SERVER_TIMESTAMP,
             'bearing':         0,

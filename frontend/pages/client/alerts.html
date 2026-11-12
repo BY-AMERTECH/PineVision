@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <link rel="icon" type="image/svg+xml" href="../../assets/images/pinevision-logo.svg" />
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
@@ -18,8 +19,6 @@
       })();
     </script>
     <title>Alerts - PineVision</title>
-    <link rel="icon" type="image/x-icon" href="/frontend/assets/images/pinevision-favicon.ico" />
-    <link rel="icon" type="image/webp" sizes="64x64" href="/frontend/assets/images/pinevision-favicon.webp" />
     <link rel="apple-touch-icon" sizes="180x180" href="/frontend/assets/images/pinevision-touch-icon.png" />
 
     <!-- CSS: Bootstrap first, then custom overrides -->
@@ -34,15 +33,21 @@
         margin-bottom: var(--space-2xl);
       }
 
+
       .alert-filters {
         display: flex;
+        flex-wrap: wrap;
+        align-items: center;
         gap: var(--space-sm);
-        overflow-x: auto;
+        overflow: visible;
         margin: 0 0 var(--space-lg);
         border-bottom: 1px solid var(--border);
+        padding-bottom: 6px;
       }
 
+
       .alert-filter {
+        position:relative;
         display: inline-flex;
         align-items: center;
         gap: var(--space-sm);
@@ -57,9 +62,14 @@
         cursor: pointer;
       }
 
+      .alert-filter::after { content:attr(data-help); position:absolute; z-index:35; top:calc(100% + 9px); left:0; display:none; width:230px; padding:10px 12px; border:1px solid var(--border); border-radius:var(--radius-md); background:var(--surf); color:var(--color-text-primary); box-shadow:0 7px 20px rgba(0,0,0,.13); font-size:var(--font-size-xs); font-weight:var(--font-weight-normal); line-height:1.45; white-space:normal; text-align:left; pointer-events:none; }
+      .alert-filter:hover::after, .alert-filter:focus-visible::after { display:block; }
+
       .alert-thresholds-button {
         margin-left: auto;
         flex: 0 0 auto;
+        align-self:center;
+        min-height:38px;
       }
 
       .alert-filter[aria-pressed="true"] {
@@ -107,6 +117,10 @@
       .alert-box .alert-top { margin-bottom: var(--space-xs); }
       .alert-box .alert-body { margin-bottom: var(--space-sm); }
       .alert-box .alert-foot { display: flex; align-items: center; justify-content: flex-end; padding-top: var(--space-sm); }
+      .alert-box .alert-meta-row { display:flex; align-items:baseline; flex-wrap:wrap; gap:8px; color:var(--muted); font-size:var(--font-size-xs); letter-spacing:normal; text-transform:none; }
+      .alert-block-name { color:var(--color-text-primary); font-size:var(--font-size-md); font-weight:var(--font-weight-bold); }
+      .alert-timestamp { color:var(--muted); font-size:var(--font-size-xs); font-weight:var(--font-weight-normal); }
+      .alert-threshold-chip { display:inline-flex; margin-top:8px; padding:5px 9px; border:1px solid var(--border); border-radius:var(--radius-pill); background:var(--surf); color:var(--color-text-secondary); font-size:var(--font-size-xs); font-weight:var(--font-weight-semibold); }
 
       .alert-foot-item {
         display: flex;
@@ -134,6 +148,8 @@
         .modal .form-row {
           grid-template-columns: 1fr;
         }
+        .alert-filters { gap:4px; }
+        .alert-thresholds-button { margin-left:0; }
       }
 
       /* ── Metric Cards ──────────────────────────────────────── */
@@ -422,23 +438,23 @@
             <div class="twrap">
               <table>
                 <colgroup>
-                  <col style="width: 28%" /><col style="width: 24%" />
-                  <col style="width: 24%" /><col style="width: 24%" />
+                  <col style="width: 34%" /><col style="width: 33%" />
+                  <col style="width: 33%" />
                 </colgroup>
-                <thead><tr><th>Metric</th><th>Watch threshold</th><th>Critical threshold</th><th>Farm average</th></tr></thead>
+                <thead><tr><th>Metric</th><th>Watch threshold</th><th>Critical threshold</th></tr></thead>
                 <tbody id="threshold-tbody"></tbody>
               </table>
             </div>
           </div>
 
           <div class="alert-filters" role="group" aria-label="Filter alerts by status">
-            <button class="alert-filter" type="button" data-alert-filter="crit" aria-pressed="true">
+            <button class="alert-filter" type="button" data-alert-filter="crit" data-help="Exceeds a critical threshold and needs prompt attention." aria-pressed="true">
               Critical <span class="alert-count crit" id="count-crit">0</span>
             </button>
-            <button class="alert-filter" type="button" data-alert-filter="warn" aria-pressed="false">
+            <button class="alert-filter" type="button" data-alert-filter="warn" data-help="Approaching a threshold. Monitor the block for changes." aria-pressed="false">
               Watch <span class="alert-count warn" id="count-warn">0</span>
             </button>
-            <button class="alert-filter" type="button" data-alert-filter="resolved" aria-pressed="false">
+            <button class="alert-filter" type="button" data-alert-filter="resolved" data-help="The alert has cleared or was marked resolved." aria-pressed="false">
               Resolved <span class="alert-count ok" id="count-ok">0</span>
             </button>
             <button class="btn btn-secondary alert-thresholds-button" type="button" onclick="openThresholdModal()">
@@ -618,6 +634,7 @@
 
     <!-- Application JavaScript -->
     <script src="../../js/auth.js"></script>
+    <script src="../../js/client-thresholds.js"></script>
     <script src="../../js/utils.js"></script>
     <script src="../../js/app.js"></script>
     <script src="../../js/cache.js"></script>
