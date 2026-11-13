@@ -723,10 +723,10 @@
         const user = firebase.auth().currentUser;
         if (!user) throw new Error("Not authenticated");
         const token = await user.getIdToken();
-        const response = await fetch("/api/history/crop-cycles?block_id=" + encodeURIComponent(blockId), {
+        const response = await fetch("https://pinevision-backend.whiteisland-36ad8831.eastasia.azurecontainerapps.io/api/history/crop-cycles?block_id=" + encodeURIComponent(blockId), {
           headers: { Authorization: "Bearer " + token },
         });
-        const payload = await response.json();
+        const payload = await response.json().catch(function () { return {}; });
         if (!response.ok) throw new Error(payload.error || "Could not load crop cycles");
         return blockScanHistory.assignCycleDisplayNumbers(payload.cycles || []).reverse();
       }
