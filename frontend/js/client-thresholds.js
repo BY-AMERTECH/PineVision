@@ -49,8 +49,23 @@ window.clientThresholds = (function () {
     return get();
   }
 
+  function waitForUser() {
+    const auth = firebase.auth();
+    if (auth.currentUser) return Promise.resolve(auth.currentUser);
+    return new Promise(function (resolve) {
+      let unsubscribe = null;
+      unsubscribe = auth.onAuthStateChanged(function (user) {
+        if (unsubscribe) unsubscribe();
+        resolve(user || null);
+      }, function () {
+        if (unsubscribe) unsubscribe();
+        resolve(null);
+      });
+    });
+  }
+
   async function request(method, body) {
-    const user = firebase.auth().currentUser;
+    const user = await waitForUser();
     if (!user) throw new Error('You are signed out. Sign in again and retry.');
     const token = await user.getIdToken();
     const response = await fetch('/api/client/alert-thresholds', {
