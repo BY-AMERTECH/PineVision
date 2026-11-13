@@ -68,7 +68,7 @@ window.clientThresholds = (function () {
     const user = await waitForUser();
     if (!user) throw new Error('You are signed out. Sign in again and retry.');
     const token = await user.getIdToken();
-    const response = await fetch('/api/client/alert-thresholds', {
+    const response = await fetch('https://pinevision-backend.whiteisland-36ad8831.eastasia.azurecontainerapps.io/api/client/alert-thresholds', {
       method: method,
       headers: {
         Authorization: 'Bearer ' + token,
