@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <link rel="icon" type="image/svg+xml" href="../../assets/images/pinevision-logo.svg" />
+    <link rel="icon" type="image/svg+xml" href="../../assets/images/pinevision-transparent-logo.svg" />
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
@@ -528,7 +528,7 @@
             <div class="nav-section-title">Monitoring</div>
             <ul class="nav-links">
               <li>
-                <a href="users.html" class="nav-link" data-tooltip="Field Operators">
+                <a href="users.html" class="nav-link" data-tooltip="Accounts">
                   <span class="nav-link-icon"
                     ><img
                       src="/frontend/assets/icons/nav-users.svg"
@@ -536,7 +536,7 @@
                       width="18"
                       height="18"
                   /></span>
-                  <span class="nav-link-text">Field Operators</span>
+                  <span class="nav-link-text">Accounts</span>
                 </a>
               </li>
               <li>
@@ -937,6 +937,7 @@
           ALL_BLOCKS = [];
           blocksSnap.forEach(function (doc) {
             const d = doc.data();
+            if (d.isDeleted === true) return;
             const operator = USERS_BY_ID[d.userId];
 
             ALL_BLOCKS.push({
@@ -1141,7 +1142,6 @@
       // ── Card builder ─────────────────────────────────────────────
 
       function buildBlockCard(block) {
-        const statusClass = blockStatusClass(block);
         const hasScanData = block.plants > 0;
 
         const bearingCount = hasScanData ? Math.round((block.bearing / 100) * block.plants) : null;
@@ -1180,7 +1180,6 @@
             <div class="fb-head-row">
               <div class="fb-block-id">${escapeHtml(block.blockName)}</div>
               <div class="fb-head-badges">
-                ${blockStatusBadge(statusClass)}
                 <span class="fb-chip">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z" />
@@ -1261,14 +1260,6 @@
         if (block.bearing >= 80) return "good";
         if (block.bearing >= 60) return "warn";
         return "crit";
-      }
-
-      function blockStatusBadge(status) {
-        if (status === "none") {
-          return '<span class="badge" style="background-color:var(--surf2);color:var(--color-text-secondary);border-color:var(--border);"><span class="bdot" style="background-color:var(--color-text-tertiary);"></span>No Scan Data</span>';
-        }
-        const labels = { good: "Healthy", warn: "Watch", crit: "Critical" };
-        return `<span class="badge ${status}"><span class="bdot"></span>${labels[status]}</span>`;
       }
 
       function growthStageLabel(block) {
@@ -1411,11 +1402,13 @@
         const user = firebase.auth().currentUser;
         if (!user) throw new Error("Not authenticated");
         const token = await user.getIdToken();
-        const response = await fetch("/api/history/crop-cycles?block_id=" + encodeURIComponent(block.id), {
+        const response = await fetch("https://pinevision-backend.whiteisland-36ad8831.eastasia.azurecontainerapps.io/api/history/crop-cycles?block_id=" + encodeURIComponent(block.id), {
           headers: { Authorization: "Bearer " + token },
         });
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.error || "Could not load crop cycles");
+        const payload = await response.json().catch(function () { return {}; });
+        if (!response.ok) {
+          throw new Error((payload.error || "Could not load crop cycles") + " (HTTP " + response.status + ")");
+        }
         return blockScanHistory.assignCycleDisplayNumbers(payload.cycles || []).reverse();
       }
 
@@ -1436,14 +1429,21 @@
         content.innerHTML = '<div class="scan-history-empty">Loading history…</div>';
         try {
           const results = await Promise.all([
-            blockScanHistory.load(block.id, block.userId, true),
-            loadCropCycleRecords(block),
+            blockScanHistory.load(block.id, null, true),
+            loadCropCycleRecords(block).catch(function (error) {
+              console.error("❌ Error loading crop cycle records:", error);
+              return null;
+            }),
           ]);
+          if (selectedBlockHistoryTab === "cycles" && results[1] === null) {
+            content.innerHTML = '<div class="scan-history-empty">Couldn’t load crop cycle history. Check the browser console for the request error. Scan History is still available.</div>';
+            return;
+          }
           if (selectedBlockHistoryTab === "cycles") {
             blockScanHistory.renderCycles(results[1], results[0], content, block.activeCycleId, viewBlockCycleScans);
             return;
           }
-          blockScanHistory.render(results[0], content, block, selectedBlockCycleId, selectedLegacyCycleCutoff, results[1]);
+          blockScanHistory.render(results[0], content, block, selectedBlockCycleId, selectedLegacyCycleCutoff, results[1] || []);
           if (selectedBlockCycleId) {
             content.insertAdjacentHTML("afterbegin", '<button type="button" class="btn btn-sm btn-secondary history-back-button" onclick="selectBlockHistoryTab(\'cycles\')">← All crop cycles</button>');
           }
@@ -1464,10 +1464,13 @@
         const block = findBlock(currentActionBlockId);
         if (!block) return;
         return Promise.all([
-          blockScanHistory.load(block.id, block.userId, true),
-          loadCropCycleRecords(block),
+          blockScanHistory.load(block.id, null, true),
+          loadCropCycleRecords(block).catch(function (error) {
+            console.error("❌ Error loading crop cycles for history export:", error);
+            return [];
+          }),
         ]).then(function (results) {
-          return blockScanHistory.download(block, block.userId, results[0], results[1], button);
+          return blockScanHistory.download(block, null, results[0], results[1], button);
         }).catch(function (error) {
           console.error("❌ Error preparing history export:", error);
           utils.showToast("Could not prepare history export. Please try again.", "error");

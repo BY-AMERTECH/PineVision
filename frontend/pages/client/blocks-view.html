@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <link rel="icon" type="image/svg+xml" href="../../assets/images/pinevision-logo.svg" />
+    <link rel="icon" type="image/svg+xml" href="../../assets/images/pinevision-transparent-logo.svg" />
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
@@ -106,6 +106,9 @@
       }
 
       .info-card-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
         font-size: var(--font-size-xs);
         font-weight: var(--font-weight-semibold);
         color: var(--muted);
@@ -114,6 +117,20 @@
         margin-bottom: var(--space-md);
         padding-bottom: var(--space-sm);
         border-bottom: var(--border-width-thin) solid var(--border);
+      }
+
+      .info-card-title svg,
+      .section-title-icon {
+        width: 16px;
+        height: 16px;
+        flex: 0 0 16px;
+        color: var(--green);
+      }
+
+      .thead-title {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
       }
 
       .stat-row {
@@ -194,6 +211,10 @@
       .scan-trend-count { flex:0 0 auto; padding:6px 11px; border:1px solid #dcebe0; border-radius:999px; background:#eff7f1; color:#287247; font-size:12px; font-weight:700; }
       .scan-trend-chart { overflow:hidden; border-radius:12px; background:rgba(255,255,255,.72); }
       .scan-trend-chart svg { display:block; width:100%; height:auto; }
+      @keyframes scan-point-highlight { from { transform:scale(1); filter:drop-shadow(0 0 0 rgba(23,35,27,0)); } to { transform:scale(1.65); filter:drop-shadow(0 0 4px rgba(23,35,27,.55)); } }
+      .scan-trend-chart circle[tabindex="0"]:hover, .scan-trend-chart circle[tabindex="0"]:focus-visible { transform-box:fill-box; transform-origin:center; stroke:#17231b; stroke-width:2; animation:scan-point-highlight .65s ease-in-out infinite alternate; }
+      @media (prefers-reduced-motion:reduce) { .scan-trend-chart circle[tabindex="0"]:hover, .scan-trend-chart circle[tabindex="0"]:focus-visible { animation:none; transform:scale(1.4); filter:drop-shadow(0 0 4px rgba(23,35,27,.55)); } }
+      .scan-trend-point-tooltip { position:fixed; z-index:2000; max-width:min(320px,calc(100vw - 24px)); padding:10px 12px; border-radius:8px; background:#17231b; color:#fff; font-size:12px; line-height:1.5; white-space:pre-line; box-shadow:0 5px 16px rgba(0,0,0,.24); pointer-events:none; }
       .scan-trend-legend { display:flex; justify-content:center; flex-wrap:wrap; gap:20px; padding:10px 0 14px; color:#46564a; font-size:12px; }
       .scan-trend-legend span { display:inline-flex; align-items:center; gap:7px; }
       .scan-trend-legend i { width:20px; height:3px; border-radius:4px; background:var(--series-color); }
@@ -687,6 +708,9 @@
           <!-- Field Info Cards (two side-by-side) -->
           <div class="row g-3 mb-4" id="field-info-row"></div>
 
+          <!-- Fruit Condition Breakdown -->
+          <div class="tcard mb-4" id="condition-breakdown"></div>
+
           <!-- Scan History (compact — click View to expand in modal) -->
           <div class="tcard trend-compact-card mb-4">
             <div
@@ -694,7 +718,7 @@
               style="padding: var(--space-md) var(--space-xl)"
             >
               <div class="d-flex align-items-center gap-3">
-                <span class="thead-title">History</span>
+                <span class="thead-title"><svg class="section-title-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 2.64-6.36L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>History</span>
                 <span class="trend-view-hint">View scans and crop cycles</span>
               </div>
               <div class="d-flex align-items-center gap-2 trend-actions">
@@ -704,8 +728,6 @@
             <div class="mb-4" id="block-bearing-trend" aria-label="Bearing results by scan"></div>
           </div>
 
-          <!-- Fruit Condition Breakdown -->
-          <div class="tcard mb-4" id="condition-breakdown"></div>
         </div>
       </main>
     </div>
@@ -885,16 +907,16 @@
     <div id="delete-block-modal" class="modal">
       <div class="modal-content" style="max-width: 420px">
         <div class="modal-header">
-          <h2 class="modal-title">Delete Block</h2>
+          <h2 class="modal-title">Move Block to Archive</h2>
           <button class="modal-close" onclick="closeDeleteModal()">
             &times;
           </button>
         </div>
         <div class="modal-body">
           <p style="font-size:var(--font-size-sm);color:var(--color-text-secondary);margin:0;">
-            Are you sure you want to delete
+            Move
             <strong id="delete-block-name" style="color:var(--color-text-primary);"></strong>?
-            This cannot be undone.
+            The block and its crop cycle and scan history will be kept in Archive until you permanently delete it.
           </p>
         </div>
         <div class="modal-footer">
@@ -922,6 +944,7 @@
 
     <!-- Application JavaScript -->
     <script src="../../js/auth.js"></script>
+    <script src="../../js/client-thresholds.js"></script>
     <script src="../../js/utils.js"></script>
     <script src="../../js/block-scan-history.js"></script>
     <script src="../../js/app.js"></script>
@@ -948,6 +971,7 @@
         const session = auth.getSession();
         currentUserId = session ? session.uid : null;
         currentAccountName = session && (session.fullName || session.username || session.email) || null;
+        await window.clientThresholds.load(currentUserId);
 
         // Get block ID from URL
         const blockId = new URLSearchParams(window.location.search).get("id");
@@ -986,6 +1010,11 @@
           }
 
           const blockData = blockDoc.data();
+
+          if (blockData.isDeleted === true) {
+            window.location.href = "archive.html";
+            return;
+          }
 
           // A client may only view/edit their own blocks — the block id in
           // the URL is not itself proof of ownership, so verify it here
@@ -1057,9 +1086,10 @@
                 currentCycleScans,
                 currentBlock.activeCycleId,
               );
-              currentBlock.estimatedTotalPlantCount = currentBlock.latestCycleResult
-                ? currentBlock.latestCycleResult.bearing + currentBlock.latestCycleResult.nonBearing
-                : 0;
+              currentBlock.estimatedTotalPlantCount = blockScanHistory.latestPlantCount(
+                currentCycleScans,
+                currentBlock.activeCycleId,
+              );
             } else {
               const latestCounts = await blockScanHistory.loadLatestPlantCounts(
                 [blockDoc.id],
@@ -1121,10 +1151,102 @@
         try {
           const history = await blockScanHistory.load(blockId, userId, true);
           blockScanHistory.renderTrend(history, container);
+          enhanceScanTrendTooltips(history, container);
         } catch (error) {
           console.error("❌ Error loading scan trend:", error);
           container.innerHTML = '<div class="scan-history-empty">Could not load scan trend.</div>';
         }
+      }
+
+      function enhanceScanTrendTooltips(history, container) {
+        const svg = container.querySelector(".scan-trend-chart svg");
+        if (!svg) return;
+        let tooltip = document.getElementById("scan-trend-point-tooltip");
+        if (!tooltip) {
+          tooltip = document.createElement("div");
+          tooltip.id = "scan-trend-point-tooltip";
+          tooltip.className = "scan-trend-point-tooltip";
+          tooltip.setAttribute("role", "tooltip");
+          tooltip.hidden = true;
+          document.body.appendChild(tooltip);
+        }
+
+        svg.setAttribute("role", "group");
+        svg.setAttribute("aria-label", "Scan history points. Focus a point to hear its scan details.");
+        const points = (history || []).filter(function (entry) {
+          return entry.data && (entry.data.status == null || entry.data.status === "completed");
+        }).map(function (entry) {
+          const bearing = scanTooltipMetric(entry.data, "bearing");
+          const nonBearing = scanTooltipMetric(entry.data, "nonBearing");
+          const total = bearing === null || nonBearing === null ? null : bearing + nonBearing;
+          if (total === null || total <= 0) return null;
+          const nonViable = scanTooltipMetric(entry.data, "nonViable");
+          const scanTotal = scanTooltipMetric(entry.data, "total");
+          const storedNonViablePercent = scanTooltipMetric(entry.data, "nonViablePercent");
+          const nonViablePercent = storedNonViablePercent !== null
+            ? storedNonViablePercent
+            : nonViable !== null && scanTotal !== null && scanTotal > 0
+              ? nonViable / scanTotal * 100
+              : null;
+          return [
+            "Scan date and time: " + entry.date.toLocaleString("en-US", {
+              year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit"
+            }),
+            "Bearing: " + bearing.toLocaleString("en-US") + " plants (" + (bearing / total * 100).toFixed(1) + "%)",
+            "Non-bearing: " + nonBearing.toLocaleString("en-US") + " plants (" + (nonBearing / total * 100).toFixed(1) + "%)",
+            "Non-Viable: " + (nonViable === null
+              ? "Unavailable"
+              : nonViable.toLocaleString("en-US") + " plants (" + (nonViablePercent === null ? "Unavailable" : nonViablePercent.toFixed(1) + "%") + ")"),
+            "Estimated plant count: " + total.toLocaleString("en-US")
+          ].join("\n");
+        }).filter(Boolean);
+        const circles = Array.from(svg.querySelectorAll('circle[tabindex="0"]'));
+        let activeTooltipCircle = null;
+        const hideTooltip = function (circle) {
+          if (circle && activeTooltipCircle !== circle) return;
+          if (circle) circle.removeAttribute("aria-describedby");
+          activeTooltipCircle = null;
+          tooltip.hidden = true;
+        };
+        circles.forEach(function (circle, circleIndex) {
+          const pointIndex = circleIndex < points.length ? circleIndex : circleIndex - points.length;
+          const details = points[pointIndex];
+          if (!details) return;
+          circle.removeAttribute("title");
+          const nativeTitle = circle.querySelector("title");
+          if (nativeTitle) nativeTitle.remove();
+          circle.setAttribute("aria-label", details);
+
+          const showTooltip = function () {
+            activeTooltipCircle = circle;
+            tooltip.textContent = details;
+            tooltip.hidden = false;
+            circle.setAttribute("aria-describedby", tooltip.id);
+            const pointRect = circle.getBoundingClientRect();
+            const tooltipRect = tooltip.getBoundingClientRect();
+            const left = Math.max(12, Math.min(
+              pointRect.left + (pointRect.width - tooltipRect.width) / 2,
+              window.innerWidth - tooltipRect.width - 12
+            ));
+            let top = pointRect.top - tooltipRect.height - 8;
+            if (top < 12) top = pointRect.bottom + 8;
+            top = Math.max(12, Math.min(top, window.innerHeight - tooltipRect.height - 12));
+            tooltip.style.left = left + "px";
+            tooltip.style.top = top + "px";
+          };
+          circle.addEventListener("pointerenter", showTooltip);
+          circle.addEventListener("pointerleave", function () {
+            if (document.activeElement !== circle) hideTooltip(circle);
+          });
+          circle.addEventListener("focus", showTooltip);
+          circle.addEventListener("blur", function () { hideTooltip(circle); });
+        });
+      }
+
+      function scanTooltipMetric(data, key) {
+        if (!data || data[key] == null || data[key] === "") return null;
+        const value = Number(data[key]);
+        return Number.isFinite(value) ? value : null;
       }
 
       function getDisplayedResultCounts(block) {
@@ -1157,17 +1279,10 @@
         const bearingPlants    = counts.bearing;
         const nonbearingPlants = counts.nonBearing;
         const nonViablePlants  = counts.nonViable;
-        const bearingAndNonbearingTotal = bearingPlants + nonbearingPlants;
-        const estimatedTotalPlants = block.estimatedTotalPlantCount || bearingAndNonbearingTotal;
-        const bearingPercent = bearingAndNonbearingTotal > 0
-          ? (bearingPlants / bearingAndNonbearingTotal) * 100
-          : 0;
-        const nonbearingPercent = bearingAndNonbearingTotal > 0
-          ? (nonbearingPlants / bearingAndNonbearingTotal) * 100
-          : 0;
-        const nonViablePercent = estimatedTotalPlants > 0
-          ? (nonViablePlants / estimatedTotalPlants) * 100
-          : 0;
+        // Keep these values aligned with the metric cards above.
+        const bearingPercent = Number(block.bearing) || 0;
+        const nonbearingPercent = Number(block.nonbearing) || 0;
+        const nonViablePercent = Number(block.nonViable) || 0;
 
         const plantSub = (n) => hasDetectedData ? formatNumber(n) + " plants" : "—";
 
@@ -1202,7 +1317,7 @@
         document.getElementById("field-info-row").innerHTML = `
             <div class="col-md-6">
                 <div class="info-card">
-                    <div class="info-card-title">General Details</div>
+                    <div class="info-card-title"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg><span>General Details</span></div>
                     <div class="stat-row">
                         <span class="stat-label">Block ID</span>
                         <span class="stat-value">${block.blockName || block.blockId}</span>
@@ -1220,14 +1335,14 @@
             </div>
             <div class="col-md-6">
                 <div class="info-card">
-                    <div class="info-card-title">Crop &amp; Growth Details</div>
+                    <div class="info-card-title"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span>Crop &amp; Growth Details</span></div>
                     <div class="stat-row">
                         <span class="stat-label">Planting Date</span>
-                        <span class="stat-value">${block.planted}</span>
+                        <span class="stat-value">${formatDateValue(block.planted)}</span>
                     </div>
                     <div class="stat-row">
                         <span class="stat-label">Forcing Date</span>
-                        <span class="stat-value">${block.forcingDate}</span>
+                        <span class="stat-value">${formatDateValue(block.forcingDate)}</span>
                     </div>
                     <div class="stat-row">
                         <span class="stat-label">Growth Stage (DAF)</span>
@@ -1244,13 +1359,14 @@
         const nonbearingPlants = counts.nonBearing;
         const nonViablePlants  = counts.nonViable;
         const totalPlants      = bearingPlants + nonbearingPlants;
-        const bearingPercent   = totalPlants > 0 ? (bearingPlants / totalPlants) * 100 : 0;
-        const nonbearingPercent = totalPlants > 0 ? (nonbearingPlants / totalPlants) * 100 : 0;
+        const bearingPercent   = Number(block.bearing) || 0;
+        const nonbearingPercent = Number(block.nonbearing) || 0;
+        const nonViablePercent = Number(block.nonViable) || 0;
         const fmtPlant = (n) => hasDetectedData ? formatNumber(n) : "—";
 
         document.getElementById("condition-breakdown").innerHTML = `
         <div class="thead-row">
-            <span class="thead-title">Fruit Condition Breakdown</span>
+            <span class="thead-title"><svg class="section-title-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v9h9"/><path d="M20.5 15A9 9 0 1 1 9 3.5"/></svg>Fruit Condition Breakdown</span>
         </div>
         <div class="twrap">
             <table class="fruit-breakdown-table">
@@ -1273,7 +1389,7 @@
                         <td class="fruit-breakdown-count">${fmtPlant(bearingPlants)}</td>
                         <td><div class="fruit-breakdown-distribution">
                             <div class="fruit-breakdown-track"><span class="fruit-breakdown-fill" style="width:${bearingPercent}%;background:var(--green);"></span></div>
-                            <span class="fruit-breakdown-percent">${totalPlants > 0 ? formatPercent(bearingPercent) : "—"}</span>
+                            <span class="fruit-breakdown-percent">${formatPercent(bearingPercent)}</span>
                         </div></td>
                     </tr>
                     <tr>
@@ -1284,7 +1400,7 @@
                         <td class="fruit-breakdown-count">${fmtPlant(nonbearingPlants)}</td>
                         <td><div class="fruit-breakdown-distribution">
                             <div class="fruit-breakdown-track"><span class="fruit-breakdown-fill" style="width:${nonbearingPercent}%;background:var(--amber);"></span></div>
-                            <span class="fruit-breakdown-percent">${totalPlants > 0 ? formatPercent(nonbearingPercent) : "—"}</span>
+                            <span class="fruit-breakdown-percent">${formatPercent(nonbearingPercent)}</span>
                         </div></td>
                     </tr>
                     <tr class="fruit-breakdown-total">
@@ -1307,7 +1423,13 @@
                             <span class="fruit-breakdown-not-counted">Not counted</span>
                         </div></td>
                         <td class="fruit-breakdown-count">${fmtPlant(nonViablePlants)}</td>
-                        <td><span class="fruit-breakdown-excluded">Excluded from total and distribution</span></td>
+                        <td>
+                            <div class="fruit-breakdown-distribution">
+                                <div class="fruit-breakdown-track"><span class="fruit-breakdown-fill" style="width:${nonViablePercent}%;background:var(--yellow-mid);"></span></div>
+                                <span class="fruit-breakdown-percent">${formatPercent(nonViablePercent)}</span>
+                            </div>
+                            <span class="fruit-breakdown-excluded">Excluded from total and distribution</span>
+                        </td>
                     </tr>
                 </tbody>
             </table>
@@ -1318,9 +1440,7 @@
       function getStatusClass(block) {
         const bearing = Number(block.bearing) || 0;
         if (!block.totalScans && bearing === 0 && !(Number(block.nonbearing) || 0) && !(Number(block.nonViable) || 0)) return "none";
-        if (bearing >= 80) return "good";
-        if (bearing >= 60) return "warn";
-        return "crit";
+        return window.clientThresholds.classify(block);
       }
 
       function statusBadge(status) {
@@ -1374,6 +1494,29 @@
 
       function formatArea(area) {
         return area + " ha";
+      }
+
+      function formatDateValue(value) {
+        if (!value) return "—";
+        let date;
+        if (value && typeof value.toDate === "function") {
+          date = value.toDate();
+        } else if (value instanceof Date) {
+          date = value;
+        } else if (typeof value === "string") {
+          const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+          date = match
+            ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+            : new Date(value);
+        } else {
+          date = new Date(value);
+        }
+        if (Number.isNaN(date.getTime())) return String(value);
+        return date.toLocaleDateString("en-US", {
+          month: "long",
+          day: "2-digit",
+          year: "numeric",
+        });
       }
 
       // ── Trend Modal — live bearing-rate history from this block's scans ──
@@ -1528,11 +1671,11 @@
             if (oldCycleRef) {
               const prior = await tx.get(oldCycleRef);
               if (!prior.exists) throw new Error("The active cycle record is missing. Refresh and try again.");
-              tx.update(oldCycleRef, {status:"completed", completedAt:now});
+              tx.update(oldCycleRef, {status:"completed", completedAt:now, blockName:data.blockName || null, section:data.section || null, area:data.area ?? null});
             } else {
-              tx.set(legacyCycleRef, {blockId:currentBlock.id,userId:currentUserId,status:"completed",planted:data.planted || null,forcingDate:data.forcingDate || null,daf:Number.isSafeInteger(Number(data.daf)) ? Number(data.daf) : null,startDate:data.planted || null,completedAt:now,createdAt:now,legacy:true});
+              tx.set(legacyCycleRef, {blockId:currentBlock.id,userId:currentUserId,status:"completed",blockName:data.blockName || null,section:data.section || null,area:data.area ?? null,planted:data.planted || null,forcingDate:data.forcingDate || null,daf:Number.isSafeInteger(Number(data.daf)) ? Number(data.daf) : null,startDate:data.planted || null,completedAt:now,createdAt:now,legacy:true});
             }
-            tx.set(newCycleRef, {blockId:currentBlock.id,userId:currentUserId,status:"active",planted:planted,forcingDate:forcingDate,daf:daf,startDate:planted,startedAt:now,createdAt:now});
+            tx.set(newCycleRef, {blockId:currentBlock.id,userId:currentUserId,status:"active",blockName:data.blockName || null,section:data.section || null,area:data.area ?? null,planted:planted,forcingDate:forcingDate,daf:daf,startDate:planted,startedAt:now,createdAt:now});
             tx.update(blockRef, {activeCycleId:newCycleRef.id,planted:planted,forcingDate:forcingDate,daf:daf,bearingPercent:0,nonBearingPercent:0,nonViable:0,totalPineapples:0,totalScans:0,estimatedBearing:0,estimatedNonBearing:0,detectionCoverage:0,lastScanned:firebase.firestore.FieldValue.delete(),lastUpdate:now});
           });
           closeNewCycleModal();
@@ -1648,7 +1791,7 @@
             if (!cycleDoc.exists || cycle.blockId !== currentBlock.id || cycle.userId !== currentUserId || cycle.status !== "active") {
               throw new Error("The active crop cycle could not be verified. Refresh and try again.");
             }
-            tx.update(cycleRef, { planted: planted, forcingDate: forcingDate, daf: daf });
+            tx.update(cycleRef, { blockName: blockName, section: section, area: area, planted: planted, forcingDate: forcingDate, daf: daf });
           }
 
           tx.update(blockRef, {
@@ -1692,25 +1835,27 @@
         utils.hideModal("delete-block-modal");
       }
 
-      function handleDeleteBlock() {
+      async function handleDeleteBlock() {
         if (!currentBlock) return;
-        firebase
-          .firestore()
-          .collection("blocks")
-          .doc(currentBlock.id)
-          .delete()
-          .then(function () {
-            closeDeleteModal();
-            utils.showToast("Block deleted.", "success");
-            setTimeout(function () {
-              window.location.href = "blocks.html";
-            }, 800);
-          })
-          .catch(function (err) {
-            console.error("❌ Failed to delete block:", err);
-            closeDeleteModal();
-            utils.showToast("Failed to delete block. Please try again.", "error");
+        const confirmButton = document.querySelector('#delete-block-modal .btn-primary');
+        if (confirmButton?.disabled) return;
+        if (confirmButton) confirmButton.disabled = true;
+        try {
+          const token = await firebase.auth().currentUser.getIdToken();
+          const response = await fetch("https://pinevision-backend.whiteisland-36ad8831.eastasia.azurecontainerapps.io/api/client/blocks/" + encodeURIComponent(currentBlock.id) + "/archive", {
+            method: "POST", headers: { Authorization: "Bearer " + token }
           });
+          const result = await response.json().catch(function () { return {}; });
+          if (!response.ok) throw new Error(result.error || "Failed to archive block");
+          closeDeleteModal();
+          utils.showToast("Block moved to Archive.", "success");
+          setTimeout(function () { window.location.href = "blocks.html"; }, 500);
+        } catch (err) {
+          console.error("❌ Failed to archive block:", err);
+          if (confirmButton) confirmButton.disabled = false;
+          closeDeleteModal();
+          utils.showToast(err.message || "Failed to archive block. Please try again.", "error");
+        }
       }
 
     </script>

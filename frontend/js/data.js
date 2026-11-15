@@ -340,12 +340,12 @@ const THRESHOLDS = {
         watch: 75      // Below 75% = Watch
     },
     nonbearing: {
-        critical: 25,  // Above 25% = Critical
-        watch: 20      // Above 20% = Watch
+        critical: 50,  // Above 50% = Critical
+        watch: 30      // Above 30% = Watch
     },
     discolored: {
-        critical: 12,  // Above 12% = Critical
-        watch: 8       // Above 8% = Watch
+        critical: 25,  // Above 25% = Critical
+        watch: 15      // Above 15% = Watch
     }
 };
 

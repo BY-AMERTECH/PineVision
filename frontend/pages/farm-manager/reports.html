@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <link rel="icon" type="image/svg+xml" href="../../assets/images/pinevision-logo.svg" />
+    <link rel="icon" type="image/svg+xml" href="../../assets/images/pinevision-transparent-logo.svg" />
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script>
@@ -262,7 +262,11 @@
             <div class="nav-section-title">Monitoring</div>
             <ul class="nav-links">
               <li>
+<<<<<<< HEAD
                 <a href="users.html" class="nav-link" data-tooltip="Field Operators">
+=======
+                <a href="users.html" class="nav-link" data-tooltip="Accounts">
+>>>>>>> features/new-fixes
                   <span class="nav-link-icon"
                     ><img
                       src="/frontend/assets/icons/nav-users.svg"
@@ -270,7 +274,11 @@
                       width="18"
                       height="18"
                   /></span>
+<<<<<<< HEAD
                   <span class="nav-link-text">Field Operators</span>
+=======
+                  <span class="nav-link-text">Accounts</span>
+>>>>>>> features/new-fixes
                 </a>
               </li>
               <li>
@@ -643,7 +651,7 @@
               USERS_BY_ID = {};
               snap.forEach(function (doc) {
                 const d = doc.data();
-                USERS_BY_ID[doc.id] = d.fullName || d.username || d.email || doc.id;
+                USERS_BY_ID[doc.id] = d.fullName || d.username || d.email || "Field Operator Not Found";
               });
               rpUsersLoaded = true;
               onDataChanged();
@@ -663,6 +671,7 @@
               BLOCKS_RAW = [];
               snap.forEach(function (doc) {
                 const d = doc.data();
+                if (d.isDeleted === true) return;
                 BLOCKS_RAW.push({
                   id: doc.id,
                   activeCycleId: d.activeCycleId || null,
@@ -776,6 +785,10 @@
 
       // ── Filter dropdown population ──────────────────────────────
 
+      function getOperatorLabel(block) {
+        return USERS_BY_ID[block.userId] || (block.userId ? "Field Operator Not Found" : "Unassigned");
+      }
+
       function populateFilterOptions() {
         const blockSelect = document.getElementById("rp-filter-block");
         const operatorSelect = document.getElementById("rp-filter-operator");
@@ -783,7 +796,7 @@
         const currentOperator = operatorSelect.value;
 
         const operatorBlocks = BLOCKS_RAW.map(function (b) {
-          return Object.assign({}, b, { operatorName: USERS_BY_ID[b.userId] || b.userId || "Unassigned" });
+          return Object.assign({}, b, { operatorName: getOperatorLabel(b) });
         });
 
         blockSelect.innerHTML =
@@ -813,7 +826,7 @@
         const dateTo = document.getElementById("rp-date-to").value;
 
         let blocks = BLOCKS_RAW.map(function (b) {
-          return Object.assign({}, b, { operatorName: USERS_BY_ID[b.userId] || b.userId || "Unassigned" });
+          return Object.assign({}, b, { operatorName: getOperatorLabel(b) });
         });
 
         if (blockFilter !== "all") blocks = blocks.filter((b) => b.id === blockFilter);
@@ -922,7 +935,11 @@
           utils.buildMetricCard("Avg Non-Bearing", utils.formatPercent(avgNonbearing), "of selected blocks", "amber") +
           utils.buildMetricCard("Avg Non-Viable", utils.formatPercent(avgNonViable), "of selected blocks", "yellow") +
           utils.buildMetricCard("Total Area", totalArea.toFixed(1) + " ha", "selected area coverage", "") +
+<<<<<<< HEAD
           utils.buildMetricCard("Unique Field Operators", new Set(blocks.map((b) => b.operatorName)).size, "flying selected blocks", "");
+=======
+          utils.buildMetricCard("Unique Field Operators", new Set(blocks.map((b) => b.userId || b.operatorName)).size, "flying selected blocks", "");
+>>>>>>> features/new-fixes
       }
 
       function renderTable(blocks) {

@@ -22,6 +22,9 @@ import requests
 
 from drone_conn.routes import drone_bp
 from drone_conn.live_socket import init_live_socket, socketio
+from drone_conn.firebase_client import (
+    set_block_archived, permanently_delete_archived_block,
+)
 
 # Absolute path to the frontend folder (one level up from backend/)
 FRONTEND = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'frontend'))
@@ -77,6 +80,49 @@ def _verify_farm_manager_token():
     return decoded, None
 
 
+def _verify_client_token():
+    """Verify the Firebase ID token and require the client role."""
+    header = request.headers.get('Authorization', '')
+    if not header.startswith('Bearer '):
+        return None, (jsonify({'error': 'Missing or invalid Authorization header'}), 401)
+    try:
+        decoded = auth.verify_id_token(header.split('Bearer ', 1)[1].strip())
+    except Exception:
+        return None, (jsonify({'error': 'Invalid or expired token'}), 401)
+
+    if not db:
+        return None, (jsonify({'error': 'Firebase not initialized'}), 500)
+    user_doc = db.collection('users').document(decoded['uid']).get()
+    if not user_doc.exists or user_doc.to_dict().get('role') != 'client':
+        return None, (jsonify({'error': 'Client access required'}), 403)
+    return decoded, None
+
+
+def _validate_alert_thresholds(value):
+    """Validate and normalize all three account alert threshold pairs."""
+    if not isinstance(value, dict) or set(value) != {'bearing', 'nonbearing', 'discolored'}:
+        return None
+
+    normalized = {}
+    for metric, bearing_rate in (
+        ('bearing', True), ('nonbearing', False), ('discolored', False)
+    ):
+        pair = value.get(metric)
+        if not isinstance(pair, dict) or set(pair) != {'watch', 'critical'}:
+            return None
+        watch = pair.get('watch')
+        critical = pair.get('critical')
+        if (isinstance(watch, bool) or not isinstance(watch, (int, float)) or
+                isinstance(critical, bool) or not isinstance(critical, (int, float))):
+            return None
+        if not (0 <= watch <= 100 and 0 <= critical <= 100):
+            return None
+        if (bearing_rate and critical >= watch) or (not bearing_rate and critical <= watch):
+            return None
+        normalized[metric] = {'watch': watch, 'critical': critical}
+    return normalized
+
+
 def _verify_history_viewer_token():
     """Allow only authenticated Super Admins and Farm Managers to read shared history."""
     decoded, error = _verify_admin_token()
@@ -119,6 +165,87 @@ def api_test():
         'status': 'success',
         'firebase': 'connected' if db else 'disconnected'
     }), 200
+
+
+@app.route('/api/client/blocks/<block_id>/archive', methods=['POST'])
+def archive_client_block(block_id):
+    decoded, error = _verify_client_token()
+    if error:
+        return error
+    try:
+        set_block_archived(block_id, decoded['uid'], True)
+        return jsonify({'success': True}), 200
+    except LookupError as exc:
+        return jsonify({'error': str(exc)}), 404
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 409
+    except Exception as exc:
+        print(f"❌ Failed to archive block: {exc}")
+        return jsonify({'error': 'Failed to archive block'}), 500
+
+
+@app.route('/api/client/blocks/<block_id>/restore', methods=['POST'])
+def restore_client_block(block_id):
+    decoded, error = _verify_client_token()
+    if error:
+        return error
+    try:
+        set_block_archived(block_id, decoded['uid'], False)
+        return jsonify({'success': True}), 200
+    except LookupError as exc:
+        return jsonify({'error': str(exc)}), 404
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 409
+    except Exception as exc:
+        print(f"❌ Failed to restore block: {exc}")
+        return jsonify({'error': 'Failed to restore block'}), 500
+
+
+@app.route('/api/client/blocks/<block_id>/permanent', methods=['DELETE'])
+def permanently_delete_client_block(block_id):
+    decoded, error = _verify_client_token()
+    if error:
+        return error
+    try:
+        permanently_delete_archived_block(block_id, decoded['uid'])
+        return jsonify({'success': True}), 200
+    except LookupError as exc:
+        return jsonify({'error': str(exc)}), 404
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 409
+    except Exception as exc:
+        print(f"❌ Failed to permanently delete block: {exc}")
+        return jsonify({'error': 'Permanent deletion was incomplete. Retry from Archive.'}), 500
+
+
+@app.route('/api/client/alert-thresholds', methods=['GET', 'PUT'])
+def client_alert_thresholds():
+    """Read or update the authenticated client's own alert thresholds."""
+    decoded, err = _verify_client_token()
+    if err:
+        return err
+
+    settings_ref = db.collection('user_settings').document(decoded['uid'])
+    try:
+        if request.method == 'GET':
+            settings_doc = settings_ref.get()
+            saved = (settings_doc.to_dict() or {}).get('alertThresholds') if settings_doc.exists else None
+            thresholds = _validate_alert_thresholds(saved) if saved else None
+            return jsonify({'alertThresholds': thresholds or {
+                'bearing': {'watch': 75, 'critical': 60},
+                'nonbearing': {'watch': 30, 'critical': 50},
+                'discolored': {'watch': 15, 'critical': 25},
+            }}), 200
+
+        data = request.get_json(silent=True) or {}
+        thresholds = _validate_alert_thresholds(data.get('alertThresholds'))
+        if thresholds is None:
+            return jsonify({'error': 'Thresholds must include valid bearing, non-bearing, and non-viable watch/critical values'}), 400
+        settings_ref.set({'alertThresholds': thresholds}, merge=True)
+        return jsonify({'alertThresholds': thresholds}), 200
+    except Exception as exc:
+        print(f"❌ Failed to process alert thresholds for {decoded['uid']}: {exc}")
+        return jsonify({'error': 'Could not load or save alert thresholds'}), 500
 
 
 @app.route('/api/auth/password-reset', methods=['POST'])
@@ -370,34 +497,46 @@ def get_crop_cycle_history():
         block_doc = db.collection('blocks').document(block_id).get()
         if not block_doc.exists:
             return jsonify({'error': 'Block not found'}), 404
-        owner_id = (block_doc.to_dict() or {}).get('userId')
-        if not owner_id:
-            return jsonify({'error': 'Block owner could not be resolved'}), 404
-
         cycles = []
-        # Filter the owner after the block-only query to avoid requiring a new
-        # composite index for staff history reads.
+        # The blockId association is the authoritative link. Older cycle
+        # records may not have a userId, so filtering by the current block
+        # owner's userId would silently hide valid history.
         query = db.collection('cropCycles').where('blockId', '==', block_id)
         for cycle_doc in query.stream():
             data = cycle_doc.to_dict() or {}
-            if data.get('userId') != owner_id:
-                continue
+
+            def timestamp_ms(value):
+                if value is None:
+                    return None
+                if hasattr(value, 'timestamp'):
+                    return int(value.timestamp() * 1000)
+                if isinstance(value, (int, float)):
+                    return int(value)
+                return None
+
+            def json_value(value):
+                if value is None or isinstance(value, (str, int, float, bool)):
+                    return value
+                if hasattr(value, 'isoformat'):
+                    return value.isoformat()
+                return str(value)
+
             cycles.append({
                 'id': cycle_doc.id,
-                'status': data.get('status'),
-                'planted': data.get('planted'),
-                'forcingDate': data.get('forcingDate'),
-                'startDate': data.get('startDate'),
-                'daf': data.get('daf'),
+                'status': json_value(data.get('status')),
+                'planted': json_value(data.get('planted')),
+                'forcingDate': json_value(data.get('forcingDate')),
+                'startDate': json_value(data.get('startDate')),
+                'daf': json_value(data.get('daf')),
                 'legacy': bool(data.get('legacy', False)),
-                'createdAtMs': int(data['createdAt'].timestamp() * 1000) if data.get('createdAt') else None,
-                'startedAtMs': int(data['startedAt'].timestamp() * 1000) if data.get('startedAt') else None,
-                'completedAtMs': int(data['completedAt'].timestamp() * 1000) if data.get('completedAt') else None,
+                'createdAtMs': timestamp_ms(data.get('createdAt')),
+                'startedAtMs': timestamp_ms(data.get('startedAt')),
+                'completedAtMs': timestamp_ms(data.get('completedAt')),
             })
         return jsonify({'cycles': cycles}), 200
     except Exception as exc:
-        print(f"❌ Failed to load crop cycle history for {block_id}: {exc}")
-        return jsonify({'error': 'Could not load crop cycle history'}), 500
+        app.logger.exception("Failed to load crop cycle history for %s", block_id)
+        return jsonify({'error': f'Could not load crop cycle history: {type(exc).__name__}: {exc}'}), 500
 
 @app.route('/api/fm/users', methods=['GET'])
 def fm_get_users():
@@ -473,8 +612,8 @@ def fm_create_user():
 
 @app.route('/api/fm/users/<user_id>', methods=['PUT'])
 def fm_update_user(user_id):
-    """Farm Manager: update a user — cannot update Super Admin accounts or promote to admin."""
-    _, err = _verify_farm_manager_token()
+    """Farm Managers may update their own profile, not another manager's."""
+    caller, err = _verify_farm_manager_token()
     if err:
         return err
 
@@ -484,10 +623,14 @@ def fm_update_user(user_id):
             return jsonify({'error': 'User not found'}), 404
         if target.to_dict().get('role') == 'admin':
             return jsonify({'error': 'Farm Managers cannot modify Super Admin accounts'}), 403
+        if target.to_dict().get('role') == 'farm_manager' and user_id != caller['uid']:
+            return jsonify({'error': 'Farm Managers cannot modify another Farm Manager account'}), 403
 
-        data = request.json
+        data = request.get_json(silent=True) or {}
         if data.get('role') == 'admin':
             return jsonify({'error': 'Farm Managers cannot assign the Super Admin role'}), 403
+        if user_id == caller['uid'] and data.get('status') == 'disabled':
+            return jsonify({'error': 'You cannot disable your own account'}), 403
 
         auth.update_user(
             user_id,
@@ -524,6 +667,8 @@ def fm_delete_user(user_id):
             return jsonify({'error': 'User not found'}), 404
         if target.to_dict().get('role') == 'admin':
             return jsonify({'error': 'Farm Managers cannot delete Super Admin accounts'}), 403
+        if target.to_dict().get('role') == 'farm_manager':
+            return jsonify({'error': 'Farm Managers cannot delete Farm Manager accounts'}), 403
 
         try:
             auth.delete_user(user_id)
@@ -538,8 +683,8 @@ def fm_delete_user(user_id):
 
 @app.route('/api/fm/users/<user_id>/reset-password', methods=['POST'])
 def fm_reset_password(user_id):
-    """Farm Manager: reset password — cannot reset Super Admin passwords."""
-    _, err = _verify_farm_manager_token()
+    """Farm Managers may reset their own password, not another manager's."""
+    caller, err = _verify_farm_manager_token()
     if err:
         return err
 
@@ -549,6 +694,8 @@ def fm_reset_password(user_id):
             return jsonify({'error': 'User not found'}), 404
         if target.to_dict().get('role') == 'admin':
             return jsonify({'error': 'Farm Managers cannot reset Super Admin passwords'}), 403
+        if target.to_dict().get('role') == 'farm_manager' and user_id != caller['uid']:
+            return jsonify({'error': 'Farm Managers cannot reset another Farm Manager password'}), 403
 
         data = request.json
         auth.update_user(user_id, password=data['newPassword'])
@@ -559,8 +706,8 @@ def fm_reset_password(user_id):
 
 @app.route('/api/fm/users/<user_id>/toggle-status', methods=['POST'])
 def fm_toggle_status(user_id):
-    """Farm Manager: toggle user status — cannot toggle Super Admin accounts."""
-    _, err = _verify_farm_manager_token()
+    """Farm Managers can toggle client accounts but cannot disable themselves."""
+    caller, err = _verify_farm_manager_token()
     if err:
         return err
 
@@ -570,6 +717,8 @@ def fm_toggle_status(user_id):
             return jsonify({'error': 'User not found'}), 404
         if user_doc.to_dict().get('role') == 'admin':
             return jsonify({'error': 'Farm Managers cannot modify Super Admin account status'}), 403
+        if user_doc.to_dict().get('role') == 'farm_manager' and user_id != caller['uid']:
+            return jsonify({'error': 'Farm Managers cannot modify another Farm Manager account'}), 403
 
         data = request.get_json(silent=True) or {}
         requested_status = data.get('status')
@@ -581,6 +730,9 @@ def fm_toggle_status(user_id):
         else:
             current_status = user_doc.to_dict().get('status', 'active')
             new_status = 'disabled' if current_status == 'active' else 'active'
+
+        if user_id == caller['uid'] and new_status == 'disabled':
+            return jsonify({'error': 'You cannot disable your own account'}), 403
 
         auth.update_user(user_id, disabled=(new_status == 'disabled'))
         db.collection('users').document(user_id).update({

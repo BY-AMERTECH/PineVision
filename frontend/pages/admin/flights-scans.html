@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <link rel="icon" type="image/svg+xml" href="../../assets/images/pinevision-logo.svg" />
+    <link rel="icon" type="image/svg+xml" href="../../assets/images/pinevision-transparent-logo.svg" />
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script>
@@ -615,6 +615,7 @@
             label: "Total Flights",
             value: rows.length,
             sub: rows.length >= SCANS_LIMIT ? "Most recent " + SCANS_LIMIT : "All sessions",
+            info: "Count of flight sessions currently loaded. The page loads up to the 300 most recent sessions.",
             color: "green",
             icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>',
           },
@@ -622,6 +623,7 @@
             label: "Avg Bearing Rate",
             value: avgBearing === "—" ? "—" : avgBearing + "%",
             sub: "Across scanned sessions",
+            info: "Average bearing rate across loaded flight sessions that have scan data.",
             color: "",
             icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
           },
@@ -629,6 +631,7 @@
             label: "Unique Field Operators",
             value: uniqueOperators,
             sub: "Active users",
+            info: "Number of distinct field operators associated with the loaded flight sessions.",
             color: "",
             icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
           },
@@ -636,6 +639,7 @@
             label: "Blocks Covered",
             value: uniqueBlocks,
             sub: "Distinct blocks",
+            info: "Number of distinct blocks in the loaded flight sessions. Repeat scans of the same block count once.",
             color: "",
             icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>',
           },
@@ -645,7 +649,7 @@
         cards.forEach(function (c) {
           const cm = colorMap[c.color] || colorMap[""];
           html +=
-            '<div class="mc ' + c.color + '">' +
+            '<div class="mc ' + c.color + '" title="' + c.info + '">' +
             '<div class="mc-icon"><div style="width:32px;height:32px;border-radius:var(--radius-sm);background:' + cm.bg +
             ";display:flex;align-items:center;justify-content:center;color:" + cm.fg + ';">' + c.icon + "</div></div>" +
             '<div class="mc-label">' + c.label + "</div>" +
@@ -719,10 +723,10 @@
         const user = firebase.auth().currentUser;
         if (!user) throw new Error("Not authenticated");
         const token = await user.getIdToken();
-        const response = await fetch("/api/history/crop-cycles?block_id=" + encodeURIComponent(blockId), {
+        const response = await fetch("https://pinevision-backend.whiteisland-36ad8831.eastasia.azurecontainerapps.io/api/history/crop-cycles?block_id=" + encodeURIComponent(blockId), {
           headers: { Authorization: "Bearer " + token },
         });
-        const payload = await response.json();
+        const payload = await response.json().catch(function () { return {}; });
         if (!response.ok) throw new Error(payload.error || "Could not load crop cycles");
         return blockScanHistory.assignCycleDisplayNumbers(payload.cycles || []).reverse();
       }

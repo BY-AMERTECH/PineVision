@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <link rel="icon" type="image/svg+xml" href="../../assets/images/pinevision-logo.svg" />
+    <link rel="icon" type="image/svg+xml" href="../../assets/images/pinevision-transparent-logo.svg" />
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script>
@@ -443,6 +443,7 @@
               BLOCKS_BY_ID = {};
               snap.forEach(function (doc) {
                 const d = doc.data();
+                if (d.isDeleted === true) return;
                 BLOCKS_BY_ID[doc.id] = {
                   blockName: d.blockName || d.blockId || doc.id,
                   section: d.section || "",
