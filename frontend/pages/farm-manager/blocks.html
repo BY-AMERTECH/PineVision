@@ -1142,7 +1142,6 @@
       // ── Card builder ─────────────────────────────────────────────
 
       function buildBlockCard(block) {
-        const statusClass = blockStatusClass(block);
         const hasScanData = block.plants > 0;
 
         const bearingCount = hasScanData ? Math.round((block.bearing / 100) * block.plants) : null;
@@ -1181,7 +1180,6 @@
             <div class="fb-head-row">
               <div class="fb-block-id">${escapeHtml(block.blockName)}</div>
               <div class="fb-head-badges">
-                ${blockStatusBadge(statusClass)}
                 <span class="fb-chip">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z" />
@@ -1262,14 +1260,6 @@
         if (block.bearing >= 80) return "good";
         if (block.bearing >= 60) return "warn";
         return "crit";
-      }
-
-      function blockStatusBadge(status) {
-        if (status === "none") {
-          return '<span class="badge" style="background-color:var(--surf2);color:var(--color-text-secondary);border-color:var(--border);"><span class="bdot" style="background-color:var(--color-text-tertiary);"></span>No Scan Data</span>';
-        }
-        const labels = { good: "Healthy", warn: "Watch", crit: "Critical" };
-        return `<span class="badge ${status}"><span class="bdot"></span>${labels[status]}</span>`;
       }
 
       function growthStageLabel(block) {
