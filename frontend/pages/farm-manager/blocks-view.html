@@ -641,7 +641,7 @@
             } else {
               const latestCounts = await blockScanHistory.loadLatestPlantCounts(
                 [blockDoc.id],
-                null,
+                currentBlock.userId,
                 { [blockDoc.id]: null },
               );
               currentBlock.estimatedTotalPlantCount = latestCounts.get(blockDoc.id) || 0;
@@ -676,17 +676,10 @@
         const bearingCount = counts.bearing;
         const nonbearingCount = counts.nonBearing;
         const nonViableCount = counts.nonViable;
-        const bearingAndNonbearingTotal = bearingCount + nonbearingCount;
-        const estimatedTotalPlants = block.estimatedTotalPlantCount || bearingAndNonbearingTotal;
-        const bearingPercent = bearingAndNonbearingTotal > 0
-          ? (bearingCount / bearingAndNonbearingTotal) * 100
-          : 0;
-        const nonbearingPercent = bearingAndNonbearingTotal > 0
-          ? (nonbearingCount / bearingAndNonbearingTotal) * 100
-          : 0;
-        const nonViablePercent = estimatedTotalPlants > 0
-          ? (nonViableCount / estimatedTotalPlants) * 100
-          : 0;
+        // Use the same stored block percentages shown on the client detail page.
+        const bearingPercent = Number(block.bearing) || 0;
+        const nonbearingPercent = Number(block.nonbearing) || 0;
+        const nonViablePercent = Number(block.nonViable) || 0;
         const plantSub = (n) => (hasScanData ? formatNumber(n) + " plants" : "—");
 
         document.getElementById("block-detail-root").innerHTML = `
@@ -847,8 +840,9 @@
       function renderConditionBreakdown(block, hasScanData, bearingCount, nonbearingCount, nonViableCount) {
         const fmtPlant = (n) => (hasScanData ? formatNumber(n) : "—");
         const totalPlants = bearingCount + nonbearingCount;
-        const bearingPercent = totalPlants > 0 ? (bearingCount / totalPlants) * 100 : 0;
-        const nonbearingPercent = totalPlants > 0 ? (nonbearingCount / totalPlants) * 100 : 0;
+        const bearingPercent = Number(block.bearing) || 0;
+        const nonbearingPercent = Number(block.nonbearing) || 0;
+        const nonViablePercent = Number(block.nonViable) || 0;
         document.getElementById("condition-breakdown").innerHTML = `
         <div class="thead-row">
             <span class="thead-title">Fruit Condition Breakdown</span>
@@ -872,7 +866,7 @@
                         <td class="fruit-breakdown-count">${fmtPlant(bearingCount)}</td>
                         <td><div class="fruit-breakdown-distribution">
                             <div class="fruit-breakdown-track"><span class="fruit-breakdown-fill" style="width:${bearingPercent}%;background:var(--green);"></span></div>
-                            <span class="fruit-breakdown-percent">${totalPlants > 0 ? formatPercent(bearingPercent) : "—"}</span>
+                            <span class="fruit-breakdown-percent">${formatPercent(bearingPercent)}</span>
                         </div></td>
                     </tr>
                     <tr>
@@ -883,7 +877,7 @@
                         <td class="fruit-breakdown-count">${fmtPlant(nonbearingCount)}</td>
                         <td><div class="fruit-breakdown-distribution">
                             <div class="fruit-breakdown-track"><span class="fruit-breakdown-fill" style="width:${nonbearingPercent}%;background:var(--amber);"></span></div>
-                            <span class="fruit-breakdown-percent">${totalPlants > 0 ? formatPercent(nonbearingPercent) : "—"}</span>
+                            <span class="fruit-breakdown-percent">${formatPercent(nonbearingPercent)}</span>
                         </div></td>
                     </tr>
                     <tr class="fruit-breakdown-total">
@@ -906,7 +900,13 @@
                             <span class="fruit-breakdown-not-counted">Not counted</span>
                         </div></td>
                         <td class="fruit-breakdown-count">${fmtPlant(nonViableCount)}</td>
-                        <td><span class="fruit-breakdown-excluded">Excluded from total and distribution</span></td>
+                        <td>
+                            <div class="fruit-breakdown-distribution">
+                                <div class="fruit-breakdown-track"><span class="fruit-breakdown-fill" style="width:${nonViablePercent}%;background:var(--yellow-mid);"></span></div>
+                                <span class="fruit-breakdown-percent">${formatPercent(nonViablePercent)}</span>
+                            </div>
+                            <span class="fruit-breakdown-excluded">Excluded from total and distribution</span>
+                        </td>
                     </tr>
                 </tbody>
             </table>
