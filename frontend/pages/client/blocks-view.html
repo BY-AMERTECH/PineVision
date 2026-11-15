@@ -1086,17 +1086,19 @@
                 currentCycleScans,
                 currentBlock.activeCycleId,
               );
-              currentBlock.estimatedTotalPlantCount = blockScanHistory.latestPlantCount(
-                currentCycleScans,
-                currentBlock.activeCycleId,
-              );
+              currentBlock.estimatedTotalPlantCount = currentBlock.latestCycleResult
+                ? currentBlock.latestCycleResult.bearing + currentBlock.latestCycleResult.nonBearing
+                : null;
             } else {
-              const latestCounts = await blockScanHistory.loadLatestPlantCounts(
+              const latestResults = await blockScanHistory.loadLatestPlantResults(
                 [blockDoc.id],
                 currentUserId,
                 { [blockDoc.id]: null },
               );
-              currentBlock.estimatedTotalPlantCount = latestCounts.get(blockDoc.id) || 0;
+              currentBlock.latestCycleResult = latestResults.get(blockDoc.id) || null;
+              currentBlock.estimatedTotalPlantCount = currentBlock.latestCycleResult
+                ? currentBlock.latestCycleResult.bearing + currentBlock.latestCycleResult.nonBearing
+                : null;
             }
           } catch (scanError) {
             console.error("❌ Error loading latest completed plant counts:", scanError);
@@ -1250,6 +1252,10 @@
       }
 
       function getDisplayedResultCounts(block) {
+        if (block.latestCycleResult && !block.hasActiveCycleScan) {
+          const result = block.latestCycleResult;
+          return { bearing: result.bearing, nonBearing: result.nonBearing, nonViable: result.nonViable, hasData: true };
+        }
         if (block.activeCycleId && !block.hasActiveCycleScan) {
           if (block.latestCycleResult) {
             const result = block.latestCycleResult;
@@ -1280,9 +1286,10 @@
         const nonbearingPlants = counts.nonBearing;
         const nonViablePlants  = counts.nonViable;
         // Keep these values aligned with the metric cards above.
-        const bearingPercent = Number(block.bearing) || 0;
-        const nonbearingPercent = Number(block.nonbearing) || 0;
-        const nonViablePercent = Number(block.nonViable) || 0;
+        const totalPlants = bearingPlants + nonbearingPlants;
+        const bearingPercent = totalPlants > 0 ? bearingPlants / totalPlants * 100 : null;
+        const nonbearingPercent = totalPlants > 0 ? nonbearingPlants / totalPlants * 100 : null;
+        const nonViablePercent = hasDetectedData ? Number(block.nonViable) : null;
 
         const plantSub = (n) => hasDetectedData ? formatNumber(n) + " plants" : "—";
 
@@ -1295,19 +1302,19 @@
           ) +
           buildMetricCard(
             "Bearing",
-            formatPercent(bearingPercent),
+            hasDetectedData ? formatPercent(bearingPercent) : "—",
             plantSub(bearingPlants),
             "green",
           ) +
           buildMetricCard(
             "Non-Bearing",
-            formatPercent(nonbearingPercent),
+            hasDetectedData ? formatPercent(nonbearingPercent) : "—",
             plantSub(nonbearingPlants),
             "amber",
           ) +
           buildMetricCard(
             "Non-Viable",
-            formatPercent(nonViablePercent),
+            hasDetectedData ? formatPercent(nonViablePercent) : "—",
             plantSub(nonViablePlants),
             "yellow",
           );
@@ -1359,9 +1366,9 @@
         const nonbearingPlants = counts.nonBearing;
         const nonViablePlants  = counts.nonViable;
         const totalPlants      = bearingPlants + nonbearingPlants;
-        const bearingPercent   = Number(block.bearing) || 0;
-        const nonbearingPercent = Number(block.nonbearing) || 0;
-        const nonViablePercent = Number(block.nonViable) || 0;
+        const bearingPercent   = totalPlants > 0 ? bearingPlants / totalPlants * 100 : null;
+        const nonbearingPercent = totalPlants > 0 ? nonbearingPlants / totalPlants * 100 : null;
+        const nonViablePercent = hasDetectedData ? Number(block.nonViable) : null;
         const fmtPlant = (n) => hasDetectedData ? formatNumber(n) : "—";
 
         document.getElementById("condition-breakdown").innerHTML = `
@@ -1489,7 +1496,7 @@
       }
 
       function formatPercent(num) {
-        return num.toFixed(1) + "%";
+        return Number.isFinite(num) ? num.toFixed(1) + "%" : "—";
       }
 
       function formatArea(area) {

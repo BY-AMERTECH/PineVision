@@ -94,6 +94,39 @@ window.blockScanHistory = (function () {
         return latestPlantCountsFromSnapshots(Array.from(ids), snapshots, userId, cycleIdsByBlock);
     }
 
+    async function loadLatestPlantResults(blockIds, userId, cycleIdsByBlock) {
+        const ids = new Set((blockIds || []).filter(Boolean).map(String));
+        if (!ids.size) return new Map();
+        const scans = firebase.firestore().collection('scans');
+        const snapshots = await Promise.all(Array.from(ids, function (blockId) {
+            let query = scans.where('blockId', '==', blockId);
+            if (userId) query = query.where('userId', '==', userId);
+            return query.get();
+        }));
+        const latest = new Map();
+        snapshots.forEach(function (snapshot) {
+            snapshot.forEach(function (doc) {
+                const data = doc.data() || {};
+                const blockId = data.blockId == null ? '' : String(data.blockId);
+                if (!ids.has(blockId) || (userId && data.userId !== userId)) return;
+                const cycleId = cycleIdsByBlock instanceof Map ? cycleIdsByBlock.get(blockId) : cycleIdsByBlock && cycleIdsByBlock[blockId];
+                if (cycleId && data.cycleId !== cycleId) return;
+                const date = scanStartDate(data);
+                const result = getStatus(data) === 'Completed' && date ? {
+                    date: date,
+                    bearing: metric(data, 'bearing'),
+                    nonBearing: metric(data, 'nonBearing'),
+                    nonViable: metric(data, 'nonViable'),
+                    total: metric(data, 'total'),
+                } : null;
+                if (!result || result.bearing === null || result.nonBearing === null || result.nonViable === null || result.total === null) return;
+                const previous = latest.get(blockId);
+                if (!previous || result.date > previous.date) latest.set(blockId, result);
+            });
+        });
+        return latest;
+    }
+
     function latestPlantCountsFromSnapshots(blockIds, snapshots, userId, cycleIdsByBlock) {
         const ids = new Set((blockIds || []).filter(Boolean).map(String));
         const latest = new Map();
@@ -685,6 +718,7 @@ window.blockScanHistory = (function () {
     return {
         load: load,
         loadLatestPlantCounts: loadLatestPlantCounts,
+        loadLatestPlantResults: loadLatestPlantResults,
         latestPlantCountsFromSnapshots: latestPlantCountsFromSnapshots,
         render: render,
         renderTrend: renderTrend,

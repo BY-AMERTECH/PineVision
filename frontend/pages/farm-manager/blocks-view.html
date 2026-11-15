@@ -641,14 +641,17 @@
               );
               currentBlock.estimatedTotalPlantCount = currentBlock.latestCycleResult
                 ? currentBlock.latestCycleResult.bearing + currentBlock.latestCycleResult.nonBearing
-                : 0;
+                : null;
             } else {
-              const latestCounts = await blockScanHistory.loadLatestPlantCounts(
+              const latestResults = await blockScanHistory.loadLatestPlantResults(
                 [blockDoc.id],
                 currentBlock.userId,
                 { [blockDoc.id]: null },
               );
-              currentBlock.estimatedTotalPlantCount = latestCounts.get(blockDoc.id) || 0;
+              currentBlock.latestCycleResult = latestResults.get(blockDoc.id) || null;
+              currentBlock.estimatedTotalPlantCount = currentBlock.latestCycleResult
+                ? currentBlock.latestCycleResult.bearing + currentBlock.latestCycleResult.nonBearing
+                : null;
             }
           } catch (scanError) {
             console.error("❌ Error loading latest completed plant counts:", scanError);
@@ -681,9 +684,9 @@
         const nonbearingCount = counts.nonBearing;
         const nonViableCount = counts.nonViable;
         // Use the same stored block percentages shown on the client detail page.
-        const bearingPercent = Number(block.bearing) || 0;
-        const nonbearingPercent = Number(block.nonbearing) || 0;
-        const nonViablePercent = Number(block.nonViable) || 0;
+        const bearingPercent = hasScanData && bearingCount + nonbearingCount > 0 ? bearingCount / (bearingCount + nonbearingCount) * 100 : null;
+        const nonbearingPercent = hasScanData && bearingCount + nonbearingCount > 0 ? nonbearingCount / (bearingCount + nonbearingCount) * 100 : null;
+        const nonViablePercent = hasScanData ? Number(block.nonViable) : null;
         const plantSub = (n) => (hasScanData ? formatNumber(n) + " plants" : "—");
 
         document.getElementById("block-detail-root").innerHTML = `
@@ -711,9 +714,9 @@
 
           <div class="row row-cols-2 row-cols-md-4 g-3 mb-4">
             ${buildMetricCard("Estimated Plant Count", block.estimatedTotalPlantCount === null ? "Unavailable" : formatNumber(block.estimatedTotalPlantCount), "Estimated total pineapple plants", "")}
-            ${buildMetricCard("Bearing", formatPercent(bearingPercent), plantSub(bearingCount), "green")}
-            ${buildMetricCard("Non-Bearing", formatPercent(nonbearingPercent), plantSub(nonbearingCount), "amber")}
-            ${buildMetricCard("Non-Viable", formatPercent(nonViablePercent), plantSub(nonViableCount), "red")}
+            ${buildMetricCard("Bearing", hasScanData ? formatPercent(bearingPercent) : "—", plantSub(bearingCount), "green")}
+            ${buildMetricCard("Non-Bearing", hasScanData ? formatPercent(nonbearingPercent) : "—", plantSub(nonbearingCount), "amber")}
+            ${buildMetricCard("Non-Viable", hasScanData ? formatPercent(nonViablePercent) : "—", plantSub(nonViableCount), "red")}
           </div>
           <div class="row g-3 mb-4">
             <div class="col-md-6">
@@ -911,6 +914,10 @@
       }
 
       function getDisplayedResultCounts(block) {
+        if (block.latestCycleResult && !block.hasActiveCycleScan) {
+          const result = block.latestCycleResult;
+          return { bearing: result.bearing, nonBearing: result.nonBearing, nonViable: result.nonViable, hasData: true };
+        }
         if (block.activeCycleId && !block.hasActiveCycleScan) {
           if (block.latestCycleResult) {
             const result = block.latestCycleResult;
@@ -937,9 +944,9 @@
       function renderConditionBreakdown(block, hasScanData, bearingCount, nonbearingCount, nonViableCount) {
         const fmtPlant = (n) => (hasScanData ? formatNumber(n) : "—");
         const totalPlants = bearingCount + nonbearingCount;
-        const bearingPercent = Number(block.bearing) || 0;
-        const nonbearingPercent = Number(block.nonbearing) || 0;
-        const nonViablePercent = Number(block.nonViable) || 0;
+        const bearingPercent = totalPlants > 0 ? bearingCount / totalPlants * 100 : null;
+        const nonbearingPercent = totalPlants > 0 ? nonbearingCount / totalPlants * 100 : null;
+        const nonViablePercent = hasScanData ? Number(block.nonViable) : null;
         document.getElementById("condition-breakdown").innerHTML = `
         <div class="thead-row">
             <span class="thead-title">Fruit Condition Breakdown</span>
@@ -1151,7 +1158,7 @@
 
 
       function formatNumber(num) { return (num || 0).toLocaleString("en-US"); }
-      function formatPercent(num) { return (num || 0).toFixed(1) + "%"; }
+      function formatPercent(num) { return Number.isFinite(num) ? num.toFixed(1) + "%" : "—"; }
       function formatArea(area) { return (area || 0) + " ha"; }
 
       function formatDateValue(value) {
