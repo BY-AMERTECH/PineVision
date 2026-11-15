@@ -89,9 +89,11 @@
                     const history = await blockScanHistory.load(block.id, currentUser.uid);
                     const result = blockScanHistory.latestCompletedResult(history, block.activeCycleId);
                     if (!result || !result.total) return;
-                    block.bearing = result.bearing / result.total * 100;
-                    block.nonBearing = result.nonBearing / result.total * 100;
-                    block.discolored = result.nonViable / result.total * 100;
+                    block.healthMetrics = {
+                        bearing: result.bearing / result.total * 100,
+                        nonbearing: result.nonBearing / result.total * 100,
+                        discolored: result.nonViable / result.total * 100
+                    };
                     block.totalScans = Math.max(block.totalScans, history.length);
                 } catch (scanError) {
                     console.error(`❌ Error loading scan health for ${block.name}:`, scanError);
@@ -327,14 +329,10 @@
     }
 
     function renderBearingDistributionChart(totals, isDark, textClr, bgSurf) {
-        const discoOfBearing = totals.avgBearing * (totals.avgDiscolored / 100);
-        const healthyBearing = totals.avgBearing - discoOfBearing;
-        const nonBearing = totals.avgNonbearing;
-
         const donutData = [
-            parseFloat(healthyBearing.toFixed(1)),
-            parseFloat(discoOfBearing.toFixed(1)),
-            parseFloat(nonBearing.toFixed(1))
+            parseFloat(totals.avgBearing.toFixed(1)),
+            parseFloat(totals.avgNonbearing.toFixed(1)),
+            parseFloat(totals.avgDiscolored.toFixed(1))
         ];
 
         const centerLabelPlugin = {
@@ -370,7 +368,7 @@
         new Chart(distCtx, {
             type: 'doughnut',
             data: {
-                labels: ['Bearing', 'Non-Viable', 'Non-Bearing'],
+                labels: ['Bearing', 'Non-bearing', 'Non-Viable'],
                 datasets: [{
                     data: donutData,
                     backgroundColor: ['#4caf78', '#f0c430', '#e6a817'],
@@ -506,7 +504,7 @@
     }
 
     function getStatusClass(block) {
-        const status = window.clientThresholds.classify(block);
+        const status = window.clientThresholds.classify(block.healthMetrics || block);
         return status === 'good' ? 'healthy' : status === 'warn' ? 'warning' : 'critical';
     }
 
