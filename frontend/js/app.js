@@ -250,6 +250,7 @@ const app = (function() {
         },
         'users': {
             icon: 'users',
+            farm_manager: { title: 'Account Management', subtitle: 'Monitor, manage and configure field operator accounts and access levels' },
             default: { title: 'Field Operator Management', subtitle: 'Monitor, manage and configure field operator accounts and access levels' }
         },
         'activity': {
