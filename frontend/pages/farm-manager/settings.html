@@ -1082,52 +1082,6 @@
                     </div>
                   </div>
 
-                  <!-- Email preferences -->
-                  <div class="scard">
-                    <div class="scard-head">
-                      <div class="scard-title">Email Preferences</div>
-                      <p class="scard-desc">
-                        Contact address for alerts and system reports
-                      </p>
-                    </div>
-                    <div class="srow">
-                      <div class="srow-label">
-                        <div class="srow-title">Email Address</div>
-                        <div class="srow-desc">
-                          Used for alert digests and report delivery
-                        </div>
-                      </div>
-                      <div class="srow-ctrl" style="min-width: 220px">
-                        <input
-                          type="email"
-                          class="s-input"
-                          id="account-email"
-                          placeholder="admin@example.com"
-                          onchange="markUnsaved()"
-                        />
-                      </div>
-                    </div>
-                    <div class="srow">
-                      <div class="srow-label">
-                        <div class="srow-title">Weekly Digest</div>
-                        <div class="srow-desc">
-                          Receive a farm status summary every Monday
-                        </div>
-                      </div>
-                      <div class="srow-ctrl">
-                        <label class="toggle-switch">
-                          <input
-                            type="checkbox"
-                            id="digest-toggle"
-                            checked
-                            onchange="markUnsaved()"
-                          />
-                          <span class="toggle-slider"></span>
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-
                   <!-- Password change -->
                   <div class="scard">
                     <div class="scard-head">
@@ -1563,8 +1517,6 @@
        * (device-local, matches the existing settings store — these are
        * personal notification preferences, not shared farm data). */
       const NOTIF_PREF_FIELDS = [
-        { id: "account-email", type: "value" },
-        { id: "digest-toggle", type: "checked" },
         { id: "date-range-default", type: "value" },
         { id: "sound-toggle", type: "checked" },
         { id: "email-alerts-toggle", type: "checked" },

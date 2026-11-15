@@ -28,6 +28,18 @@
     <link rel="stylesheet" href="../../css/components.css" />
 
     <style>
+      .client-settings-page .topbar-account-info { max-width: min(38vw, 320px); }
+      .client-settings-page .topbar-account-name {
+        max-width: none;
+        white-space: normal;
+        overflow: visible;
+        overflow-wrap: anywhere;
+        text-overflow: clip;
+      }
+      @media (max-width: 640px) {
+        .client-settings-page .topbar-account-info { display: flex; max-width: 38vw; }
+      }
+
       .settings-section {
         background: var(--surf);
         border: var(--border-width-thin) solid var(--border);
@@ -215,7 +227,7 @@
       }
     </style>
   </head>
-  <body>
+  <body class="client-settings-page">
     <div class="d-flex min-vh-100">
       <!-- Sidebar Navigation -->
       <aside class="sidebar">
@@ -613,6 +625,7 @@
 
           if (userDoc.exists) {
             const userData = userDoc.data();
+            const username = userData.username || currentUser.username || "Unavailable";
 
             // Get full name
             let fullName = "";
@@ -638,7 +651,7 @@
             const roleLabel = roleLabels[role] || role;
 
             // Display in settings page
-            document.getElementById("current-username").textContent = fullName;
+            document.getElementById("current-username").textContent = username;
             document.getElementById("current-role").textContent = roleLabel;
 
             // Update sidebar user info
@@ -648,7 +661,7 @@
           } else {
             console.warn("⚠️ Field Operator document not found");
             document.getElementById("current-username").textContent =
-              currentUser.email || "Field Operator";
+              currentUser.username || "Unavailable";
             document.getElementById("current-role").textContent = "Field Operator";
           }
         } catch (error) {
@@ -660,13 +673,13 @@
       }
 
       function updateSidebarUserInfo(fullName, role) {
-        // Get first name from full name
+        // Keep the full name visible in this page's topbar.
         const firstName = fullName.split(" ")[0];
 
         // Update topbar account name
         const topbarName = document.querySelector(".topbar-account-name");
         if (topbarName) {
-          topbarName.textContent = firstName;
+          topbarName.textContent = fullName;
         }
 
         // Update topbar account role

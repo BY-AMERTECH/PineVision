@@ -324,7 +324,7 @@ const app = (function() {
         }
         if (nameEl) nameEl.textContent = displayName;
         if (roleEl) roleEl.textContent = roleLabel;
-        if (menuNameEl) menuNameEl.textContent = displayName;
+        if (menuNameEl) menuNameEl.textContent = session.username || displayName;
         if (menuEmailEl) menuEmailEl.textContent = session.email || '';
 
         setupAccountMenu(topbar);
