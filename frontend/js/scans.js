@@ -53,16 +53,17 @@
                 .where('userId', '==', currentUserId)
                 .get();
 
-            // Create a map of blockId to block number
-            const blockIdToNumber = {};
+            // Resolve scan block IDs to the name shown in the block records.
+            const blockIdToName = {};
             let blockIndex = 1;
             blocksSnapshot.forEach((doc) => {
-                blockIdToNumber[doc.id] = blockIndex;
-                console.log(`Block mapping: ${doc.id} -> Block ${blockIndex}`);
+                const blockData = doc.data() || {};
+                blockIdToName[doc.id] = blockData.blockName || blockData.blockId || `Block ${blockIndex}`;
+                console.log(`Block mapping: ${doc.id} -> ${blockIdToName[doc.id]}`);
                 blockIndex++;
             });
 
-            console.log('All block IDs:', Object.keys(blockIdToNumber));
+            console.log('All block IDs:', Object.keys(blockIdToName));
 
             // Fetch only this user's scans, ordered by startTime descending (newest first)
             const scansSnapshot = await firebase.firestore()
@@ -77,12 +78,12 @@
                 const data = doc.data();
 
                 console.log(`Scan blockId: "${data.blockId}"`);
-                console.log(`Is in mapping? ${!!blockIdToNumber[data.blockId]}`);
+                console.log(`Is in mapping? ${!!blockIdToName[data.blockId]}`);
 
                 // Get block name using the mapping
                 let blockName = 'Unknown Block';
-                if (data.blockId && blockIdToNumber[data.blockId]) {
-                    blockName = `Block ${blockIdToNumber[data.blockId]}`;
+                if (data.blockId && blockIdToName[data.blockId]) {
+                    blockName = blockIdToName[data.blockId];
                 }
 
                 console.log(`Final blockName: ${blockName}`);
@@ -105,9 +106,9 @@
 
                 // Calculate duration
                 let duration = 'N/A';
-                if (data.startTime && data.endTime) {
-                    const start = data.startTime.toDate();
-                    const end = data.endTime.toDate();
+                const start = data.startTime && typeof data.startTime.toDate === 'function' ? data.startTime.toDate() : null;
+                const end = data.endTime && typeof data.endTime.toDate === 'function' ? data.endTime.toDate() : null;
+                if (start && end && end >= start) {
                     const diffMs = end - start;
                     const hours = Math.floor(diffMs / 3600000);
                     const minutes = Math.floor((diffMs % 3600000) / 60000);
@@ -115,25 +116,32 @@
                 }
 
                 // Parse date
-                const scanDate = data.startTime ? data.startTime.toDate() : new Date();
-                const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-                const weekNumber = Math.ceil(scanDate.getDate() / 7);
+                const scanDate = start && Number.isFinite(start.getTime()) ? start : null;
+                const scanCounts = {
+                    bearing: scanCount(data, 'bearing'),
+                    nonBearing: scanCount(data, 'nonBearing'),
+                    nonViable: scanCount(data, 'nonViable'),
+                };
+                const plantTotal = scanCounts.bearing !== null && scanCounts.nonBearing !== null
+                    ? scanCounts.bearing + scanCounts.nonBearing
+                    : null;
+                const status = data.status || 'completed';
 
                 scansData.push({
                     id: doc.id,
-                    day: scanDate.getDate().toString().padStart(2, '0'),
-                    month: months[scanDate.getMonth()],
-                    year: scanDate.getFullYear().toString(),
-                    title: `Weekly Farm Scan - Week ${weekNumber}`,
-                    bearing: data.bearing || 0,
-                    nonBearing: data.nonBearing || 0,
-                    nonViable: data.nonViable || 0,
-                    total: data.total || 0,
+                    title: scanDate
+                        ? `Block Scan - ${scanDate.toLocaleDateString('en-US', { month: 'long', day: '2-digit', year: 'numeric' })}`
+                        : 'Block Scan - Date unavailable',
+                    scanDate: scanDate,
+                    bearing: scanCounts.bearing,
+                    nonBearing: scanCounts.nonBearing,
+                    nonViable: scanCounts.nonViable,
+                    total: plantTotal,
                     operator: operatorName,
                     drone: 'DJI Mavic 3 Multispectral',
-                    time: scanDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+                    time: scanDate ? scanDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : 'Unavailable',
                     duration: duration,
-                    status: data.status || 'completed',
+                    status: status,
                     blockId: data.blockId,
                     blockName: blockName
                 });
@@ -166,13 +174,16 @@
             return;
         }
 
-        const latest = scansData[0]; // Already sorted by newest first
-        const latestDate = `${latest.day} ${latest.month} ${latest.year}`;
-
-        // Calculate percentages
-        const bearingPercent = latest.total > 0 ? (latest.bearing / latest.total) * 100 : 0;
-        const nonBearingPercent = latest.total > 0 ? (latest.nonBearing / latest.total) * 100 : 0;
-        const nonViablePercent = latest.total > 0 ? (latest.nonViable / latest.total) * 100 : 0;
+        const latest = scansData.find((scan) =>
+            scan.status === 'completed' && scan.bearing !== null && scan.nonBearing !== null
+        );
+        const latestDate = latest && latest.scanDate
+            ? `Latest completed scan · ${latest.scanDate.toLocaleDateString('en-US', { month: 'long', day: '2-digit', year: 'numeric' })}`
+            : 'No completed scan';
+        const plantTotal = latest ? latest.bearing + latest.nonBearing : null;
+        const bearingPercent = plantTotal > 0 ? latest.bearing / plantTotal * 100 : null;
+        const nonBearingPercent = plantTotal > 0 ? latest.nonBearing / plantTotal * 100 : null;
+        const nonViablePercent = plantTotal > 0 && latest.nonViable !== null ? latest.nonViable / plantTotal * 100 : null;
 
         const metricsHTML = `
             ${buildMetricCard(
@@ -196,7 +207,7 @@
             ${buildMetricCard(
             'Latest Non-Viable',
             formatPercent(nonViablePercent),
-            'Discoloration detected',
+            latestDate,
             'yellow'
         )}
         `;
@@ -298,18 +309,13 @@
     }
 
     function buildScanEntry(scan) {
-        // Calculate percentages from raw counts
-        const bearingPercent = scan.total > 0 ? (scan.bearing / scan.total) * 100 : 0;
-        const nonBearingPercent = scan.total > 0 ? (scan.nonBearing / scan.total) * 100 : 0;
-        const nonViablePercent = scan.total > 0 ? (scan.nonViable / scan.total) * 100 : 0;
+        const denominator = scan.total;
+        const bearingPercent = denominator > 0 && scan.bearing !== null ? scan.bearing / denominator * 100 : null;
+        const nonBearingPercent = denominator > 0 && scan.nonBearing !== null ? scan.nonBearing / denominator * 100 : null;
+        const nonViablePercent = denominator > 0 && scan.nonViable !== null ? scan.nonViable / denominator * 100 : null;
 
         return `
         <div class="scan-entry">
-            <div class="sdate">
-                <div class="sdate-day">${scan.day}</div>
-                <div class="sdate-month">${scan.month}</div>
-                <div class="sdate-year">${scan.year}</div>
-            </div>
             <div class="sinfo">
                 <div class="sinfo-title">${scan.title}</div>
                 <div class="spills">
@@ -327,7 +333,7 @@
                     </span>
                 </div>
                 <div class="sstats">
-                    <span>Estimated Plants: <strong>${formatNumber(scan.total)}</strong></span>
+                    <span>Estimated Plants: <strong>${scan.total === null ? 'Unavailable' : formatNumber(scan.total)}</strong></span>
                     <span>Field Operator: ${scan.operator}</span>
                     <span>Timestamp: <strong>${scan.time}</strong></span>
                     <span>Duration: <strong>${scan.duration}</strong></span>
@@ -356,11 +362,17 @@
     }
 
     function formatPercent(num) {
-        return num.toFixed(1) + '%';
+        return Number.isFinite(num) ? num.toFixed(1) + '%' : 'Unavailable';
     }
 
     function formatNumber(num) {
-        return num.toLocaleString();
+        return Number.isFinite(num) ? num.toLocaleString() : 'Unavailable';
+    }
+
+    function scanCount(data, key) {
+        if (!data || data[key] == null || data[key] === '') return null;
+        const count = Number(data[key]);
+        return Number.isSafeInteger(count) && count >= 0 ? count : null;
     }
 
 })();
