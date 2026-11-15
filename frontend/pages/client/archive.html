@@ -53,11 +53,11 @@
     .archive-search-stack .fb-search{flex:1;min-width:220px;max-width:360px}
     .archive-search-clear{position:absolute;right:7px;top:50%;transform:translateY(-50%);border:0;background:transparent;color:var(--color-text-tertiary);font-size:20px;line-height:1;padding:3px 6px}
     .archive-search-clear:hover{color:var(--color-text-primary)}
-    .archive-info-hint{display:flex;justify-content:center;flex:none;margin:0}
+    .archive-info-hint{position:relative;z-index:1201;display:flex;justify-content:center;flex:none;margin:0}
     .archive-info-button{position:relative;display:inline-flex;align-items:center;justify-content:center;width:25px;height:25px;padding:0;border:0;border-radius:50%;background:transparent;color:var(--color-text-secondary);cursor:help}
     .archive-info-button:hover,.archive-info-button:focus-visible{background:var(--green-bg,#edf5ef);color:var(--green,#39764d);outline:none}
     .archive-info-button svg{width:17px;height:17px}
-    .archive-info-tooltip{position:absolute;right:0;bottom:calc(100% + 8px);z-index:1200;width:max-content;max-width:min(280px,calc(100vw - 40px));padding:9px 11px;border-radius:7px;background:#26332b;color:#fff;text-align:left;font-size:12px;line-height:1.4;box-shadow:0 4px 12px #12201930;visibility:hidden;opacity:0;transition:opacity .12s ease}
+    .archive-info-tooltip{position:absolute;right:0;top:calc(100% + 8px);z-index:1200;width:max-content;max-width:min(280px,calc(100vw - 40px));padding:9px 11px;border-radius:7px;background:#26332b;color:#fff;text-align:left;font-size:12px;line-height:1.4;box-shadow:0 4px 12px #12201930;visibility:hidden;opacity:0;transition:opacity .12s ease}
     .archive-info-button:hover .archive-info-tooltip,.archive-info-button:focus-visible .archive-info-tooltip{visibility:visible;opacity:1}
     @media(max-width:640px){.archive-filter-controls{align-items:stretch;flex-direction:column;gap:var(--space-md)}.archive-search-stack{min-width:0;max-width:none;width:100%}.archive-search-stack .fb-search{min-width:0;max-width:none}}
     @media(max-width:580px){.filter-bar{gap:var(--space-md)}.filter-bar-actions{width:100%;margin-left:0;align-self:stretch;flex-direction:column;align-items:stretch}.filter-bar-actions .form-select{width:100%;min-width:0}}
