@@ -683,10 +683,11 @@
         const bearingCount = counts.bearing;
         const nonbearingCount = counts.nonBearing;
         const nonViableCount = counts.nonViable;
-        // Use the same stored block percentages shown on the client detail page.
+        const estimatedPlantCount = hasScanData ? bearingCount + nonbearingCount : null;
+        // Derive the distribution from the same scan counts used by the client detail page.
         const bearingPercent = hasScanData && bearingCount + nonbearingCount > 0 ? bearingCount / (bearingCount + nonbearingCount) * 100 : null;
         const nonbearingPercent = hasScanData && bearingCount + nonbearingCount > 0 ? nonbearingCount / (bearingCount + nonbearingCount) * 100 : null;
-        const nonViablePercent = hasScanData ? Number(block.nonViable) : null;
+        const nonViablePercent = bearingCount + nonbearingCount > 0 ? nonViableCount / (bearingCount + nonbearingCount) * 100 : null;
         const plantSub = (n) => (hasScanData ? formatNumber(n) + " plants" : "—");
 
         document.getElementById("block-detail-root").innerHTML = `
@@ -713,7 +714,7 @@
           </div>
 
           <div class="row row-cols-2 row-cols-md-4 g-3 mb-4">
-            ${buildMetricCard("Estimated Plant Count", block.estimatedTotalPlantCount === null ? "Unavailable" : formatNumber(block.estimatedTotalPlantCount), "Estimated total pineapple plants", "")}
+            ${buildMetricCard("Estimated Plant Count", estimatedPlantCount === null ? "Unavailable" : formatNumber(estimatedPlantCount), "Estimated total pineapple plants", "")}
             ${buildMetricCard("Bearing", hasScanData ? formatPercent(bearingPercent) : "—", plantSub(bearingCount), "green")}
             ${buildMetricCard("Non-Bearing", hasScanData ? formatPercent(nonbearingPercent) : "—", plantSub(nonbearingCount), "amber")}
             ${buildMetricCard("Non-Viable", hasScanData ? formatPercent(nonViablePercent) : "—", plantSub(nonViableCount), "red")}
@@ -845,13 +846,7 @@
           const total = bearing === null || nonBearing === null ? null : bearing + nonBearing;
           if (total === null || total <= 0) return null;
           const nonViable = scanTooltipMetric(entry.data, "nonViable");
-          const scanTotal = scanTooltipMetric(entry.data, "total");
-          const storedNonViablePercent = scanTooltipMetric(entry.data, "nonViablePercent");
-          const nonViablePercent = storedNonViablePercent !== null
-            ? storedNonViablePercent
-            : nonViable !== null && scanTotal !== null && scanTotal > 0
-              ? nonViable / scanTotal * 100
-              : null;
+          const nonViablePercent = nonViable !== null ? nonViable / total * 100 : null;
           return [
             "Scan date and time: " + entry.date.toLocaleString("en-US", {
               year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit"
@@ -914,7 +909,7 @@
       }
 
       function getDisplayedResultCounts(block) {
-        if (block.latestCycleResult && !block.hasActiveCycleScan) {
+        if (block.latestCycleResult) {
           const result = block.latestCycleResult;
           return { bearing: result.bearing, nonBearing: result.nonBearing, nonViable: result.nonViable, hasData: true };
         }
@@ -932,13 +927,7 @@
             return { bearing: 0, nonBearing: 0, nonViable: 0, hasData: false };
           }
         }
-        const hasData = block.plants > 0;
-        return {
-          bearing: hasData ? Math.round((block.bearing / 100) * block.plants) : 0,
-          nonBearing: hasData ? Math.round((block.nonbearing / 100) * block.plants) : 0,
-          nonViable: hasData ? Math.round((block.nonViable / 100) * block.plants) : 0,
-          hasData: hasData,
-        };
+        return { bearing: 0, nonBearing: 0, nonViable: 0, hasData: false };
       }
 
       function renderConditionBreakdown(block, hasScanData, bearingCount, nonbearingCount, nonViableCount) {
@@ -946,7 +935,7 @@
         const totalPlants = bearingCount + nonbearingCount;
         const bearingPercent = totalPlants > 0 ? bearingCount / totalPlants * 100 : null;
         const nonbearingPercent = totalPlants > 0 ? nonbearingCount / totalPlants * 100 : null;
-        const nonViablePercent = hasScanData ? Number(block.nonViable) : null;
+        const nonViablePercent = totalPlants > 0 ? nonViableCount / totalPlants * 100 : null;
         document.getElementById("condition-breakdown").innerHTML = `
         <div class="thead-row">
             <span class="thead-title">Fruit Condition Breakdown</span>

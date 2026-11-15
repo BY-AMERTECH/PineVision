@@ -457,9 +457,9 @@ window.blockScanHistory = (function () {
             const resultSummary = result
                 ? 'Latest completed results: Estimated plants ' + formatCount(result.bearing + result.nonBearing) +
                     ', Total detections ' + formatCount(result.total) +
-                    ' (Bearing ' + formatCount(result.bearing) +
-                    ', Non-bearing ' + formatCount(result.nonBearing) +
-                    ', Non-viable ' + formatCount(result.nonViable) + ')'
+                    ' (Bearing ' + formatCount(result.bearing) + ' · ' + (formatPercent(result.bearing, result.bearing + result.nonBearing) || 'Unavailable') +
+                    ', Non-bearing ' + formatCount(result.nonBearing) + ' · ' + (formatPercent(result.nonBearing, result.bearing + result.nonBearing) || 'Unavailable') +
+                    ', Non-viable ' + formatCount(result.nonViable) + ' · ' + (formatPercent(result.nonViable, result.bearing + result.nonBearing) || 'Unavailable') + ')'
                 : 'Latest completed results: N/A';
             return '<article class="cycle-history-card"><header><strong>Cycle ' + cycle.displayNumber + '</strong>' +
                 (active ? '<span class="cycle-active-badge">Active</span>' : '<span>' + escapeHtml(cycle.status || 'Unknown') + '</span>') +
@@ -609,10 +609,10 @@ window.blockScanHistory = (function () {
     function workbookBlob(history, block, cycles) {
         const scanRows = [[
             'Scan reference', 'Crop Cycle', 'Block ID', 'Section at scan', 'Block Area (ha)',
-            'Planting date at scan', 'Forcing date at scan', 'DAF at scan', 'Account',
+            'Planting date at scan', 'Forcing date at scan', 'DAF at scan', 'Scan Date', 'Account',
             'Start date (UTC)', 'End date (UTC)', 'Duration (seconds)',
             'Bearing detections', 'Non-bearing detections', 'Non-viable detections',
-            'Estimated plant count',
+            'Estimated plant count', 'Bearing %', 'Non-bearing %', 'Non-viable %',
         ]];
         const orderedHistory = history.slice().sort(function (a, b) { return a.date - b.date; });
         const scanCounts = new Map();
@@ -622,32 +622,46 @@ window.blockScanHistory = (function () {
             const end = d.endTime && typeof d.endTime.toDate === 'function' ? d.endTime.toDate() : null;
             const bearing = metric(d, 'bearing');
             const nonBearing = metric(d, 'nonBearing');
+            const nonViable = metric(d, 'nonViable');
+            const plantTotal = bearing !== null && nonBearing !== null ? bearing + nonBearing : null;
+            const scanSection = [d.sectionAtScan, cycle && cycle.section, block.section]
+                .find(function (value) { return value != null && String(value).trim() !== ''; });
             const blockReference = readableBlockReference(block);
             if (cycle) scanCounts.set(cycle.id, (scanCounts.get(cycle.id) || 0) + 1);
             scanRows.push([
                 scanReference(entry), cycle ? 'Cycle ' + cycle.displayNumber : 'Unassigned', blockReference,
-                sectionValue(d.sectionAtScan),
+                sectionValue(scanSection),
                 block.area == null ? 'Not recorded' : block.area,
                 d.plantedAtScan || cycle && cycle.planted || 'Not recorded',
                 d.forcingDateAtScan || cycle && cycle.forcingDate || 'Not recorded',
                 d.dafAtScan == null ? cycle && cycle.daf != null ? cycle.daf : 'Not recorded' : d.dafAtScan,
+                entry.date.toISOString().slice(0, 10),
                 block.accountName || block.registeredBy || 'N/A',
                 entry.date.toISOString().slice(0, 10), end ? end.toISOString().slice(0, 10) : 'N/A',
                 end && end >= entry.date ? Math.round((end - entry.date) / 1000) : 'N/A',
-                bearing ?? 'N/A', nonBearing ?? 'N/A', metric(d, 'nonViable') ?? 'N/A',
-                bearing !== null && nonBearing !== null ? bearing + nonBearing : 'N/A',
+                bearing ?? 'N/A', nonBearing ?? 'N/A', nonViable ?? 'N/A',
+                plantTotal !== null ? plantTotal : 'N/A',
+                plantTotal > 0 ? bearing / plantTotal * 100 : 'N/A',
+                plantTotal > 0 ? nonBearing / plantTotal * 100 : 'N/A',
+                plantTotal > 0 && nonViable !== null ? nonViable / plantTotal * 100 : 'N/A',
             ]);
         });
 
-        const cycleRows = [['Crop Cycle', 'Section for cycle', 'Area for cycle', 'Planting Date', 'Forcing Date', 'DAF', 'Start Date', 'Completed Date', 'Scan Count', 'Latest Scan']];
+        const cycleRows = [['Crop Cycle', 'Section for cycle', 'Area for cycle', 'Planting Date', 'Forcing Date', 'DAF', 'Start Date', 'Completed Date', 'Scan Count', 'Latest Scan', 'Latest Estimated Plant Count', 'Latest Bearing', 'Latest Non-bearing', 'Latest Non-viable', 'Bearing %', 'Non-bearing %', 'Non-viable %']];
         cycles.slice().sort(function (a, b) { return a.displayNumber - b.displayNumber; }).forEach(function (cycle) {
             const cycleScans = orderedHistory.filter(function (entry) { return assignedCycle(entry, cycles) === cycle; });
             const latest = cycleScans.length ? cycleScans[cycleScans.length - 1].date.toISOString() : '';
+            const result = latestCompletedResult(cycleScans, null);
+            const plantTotal = result ? result.bearing + result.nonBearing : null;
             cycleRows.push([
-                'Cycle ' + cycle.displayNumber, sectionValue(cycle.section),
+                'Cycle ' + cycle.displayNumber, sectionValue(cycle.section || block.section),
                 cycle.area == null ? 'Not recorded' : cycle.area,
                 cycle.planted || 'Unavailable', cycle.forcingDate || 'Unavailable', cycle.daf == null ? 'Unavailable' : cycle.daf,
                 cycle.startDate || 'Unavailable', timestamp(cycle.completedAtMs == null ? cycle.completedAt : cycle.completedAtMs) || 'Unavailable', scanCounts.get(cycle.id) || 0, latest || 'Unavailable',
+                plantTotal !== null ? plantTotal : 'N/A', result ? result.bearing : 'N/A', result ? result.nonBearing : 'N/A', result ? result.nonViable : 'N/A',
+                plantTotal > 0 ? result.bearing / plantTotal * 100 : 'N/A',
+                plantTotal > 0 ? result.nonBearing / plantTotal * 100 : 'N/A',
+                plantTotal > 0 ? result.nonViable / plantTotal * 100 : 'N/A',
             ]);
         });
 

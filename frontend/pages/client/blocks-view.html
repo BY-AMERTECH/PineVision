@@ -797,7 +797,7 @@
                   id="edit-area"
                   name="area"
                   class="form-input"
-                  step="0.1"
+                  step="any"
                   placeholder="e.g., 2.8"
                   required
                 />
@@ -1183,13 +1183,7 @@
           const total = bearing === null || nonBearing === null ? null : bearing + nonBearing;
           if (total === null || total <= 0) return null;
           const nonViable = scanTooltipMetric(entry.data, "nonViable");
-          const scanTotal = scanTooltipMetric(entry.data, "total");
-          const storedNonViablePercent = scanTooltipMetric(entry.data, "nonViablePercent");
-          const nonViablePercent = storedNonViablePercent !== null
-            ? storedNonViablePercent
-            : nonViable !== null && scanTotal !== null && scanTotal > 0
-              ? nonViable / scanTotal * 100
-              : null;
+          const nonViablePercent = nonViable !== null ? nonViable / total * 100 : null;
           return [
             "Scan date and time: " + entry.date.toLocaleString("en-US", {
               year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit"
@@ -1252,7 +1246,7 @@
       }
 
       function getDisplayedResultCounts(block) {
-        if (block.latestCycleResult && !block.hasActiveCycleScan) {
+        if (block.latestCycleResult) {
           const result = block.latestCycleResult;
           return { bearing: result.bearing, nonBearing: result.nonBearing, nonViable: result.nonViable, hasData: true };
         }
@@ -1270,13 +1264,7 @@
             return { bearing: 0, nonBearing: 0, nonViable: 0, hasData: false };
           }
         }
-        const hasData = block.plants > 0;
-        return {
-          bearing: hasData ? Math.round((block.bearing / 100) * block.plants) : 0,
-          nonBearing: hasData ? Math.round((block.nonbearing / 100) * block.plants) : 0,
-          nonViable: hasData ? Math.round((block.nonViable / 100) * block.plants) : 0,
-          hasData: hasData,
-        };
+        return { bearing: 0, nonBearing: 0, nonViable: 0, hasData: false };
       }
 
       function renderMetricCards(block) {
@@ -1285,18 +1273,18 @@
         const bearingPlants    = counts.bearing;
         const nonbearingPlants = counts.nonBearing;
         const nonViablePlants  = counts.nonViable;
-        // Keep these values aligned with the metric cards above.
+        // Use one exact count sum for the estimate and both fruit percentages.
         const totalPlants = bearingPlants + nonbearingPlants;
         const bearingPercent = totalPlants > 0 ? bearingPlants / totalPlants * 100 : null;
         const nonbearingPercent = totalPlants > 0 ? nonbearingPlants / totalPlants * 100 : null;
-        const nonViablePercent = hasDetectedData ? Number(block.nonViable) : null;
+        const nonViablePercent = totalPlants > 0 ? nonViablePlants / totalPlants * 100 : null;
 
         const plantSub = (n) => hasDetectedData ? formatNumber(n) + " plants" : "—";
 
         document.getElementById("metric-cards-row").innerHTML =
           buildMetricCard(
             "Estimated Plant Count",
-            block.estimatedTotalPlantCount === null ? "Unavailable" : formatNumber(block.estimatedTotalPlantCount),
+            hasDetectedData ? formatNumber(totalPlants) : "Unavailable",
             "Estimated total pineapple plants",
             "",
           ) +
@@ -1368,7 +1356,7 @@
         const totalPlants      = bearingPlants + nonbearingPlants;
         const bearingPercent   = totalPlants > 0 ? bearingPlants / totalPlants * 100 : null;
         const nonbearingPercent = totalPlants > 0 ? nonbearingPlants / totalPlants * 100 : null;
-        const nonViablePercent = hasDetectedData ? Number(block.nonViable) : null;
+        const nonViablePercent = totalPlants > 0 ? nonViablePlants / totalPlants * 100 : null;
         const fmtPlant = (n) => hasDetectedData ? formatNumber(n) : "—";
 
         document.getElementById("condition-breakdown").innerHTML = `

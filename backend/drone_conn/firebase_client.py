@@ -138,7 +138,7 @@ def update_detection_batch(
         plant_total     = bearing_count + non_bearing_count
         bearing_pct     = (bearing_count     / plant_total * 100) if plant_total > 0 else 0.0
         non_bearing_pct = (non_bearing_count / plant_total * 100) if plant_total > 0 else 0.0
-        non_viable_pct  = (non_viable_count  / total_count * 100) if total_count > 0 else 0.0
+        non_viable_pct  = (non_viable_count  / plant_total * 100) if plant_total > 0 else 0.0
 
         block_ref = db.collection('blocks').document(block_id)
         block_update = {
@@ -321,7 +321,7 @@ def complete_scan_session(
         plant_total     = bearing_count + non_bearing_count
         bearing_pct     = (bearing_count     / plant_total * 100) if plant_total > 0 else 0.0
         non_bearing_pct = (non_bearing_count / plant_total * 100) if plant_total > 0 else 0.0
-        non_viable_pct  = (non_viable_count  / total_count * 100) if total_count > 0 else 0.0
+        non_viable_pct  = (non_viable_count  / plant_total * 100) if plant_total > 0 else 0.0
 
         scan_ref = db.collection('scans').document(scan_id)
         scan_update = {
@@ -404,7 +404,7 @@ def update_block_stats(
         plant_total     = bearing_count + non_bearing_count
         bearing_pct     = (bearing_count     / plant_total * 100) if plant_total > 0 else 0.0
         non_bearing_pct = (non_bearing_count / plant_total * 100) if plant_total > 0 else 0.0
-        non_viable_pct  = (non_viable_count  / total_count * 100) if total_count > 0 else 0.0
+        non_viable_pct  = (non_viable_count  / plant_total * 100) if plant_total > 0 else 0.0
 
         db.collection('blocks').document(block_id).update({
             'bearingPercent':    round(bearing_pct,     1),
