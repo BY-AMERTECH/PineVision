@@ -88,11 +88,13 @@
                 try {
                     const history = await blockScanHistory.load(block.id, currentUser.uid);
                     const result = blockScanHistory.latestCompletedResult(history, block.activeCycleId);
-                    if (!result || !result.total) return;
+                    if (!result) return;
+                    const plantTotal = result.bearing + result.nonBearing;
+                    if (plantTotal <= 0) return;
                     block.healthMetrics = {
-                        bearing: result.bearing / result.total * 100,
-                        nonbearing: result.nonBearing / result.total * 100,
-                        discolored: result.nonViable / result.total * 100
+                        bearing: result.bearing / plantTotal * 100,
+                        nonbearing: result.nonBearing / plantTotal * 100,
+                        discolored: result.nonViable / plantTotal * 100
                     };
                     block.totalScans = Math.max(block.totalScans, history.length);
                 } catch (scanError) {
@@ -284,8 +286,8 @@
                 <td>${block.section}</td>
                 <td style="font-family: var(--font-mono);">${formatArea(block.area)}</td>
                 <td style="font-family: var(--font-mono);">${block.estimatedTotalPlantCount === null ? 'Unavailable' : formatNumber(block.estimatedTotalPlantCount)}</td>
-                <td>${buildInlineBar(block.bearing, barColor)}</td>
-                <td style="font-family: var(--font-mono);">${formatPercent(block.discolored)}</td>
+                <td>${buildInlineBar(block.healthMetrics ? block.healthMetrics.bearing : block.bearing, barColor)}</td>
+                <td style="font-family: var(--font-mono);">${formatPercent(block.healthMetrics ? block.healthMetrics.nonbearing : block.nonBearing)}</td>
                 <td>${buildStatusBadge(statusClass)}</td>
             </tr>
         `;
