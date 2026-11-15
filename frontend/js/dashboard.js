@@ -83,6 +83,21 @@
                 console.error('❌ Error loading latest completed plant counts:', scanError);
             }
 
+            // Health metrics come from each block's latest completed scan in its active cycle.
+            await Promise.all(blocksData.map(async function (block) {
+                try {
+                    const history = await blockScanHistory.load(block.id, currentUser.uid);
+                    const result = blockScanHistory.latestCompletedResult(history, block.activeCycleId);
+                    if (!result || !result.total) return;
+                    block.bearing = result.bearing / result.total * 100;
+                    block.nonBearing = result.nonBearing / result.total * 100;
+                    block.discolored = result.nonViable / result.total * 100;
+                    block.totalScans = Math.max(block.totalScans, history.length);
+                } catch (scanError) {
+                    console.error(`❌ Error loading scan health for ${block.name}:`, scanError);
+                }
+            }));
+
             console.log(`✅ Loaded ${blocksData.length} blocks from Firestore`);
 
             // Calculate farm totals
@@ -256,7 +271,7 @@
 
         blocksData.forEach((block, index) => {
             const statusClass = getStatusClass(block);
-            const barColor = getBarColor(block.bearing);
+            const barColor = getBarColor(statusClass);
 
             const blockName = block.name || `Block ${index + 1}`;
 
@@ -402,11 +417,7 @@
     }
 
     function renderBearingByBlockChart(isDark, textClr, gridClr, bgSurf) {
-        const barColors = blocksData.map(b =>
-            b.bearing >= 75 ? '#4caf78'
-                : b.bearing >= 60 ? '#e6a817'
-                    : '#d94f4f'
-        );
+        const barColors = blocksData.map(block => getBarColor(getStatusClass(block)));
 
         const blockCanvas = document.getElementById('bearing-by-block-chart');
         if (!blockCanvas) return;
@@ -488,22 +499,21 @@
     function buildStatusBadge(statusClass) {
         const labels = {
             healthy: 'Healthy',
-            warning: 'At Risk',
+            warning: 'Watch',
             critical: 'Critical'
         };
         return `<span class="status-badge status-badge-${statusClass}">${labels[statusClass] || 'Unknown'}</span>`;
     }
 
     function getStatusClass(block) {
-        if (!block.totalScans && !(Number(block.bearing) || 0) &&
-            !(Number(block.nonBearing) || 0) && !(Number(block.discolored) || 0)) return 'critical';
         const status = window.clientThresholds.classify(block);
         return status === 'good' ? 'healthy' : status === 'warn' ? 'warning' : 'critical';
     }
 
-    function getBarColor(bearing) {
-        const color = window.clientThresholds.bearingColor(bearing);
-        return color === 'var(--green)' ? '#4caf78' : color === 'var(--amber)' ? '#e6a817' : '#d94f4f';
+    function getBarColor(statusClass) {
+        return statusClass === 'healthy' ? '#4caf78'
+            : statusClass === 'warning' ? '#e6a817'
+                : '#d94f4f';
     }
 
     function formatNumber(num) {
