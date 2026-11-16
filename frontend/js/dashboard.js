@@ -89,9 +89,10 @@
                     const history = await blockScanHistory.load(block.id, currentUser.uid);
                     const result = blockScanHistory.latestCompletedResult(history, block.activeCycleId);
                     if (!result || !result.total) return;
+                    const estimatedPlants = result.bearing + result.nonBearing;
                     block.healthMetrics = {
-                        bearing: result.bearing / result.total * 100,
-                        nonbearing: result.nonBearing / result.total * 100,
+                        bearing: estimatedPlants > 0 ? result.bearing / estimatedPlants * 100 : 0,
+                        nonbearing: estimatedPlants > 0 ? result.nonBearing / estimatedPlants * 100 : 0,
                         discolored: result.nonViable / result.total * 100
                     };
                     block.totalScans = Math.max(block.totalScans, history.length);
@@ -142,9 +143,17 @@
 
         blocksData.forEach(block => {
             const weight = weightingTotal > 0 ? (block.totalPineapples || 0) / weightingTotal : 0;
-            weightedBearing += (block.bearing || 0) * weight;
-            weightedNonBearing += (block.nonBearing || 0) * weight;
-            weightedDiscolored += (block.discolored || 0) * weight;
+            const metrics = block.healthMetrics || block;
+            let bearing = Number(metrics.bearing) || 0;
+            let nonBearing = Number(metrics.nonbearing ?? metrics.nonBearing) || 0;
+            if (!block.healthMetrics && bearing + nonBearing > 0) {
+                const viableTotal = bearing + nonBearing;
+                bearing = bearing / viableTotal * 100;
+                nonBearing = nonBearing / viableTotal * 100;
+            }
+            weightedBearing += bearing * weight;
+            weightedNonBearing += nonBearing * weight;
+            weightedDiscolored += (metrics.discolored ?? metrics.nonViable ?? 0) * weight;
         });
 
         return {
@@ -331,8 +340,7 @@
     function renderBearingDistributionChart(totals, isDark, textClr, bgSurf) {
         const donutData = [
             parseFloat(totals.avgBearing.toFixed(1)),
-            parseFloat(totals.avgNonbearing.toFixed(1)),
-            parseFloat(totals.avgDiscolored.toFixed(1))
+            parseFloat(totals.avgNonbearing.toFixed(1))
         ];
 
         const centerLabelPlugin = {
@@ -368,10 +376,10 @@
         new Chart(distCtx, {
             type: 'doughnut',
             data: {
-                labels: ['Bearing', 'Non-bearing', 'Non-Viable'],
+                labels: ['Bearing', 'Non-bearing'],
                 datasets: [{
                     data: donutData,
-                    backgroundColor: ['#4caf78', '#f0c430', '#e6a817'],
+                    backgroundColor: ['#4caf78', '#f0c430'],
                     borderColor: bgSurf,
                     borderWidth: 3,
                     hoverOffset: 6
