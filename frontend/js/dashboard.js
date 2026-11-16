@@ -340,7 +340,8 @@
     function renderBearingDistributionChart(totals, isDark, textClr, bgSurf) {
         const donutData = [
             parseFloat(totals.avgBearing.toFixed(1)),
-            parseFloat(totals.avgNonbearing.toFixed(1))
+            parseFloat(totals.avgNonbearing.toFixed(1)),
+            parseFloat(totals.avgDiscolored.toFixed(1))
         ];
 
         const centerLabelPlugin = {
@@ -376,10 +377,10 @@
         new Chart(distCtx, {
             type: 'doughnut',
             data: {
-                labels: ['Bearing', 'Non-bearing'],
+                labels: ['Bearing', 'Non-bearing', 'Non-Viable'],
                 datasets: [{
                     data: donutData,
-                    backgroundColor: ['#4caf78', '#f0c430'],
+                    backgroundColor: ['#4caf78', '#f0c430', '#e6a817'],
                     borderColor: bgSurf,
                     borderWidth: 3,
                     hoverOffset: 6
