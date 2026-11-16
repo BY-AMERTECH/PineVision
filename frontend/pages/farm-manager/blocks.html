@@ -885,6 +885,7 @@
     <script src="../../js/auth.js"></script>
     <script src="../../js/data.js"></script>
     <script src="../../js/utils.js"></script>
+    <script src="../../js/farm-manager-thresholds.js"></script>
     <script src="../../js/block-scan-history.js"></script>
     <script src="../../js/app.js"></script>
 
@@ -1257,9 +1258,7 @@
 
       function blockStatusClass(block) {
         if (!block.totalScans || block.plants <= 0) return "none";
-        if (block.bearing >= 80) return "good";
-        if (block.bearing >= 60) return "warn";
-        return "crit";
+        return window.farmManagerThresholds.classify(block);
       }
 
       function growthStageLabel(block) {
