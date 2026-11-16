@@ -608,6 +608,7 @@
       let rpBlocksLoaded = false;
       let rpUsersLoaded = false;
       let rpScansLoaded = false;
+      let rpBlocksRefreshId = 0;
 
       let BLOCKS_RAW = [];   // [{id, blockName, section, userId, operatorName, ...}]
       let USERS_BY_ID = {};  // userId -> fullName
@@ -660,6 +661,7 @@
           .limit(RP_LIMIT)
           .onSnapshot(
             async function (snap) {
+              const refreshId = ++rpBlocksRefreshId;
               BLOCKS_RAW = [];
               snap.forEach(function (doc) {
                 const d = doc.data();
@@ -675,22 +677,42 @@
                   bearing: d.bearingPercent || 0,
                   nonbearing: d.nonBearingPercent || 0,
                   nonViable: d.nonViable || 0,
+                  bearingCount: null,
+                  nonbearingCount: null,
+                  nonViableCount: null,
                   totalScans: d.totalScans || 0,
                   plants: null,
                 });
               });
+              const reportBlocks = BLOCKS_RAW;
               try {
-                const latestCounts = await blockScanHistory.loadLatestPlantCounts(
-                  BLOCKS_RAW.map((block) => block.id),
+                const latestResults = await blockScanHistory.loadLatestPlantResults(
+                  reportBlocks.map((block) => block.id),
                   null,
-                  Object.fromEntries(BLOCKS_RAW.map((block) => [block.id, block.activeCycleId])),
+                  Object.fromEntries(reportBlocks.map((block) => [block.id, block.activeCycleId])),
                 );
-                BLOCKS_RAW.forEach(function (block) {
-                  block.plants = latestCounts.get(block.id) || 0;
+                reportBlocks.forEach(function (block) {
+                  const result = latestResults.get(block.id);
+                  if (!result) {
+                    block.plants = 0;
+                    block.bearing = 0;
+                    block.nonbearing = 0;
+                    block.nonViable = 0;
+                    return;
+                  }
+                  block.bearingCount = result.bearing;
+                  block.nonbearingCount = result.nonBearing;
+                  block.nonViableCount = result.nonViable;
+                  const denominator = result.bearing + result.nonBearing;
+                  block.plants = denominator;
+                  block.bearing = denominator > 0 ? result.bearing / denominator * 100 : 0;
+                  block.nonbearing = denominator > 0 ? result.nonBearing / denominator * 100 : 0;
+                  block.nonViable = denominator > 0 ? result.nonViable / denominator * 100 : 0;
                 });
               } catch (scanError) {
-                console.error("❌ Error loading latest completed plant counts:", scanError);
+                console.error("❌ Error loading latest completed scan results:", scanError);
               }
+              if (refreshId !== rpBlocksRefreshId) return;
               rpBlocksLoaded = true;
               setLiveStatus(true);
               onDataChanged();
@@ -731,6 +753,7 @@
       }
 
       function detachListeners() {
+        rpBlocksRefreshId += 1;
         [rpBlocksUnsub, rpUsersUnsub, rpScansUnsub].forEach(function (unsub) {
           if (typeof unsub === "function") {
             try {
@@ -885,6 +908,8 @@
           ],
         ];
         CURRENT_REPORT_BLOCKS.forEach((block) => {
+          const rateTotal = (block.bearingCount || 0) + (block.nonbearingCount || 0);
+          const hasRateData = block.bearingCount != null && block.nonbearingCount != null && rateTotal > 0;
           rows.push([
             block.blockName || "N/A",
             block.section || "N/A",
@@ -892,12 +917,12 @@
             block.daf || "N/A",
             block.area || "N/A",
             block.plants || "N/A",
-            block.plants ? Math.round(block.plants * block.bearing / 100) : "N/A",
-            block.plants ? Math.round(block.plants * block.nonbearing / 100) : "N/A",
-            block.plants ? Math.round(block.plants * block.nonViable / 100) : "N/A",
-            block.plants ? block.bearing.toFixed(1) : "N/A",
-            block.plants ? block.nonbearing.toFixed(1) : "N/A",
-            block.plants ? block.nonViable.toFixed(1) : "N/A",
+            block.bearingCount ?? "N/A",
+            block.nonbearingCount ?? "N/A",
+            block.nonViableCount ?? "N/A",
+            hasRateData ? (block.bearingCount / rateTotal * 100).toFixed(1) : "N/A",
+            hasRateData ? (block.nonbearingCount / rateTotal * 100).toFixed(1) : "N/A",
+            hasRateData && block.nonViableCount != null ? (block.nonViableCount / rateTotal * 100).toFixed(1) : "N/A",
             statusLabel(blockStatusClass(block)) || "N/A",
           ]);
         });
@@ -914,9 +939,13 @@
 
         const plantsAvailable = blocks.every((block) => Number.isSafeInteger(block.plants));
         const totalPlants = blocks.reduce((s, b) => s + (b.plants || 0), 0);
-        const avgBearing = blocks.reduce((s, b) => s + b.bearing, 0) / blocks.length;
-        const avgNonbearing = blocks.reduce((s, b) => s + b.nonbearing, 0) / blocks.length;
-        const avgNonViable = blocks.reduce((s, b) => s + b.nonViable, 0) / blocks.length;
+        const bearingTotal = blocks.reduce((sum, block) => sum + (block.bearingCount || 0), 0);
+        const nonbearingTotal = blocks.reduce((sum, block) => sum + (block.nonbearingCount || 0), 0);
+        const nonViableTotal = blocks.reduce((sum, block) => sum + (block.nonViableCount || 0), 0);
+        const rateDenominator = bearingTotal + nonbearingTotal;
+        const avgBearing = rateDenominator > 0 ? bearingTotal / rateDenominator * 100 : 0;
+        const avgNonbearing = rateDenominator > 0 ? nonbearingTotal / rateDenominator * 100 : 0;
+        const avgNonViable = rateDenominator > 0 ? nonViableTotal / rateDenominator * 100 : 0;
         const totalArea = blocks.reduce((s, b) => s + b.area, 0);
 
         document.getElementById("rp-metrics").innerHTML =

@@ -611,6 +611,13 @@
                 block.bearingCount = latestResult.bearing;
                 block.nonbearingCount = latestResult.nonBearing;
                 block.nonViableCount = latestResult.nonViable;
+                const denominator = latestResult.bearing + latestResult.nonBearing;
+                block.plants = denominator;
+                if (denominator > 0) {
+                  block.bearing = latestResult.bearing / denominator * 100;
+                  block.nonbearing = latestResult.nonBearing / denominator * 100;
+                  block.nonViable = latestResult.nonViable / denominator * 100;
+                }
               }
             });
 
@@ -718,6 +725,8 @@
           ],
         ];
         CURRENT_REPORT_BLOCKS.forEach((block) => {
+          const rateTotal = (block.bearingCount || 0) + (block.nonbearingCount || 0);
+          const hasRateData = block.bearingCount != null && block.nonbearingCount != null && rateTotal > 0;
           rows.push([
             block.blockName || "N/A",
             block.section || "N/A",
@@ -727,9 +736,9 @@
             block.bearingCount ?? "N/A",
             block.nonbearingCount ?? "N/A",
             block.nonViableCount ?? "N/A",
-            block.plants != null ? block.bearing.toFixed(1) : "N/A",
-            block.plants != null ? block.nonbearing.toFixed(1) : "N/A",
-            block.plants != null ? block.nonViable.toFixed(1) : "N/A",
+            hasRateData ? (block.bearingCount / rateTotal * 100).toFixed(1) : "N/A",
+            hasRateData ? (block.nonbearingCount / rateTotal * 100).toFixed(1) : "N/A",
+            hasRateData && block.nonViableCount != null ? (block.nonViableCount / rateTotal * 100).toFixed(1) : "N/A",
             statusLabel(blockStatusClass(block)) || "N/A",
           ]);
         });
@@ -745,12 +754,13 @@
         }
 
         const totalPlants = blocks.reduce((s, b) => s + (b.plants || 0), 0);
-        const avgBearing =
-          blocks.reduce((s, b) => s + b.bearing, 0) / blocks.length;
-        const avgNonbearing =
-          blocks.reduce((s, b) => s + b.nonbearing, 0) / blocks.length;
-        const avgNonViable =
-          blocks.reduce((s, b) => s + b.nonViable, 0) / blocks.length;
+        const bearingTotal = blocks.reduce((sum, block) => sum + (block.bearingCount || 0), 0);
+        const nonbearingTotal = blocks.reduce((sum, block) => sum + (block.nonbearingCount || 0), 0);
+        const nonViableTotal = blocks.reduce((sum, block) => sum + (block.nonViableCount || 0), 0);
+        const rateDenominator = bearingTotal + nonbearingTotal;
+        const avgBearing = rateDenominator > 0 ? bearingTotal / rateDenominator * 100 : 0;
+        const avgNonbearing = rateDenominator > 0 ? nonbearingTotal / rateDenominator * 100 : 0;
+        const avgNonViable = rateDenominator > 0 ? nonViableTotal / rateDenominator * 100 : 0;
         const totalArea = blocks.reduce((s, b) => s + b.area, 0);
 
         document.getElementById("report-metrics").innerHTML = `

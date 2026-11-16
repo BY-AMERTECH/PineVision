@@ -721,13 +721,21 @@
           });
 
           try {
-            const latestCounts = await blockScanHistory.loadLatestPlantCounts(
+            const latestResults = await blockScanHistory.loadLatestPlantResults(
               ALL_BLOCKS.map((block) => block.id),
               currentUser.uid,
               Object.fromEntries(ALL_BLOCKS.map((block) => [block.id, block.activeCycleId])),
             );
             ALL_BLOCKS.forEach(function (block) {
-              block.estimatedTotalPlantCount = latestCounts.get(block.id) || 0;
+              const result = latestResults.get(block.id);
+              if (!result) return;
+              const denominator = result.bearing + result.nonBearing;
+              block.estimatedTotalPlantCount = denominator;
+              if (denominator > 0) {
+                block.bearing = result.bearing / denominator * 100;
+                block.nonbearing = result.nonBearing / denominator * 100;
+                block.nonViable = result.nonViable / denominator * 100;
+              }
             });
           } catch (scanError) {
             console.error("❌ Error loading latest completed plant counts:", scanError);

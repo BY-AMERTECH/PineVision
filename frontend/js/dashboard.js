@@ -91,10 +91,16 @@
                     if (!result) return;
                     const plantTotal = result.bearing + result.nonBearing;
                     if (plantTotal <= 0) return;
+                    block.estimatedTotalPlantCount = plantTotal;
                     block.healthMetrics = {
                         bearing: result.bearing / plantTotal * 100,
                         nonbearing: result.nonBearing / plantTotal * 100,
                         discolored: result.nonViable / plantTotal * 100
+                    };
+                    block.healthCounts = {
+                        bearing: result.bearing,
+                        nonBearing: result.nonBearing,
+                        nonViable: result.nonViable
                     };
                     block.totalScans = Math.max(block.totalScans, history.length);
                 } catch (scanError) {
@@ -135,19 +141,13 @@
         }
 
         const totalPlants = blocksData.reduce((sum, b) => sum + (b.estimatedTotalPlantCount || 0), 0);
-        const weightingTotal = blocksData.reduce((sum, b) => sum + (b.totalPineapples || 0), 0);
-
-        // Weighted average by total pineapples
-        let weightedBearing = 0;
-        let weightedNonBearing = 0;
-        let weightedDiscolored = 0;
-
-        blocksData.forEach(block => {
-            const weight = weightingTotal > 0 ? (block.totalPineapples || 0) / weightingTotal : 0;
-            weightedBearing += (block.bearing || 0) * weight;
-            weightedNonBearing += (block.nonBearing || 0) * weight;
-            weightedDiscolored += (block.discolored || 0) * weight;
-        });
+        const totalBearing = blocksData.reduce((sum, block) => sum + (block.healthCounts?.bearing || 0), 0);
+        const totalNonBearing = blocksData.reduce((sum, block) => sum + (block.healthCounts?.nonBearing || 0), 0);
+        const totalNonViable = blocksData.reduce((sum, block) => sum + (block.healthCounts?.nonViable || 0), 0);
+        const rateDenominator = totalBearing + totalNonBearing;
+        const weightedBearing = rateDenominator > 0 ? totalBearing / rateDenominator * 100 : 0;
+        const weightedNonBearing = rateDenominator > 0 ? totalNonBearing / rateDenominator * 100 : 0;
+        const weightedDiscolored = rateDenominator > 0 ? totalNonViable / rateDenominator * 100 : 0;
 
         return {
             totalPlants,
@@ -333,8 +333,7 @@
     function renderBearingDistributionChart(totals, isDark, textClr, bgSurf) {
         const donutData = [
             parseFloat(totals.avgBearing.toFixed(1)),
-            parseFloat(totals.avgNonbearing.toFixed(1)),
-            parseFloat(totals.avgDiscolored.toFixed(1))
+            parseFloat(totals.avgNonbearing.toFixed(1))
         ];
 
         const centerLabelPlugin = {
@@ -370,7 +369,7 @@
         new Chart(distCtx, {
             type: 'doughnut',
             data: {
-                labels: ['Bearing', 'Non-bearing', 'Non-Viable'],
+                labels: ['Bearing', 'Non-bearing'],
                 datasets: [{
                     data: donutData,
                     backgroundColor: ['#4caf78', '#f0c430', '#e6a817'],
