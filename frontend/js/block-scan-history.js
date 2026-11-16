@@ -304,16 +304,19 @@ window.blockScanHistory = (function () {
         const points = completed.map(function (entry, index) {
             const bearing = metric(entry.data, 'bearing');
             const nonBearing = metric(entry.data, 'nonBearing');
-            const denominator = bearing === null || nonBearing === null ? 0 : bearing + nonBearing;
-            return denominator > 0 ? {
+            const nonViable = metric(entry.data, 'nonViable');
+            const total = metric(entry.data, 'total');
+            const denominator = total !== null && total > 0 ? total : (bearing || 0) + (nonBearing || 0) + (nonViable || 0);
+            return denominator > 0 && bearing !== null && nonBearing !== null ? {
                 date: entry.date,
                 scanNumber: index + 1,
                 monthIndex: entry.date.getMonth(),
                 bearing: bearing,
                 nonBearing: nonBearing,
-                nonViable: metric(entry.data, 'nonViable'),
+                nonViable: nonViable,
                 bearingPercent: bearing / denominator * 100,
                 nonBearingPercent: nonBearing / denominator * 100,
+                nonViablePercent: nonViable === null ? null : nonViable / denominator * 100,
             } : null;
         }).filter(Boolean);
         if (!points.length) return '';
@@ -335,7 +338,7 @@ window.blockScanHistory = (function () {
                 point.periodLabel,
                 'Bearing: ' + formatCount(point.bearing) + ' plants (' + point.bearingPercent.toFixed(1) + '%)',
                 'Non-bearing: ' + formatCount(point.nonBearing) + ' plants (' + point.nonBearingPercent.toFixed(1) + '%)',
-                point.nonViable === null ? 'Non-viable: unavailable' : 'Non-viable: ' + formatCount(point.nonViable) + ' plants',
+                point.nonViable === null ? 'Non-viable: unavailable' : 'Non-viable: ' + formatCount(point.nonViable) + ' plants (' + point.nonViablePercent.toFixed(1) + '%)',
             ].join(' · ');
         });
         const width = 1200, height = 320, left = 72, right = 28, top = 36, bottom = 72;
@@ -348,11 +351,12 @@ window.blockScanHistory = (function () {
         const series = [
             { key: 'bearingPercent', label: 'Bearing', color: '#2f8f5b' },
             { key: 'nonBearingPercent', label: 'Non-bearing', color: '#d39a22' },
+            { key: 'nonViablePercent', label: 'Non-viable', color: '#c6534f' },
         ];
         const paths = series.map(function (line) {
             const coordinates = points.map(function (point) {
                 return { x: x(point.monthIndex, point.monthFraction), y: y(point[line.key]), value: point[line.key], point: point };
-            });
+            }).filter(function (point) { return point.value !== null; });
             const linePath = coordinates.map(function (point, index) {
                 const command = index === 0 ? 'M' : 'L';
                 return command + point.x.toFixed(1) + ',' + point.y.toFixed(1);
@@ -367,8 +371,8 @@ window.blockScanHistory = (function () {
         }).join('');
         const interval = completed.length > 1 ? Math.round((completed[completed.length-1].date - completed[0].date) / 86400000) : null;
         const frequency = completed.length === 1 ? '1 completed scan' : `${completed.length} completed scans · ${interval} days between first and last scan`;
-        const legend = `<div class="scan-trend-legend" aria-label="Graph legend"><span><i style="--series-color:${series[0].color}"></i>Bearing %</span><span><i style="--series-color:${series[1].color}"></i>Non-bearing %</span></div>`;
-        return `<section class="scan-history-trend" aria-label="Scan history comparison"><header class="scan-trend-header"><div><span class="scan-trend-eyebrow">BLOCK PERFORMANCE</span><h3>Scan history comparison</h3><p>${frequency} · each point represents one scan</p></div><span class="scan-trend-count">${completed.length} ${completed.length === 1 ? 'scan' : 'scans'}</span></header><div class="scan-trend-chart"><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Bearing and non-bearing percentages for individual scans, shown across January through December"><line x1="${left}" y1="${top}" x2="${left}" y2="${height-bottom}" stroke="#bdc9c0"/><line x1="${left}" y1="${height-bottom}" x2="${width-right}" y2="${height-bottom}" stroke="#bdc9c0"/>${ticks}${paths}${xLabels}<text x="17" y="${top+plotHeight/2}" transform="rotate(-90 17 ${top+plotHeight/2})" text-anchor="middle" font-size="12" fill="#536057">Plants (%)</text></svg></div>${legend}</section>`;
+        const legend = `<div class="scan-trend-legend" aria-label="Graph legend">${series.map(function (item) { return `<span><i style="--series-color:${item.color}"></i>${item.label} %</span>`; }).join('')}</div>`;
+        return `<section class="scan-history-trend" aria-label="Scan history comparison"><header class="scan-trend-header"><div><span class="scan-trend-eyebrow">BLOCK PERFORMANCE</span><h3>Scan history comparison</h3><p>${frequency} · each point represents one scan</p></div><span class="scan-trend-count">${completed.length} ${completed.length === 1 ? 'scan' : 'scans'}</span></header><div class="scan-trend-chart"><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Bearing, non-bearing, and non-viable percentages for individual scans, shown across January through December"><line x1="${left}" y1="${top}" x2="${left}" y2="${height-bottom}" stroke="#bdc9c0"/><line x1="${left}" y1="${height-bottom}" x2="${width-right}" y2="${height-bottom}" stroke="#bdc9c0"/>${ticks}${paths}${xLabels}<text x="17" y="${top+plotHeight/2}" transform="rotate(-90 17 ${top+plotHeight/2})" text-anchor="middle" font-size="12" fill="#536057">Plants (%)</text></svg></div>${legend}</section>`;
     }
 
     function timestamp(value) {
