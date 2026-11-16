@@ -415,6 +415,8 @@
     }
 
     function renderBearingByBlockChart(isDark, textClr, gridClr, bgSurf) {
+        const barColors = blocksData.map(block => getBarColor(getStatusClass(block)));
+
         const blockCanvas = document.getElementById('bearing-by-block-chart');
         if (!blockCanvas) return;
 
@@ -425,27 +427,17 @@
                 labels: blocksData.map((b, index) => b.name || `Block ${index + 1}`),
                 datasets: [{
                     label: 'Bearing %',
-                    data: blocksData.map(b => b.healthMetrics ? b.healthMetrics.bearing : b.bearing),
-                    backgroundColor: '#4caf78',
+                    data: blocksData.map(b => b.bearing),
+                    backgroundColor: barColors,
                     borderRadius: 4,
-                    barThickness: 12
-                }, {
-                    label: 'Non-viable %',
-                    data: blocksData.map(b => b.healthMetrics ? b.healthMetrics.discolored : b.discolored),
-                    backgroundColor: '#e6a817',
-                    borderRadius: 4,
-                    barThickness: 12
+                    barThickness: 18
                 }]
             },
             options: {
                 responsive: true,
                 indexAxis: 'y',
                 plugins: {
-                    legend: {
-                        display: true,
-                        position: 'bottom',
-                        labels: { color: textClr, boxWidth: 12, boxHeight: 12, font: { family: 'Inter, sans-serif', size: 12 } }
-                    },
+                    legend: { display: false },
                     tooltip: {
                         callbacks: {
                             label: ctx => ` ${ctx.parsed.x.toFixed(1)}%`
