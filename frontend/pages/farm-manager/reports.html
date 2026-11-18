@@ -262,11 +262,7 @@
             <div class="nav-section-title">Monitoring</div>
             <ul class="nav-links">
               <li>
-<<<<<<< HEAD
-                <a href="users.html" class="nav-link" data-tooltip="Field Operators">
-=======
                 <a href="users.html" class="nav-link" data-tooltip="Accounts">
->>>>>>> features/new-fixes
                   <span class="nav-link-icon"
                     ><img
                       src="/frontend/assets/icons/nav-users.svg"
@@ -274,11 +270,7 @@
                       width="18"
                       height="18"
                   /></span>
-<<<<<<< HEAD
-                  <span class="nav-link-text">Field Operators</span>
-=======
                   <span class="nav-link-text">Accounts</span>
->>>>>>> features/new-fixes
                 </a>
               </li>
               <li>
@@ -935,11 +927,7 @@
           utils.buildMetricCard("Avg Non-Bearing", utils.formatPercent(avgNonbearing), "of selected blocks", "amber") +
           utils.buildMetricCard("Avg Non-Viable", utils.formatPercent(avgNonViable), "of selected blocks", "yellow") +
           utils.buildMetricCard("Total Area", totalArea.toFixed(1) + " ha", "selected area coverage", "") +
-<<<<<<< HEAD
-          utils.buildMetricCard("Unique Field Operators", new Set(blocks.map((b) => b.operatorName)).size, "flying selected blocks", "");
-=======
           utils.buildMetricCard("Unique Field Operators", new Set(blocks.map((b) => b.userId || b.operatorName)).size, "flying selected blocks", "");
->>>>>>> features/new-fixes
       }
 
       function renderTable(blocks) {
