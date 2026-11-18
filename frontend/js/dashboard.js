@@ -90,6 +90,12 @@
                     const result = blockScanHistory.latestCompletedResult(history, block.activeCycleId);
                     if (!result || !result.total) return;
                     const estimatedPlants = result.bearing + result.nonBearing;
+                    block.blockSummaryMetrics = {
+                        estimatedPlants,
+                        bearing: estimatedPlants > 0 ? result.bearing / estimatedPlants * 100 : 0,
+                        nonBearing: estimatedPlants > 0 ? result.nonBearing / estimatedPlants * 100 : 0,
+                        nonViable: estimatedPlants > 0 ? result.nonViable / estimatedPlants * 100 : 0
+                    };
                     block.healthMetrics = {
                         bearing: estimatedPlants > 0 ? result.bearing / estimatedPlants * 100 : 0,
                         nonbearing: estimatedPlants > 0 ? result.nonBearing / estimatedPlants * 100 : 0,
@@ -283,6 +289,7 @@
         blocksData.forEach((block, index) => {
             const statusClass = getStatusClass(block);
             const barColor = getBarColor(statusClass);
+            const summaryMetrics = block.blockSummaryMetrics || block;
 
             const blockName = block.name || `Block ${index + 1}`;
 
@@ -292,15 +299,16 @@
                 <td style="font-family: var(--font-mono);">${block.daf} days</td>
                 <td>${block.section}</td>
                 <td style="font-family: var(--font-mono);">${formatArea(block.area)}</td>
-                <td style="font-family: var(--font-mono);">${block.estimatedTotalPlantCount === null ? 'Unavailable' : formatNumber(block.estimatedTotalPlantCount)}</td>
-                <td>${buildInlineBar(block.bearing, barColor)}</td>
-                <td style="font-family: var(--font-mono);">${formatPercent(block.discolored)}</td>
+                <td style="font-family: var(--font-mono);">${block.blockSummaryMetrics ? formatNumber(summaryMetrics.estimatedPlants) : block.estimatedTotalPlantCount === null ? 'Unavailable' : formatNumber(block.estimatedTotalPlantCount)}</td>
+                <td>${buildInlineBar(summaryMetrics.bearing, barColor)}</td>
+                <td>${buildInlineBar(summaryMetrics.nonBearing ?? summaryMetrics.nonBearingPercent ?? 0, '#e6a817')}</td>
+                <td style="font-family: var(--font-mono);">${formatPercent(summaryMetrics.nonViable ?? summaryMetrics.discolored ?? 0)}</td>
                 <td>${buildStatusBadge(statusClass)}</td>
             </tr>
         `;
         });
 
-        tbody.innerHTML = rowsHTML || '<tr><td colspan="8" style="text-align:center;padding:var(--space-xl);color:var(--color-text-secondary);">No blocks recorded yet.</td></tr>';
+        tbody.innerHTML = rowsHTML || '<tr><td colspan="9" style="text-align:center;padding:var(--space-xl);color:var(--color-text-secondary);">No blocks recorded yet.</td></tr>';
     }
 
     // ═══════════════════════════════════════════════════════════
