@@ -587,9 +587,8 @@
       // ══════════════════════════════════════════════════════════════
       // Reports — live Firestore sync (farm-wide, all accounts)
       //
-      // The report is generated from the live `blocks` collection (each
-      // block's bearingPercent/nonBearingPercent/nonViable reflect its
-      // most recent scan), joined against `users` for the flight
+      // The report uses each block's latest completed scan counts for
+      // estimated plants and condition percentages, joined against `users` for the flight
       // operator's name. The `scans` collection is joined separately to
       // count how many scan sessions fall inside the selected date
       // range, for the "Scans in Range" metric — a real link between the
@@ -677,19 +676,31 @@
                   nonViable: d.nonViable || 0,
                   totalScans: d.totalScans || 0,
                   plants: null,
+                  bearingCount: null,
+                  nonbearingCount: null,
+                  nonViableCount: null,
                 });
               });
               try {
-                const latestCounts = await blockScanHistory.loadLatestPlantCounts(
-                  BLOCKS_RAW.map((block) => block.id),
-                  null,
-                  Object.fromEntries(BLOCKS_RAW.map((block) => [block.id, block.activeCycleId])),
-                );
-                BLOCKS_RAW.forEach(function (block) {
-                  block.plants = latestCounts.get(block.id) || 0;
-                });
+                await Promise.all(BLOCKS_RAW.map(async function (block) {
+                  const history = await blockScanHistory.load(block.id, null, true);
+                  const result = blockScanHistory.latestCompletedResult(history, block.activeCycleId);
+                  if (!result) {
+                    block.plants = 0;
+                    return;
+                  }
+                  block.bearingCount = result.bearing;
+                  block.nonbearingCount = result.nonBearing;
+                  block.nonViableCount = result.nonViable;
+                  block.plants = result.bearing + result.nonBearing;
+                  if (block.plants > 0) {
+                    block.bearing = result.bearing / block.plants * 100;
+                    block.nonbearing = result.nonBearing / block.plants * 100;
+                    block.nonViable = result.nonViable / block.plants * 100;
+                  }
+                }));
               } catch (scanError) {
-                console.error("❌ Error loading latest completed plant counts:", scanError);
+                console.error("❌ Error loading latest completed scan metrics:", scanError);
               }
               rpBlocksLoaded = true;
               setLiveStatus(true);
@@ -892,9 +903,9 @@
             block.daf || "N/A",
             block.area || "N/A",
             block.plants || "N/A",
-            block.plants ? Math.round(block.plants * block.bearing / 100) : "N/A",
-            block.plants ? Math.round(block.plants * block.nonbearing / 100) : "N/A",
-            block.plants ? Math.round(block.plants * block.nonViable / 100) : "N/A",
+            block.bearingCount ?? "N/A",
+            block.nonbearingCount ?? "N/A",
+            block.nonViableCount ?? "N/A",
             block.plants ? block.bearing.toFixed(1) : "N/A",
             block.plants ? block.nonbearing.toFixed(1) : "N/A",
             block.plants ? block.nonViable.toFixed(1) : "N/A",
