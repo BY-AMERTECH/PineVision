@@ -976,9 +976,9 @@
                         <td style="font-size:var(--font-size-sm);color:var(--color-text-secondary);">${escapeHtml(block.operatorName)}</td>
                         <td style="font-family:var(--font-mono);">${block.daf}d</td>
                         <td style="font-family:var(--font-mono);">${utils.formatArea(block.area)}</td>
-                        <td>${utils.buildInlineBar(block.bearing, utils.barColor(block.bearing))}</td>
-                        <td>${utils.buildInlineBar(block.nonbearing, "var(--amber-mid)")}</td>
-                        <td>${utils.buildInlineBar(block.nonViable, "var(--yellow-mid)")}</td>
+                        <td>${utils.buildInlineBar(block.bearing, reportMetricColor("bearing", block.bearing))}</td>
+                        <td>${utils.buildInlineBar(block.nonbearing, reportMetricColor("nonbearing", block.nonbearing))}</td>
+                        <td>${utils.buildInlineBar(block.nonViable, reportMetricColor("nonViable", block.nonViable))}</td>
                         <td>${blockStatusBadge(statusClass)}</td>
                     </tr>`;
         });
@@ -1003,12 +1003,37 @@
 
       function blockStatusClass(block) {
         if (!block.totalScans || block.plants <= 0) return "none";
-        const bearing = Number(block.bearing) || 0;
-        const nonbearing = Number(block.nonbearing) || 0;
-        const nonViable = Number(block.nonViable) || 0;
+        const metricStatuses = [
+          reportMetricStatus("bearing", block.bearing),
+          reportMetricStatus("nonbearing", block.nonbearing),
+          reportMetricStatus("nonViable", block.nonViable),
+        ];
+        if (metricStatuses.includes("crit")) return "crit";
+        if (metricStatuses.includes("warn")) return "warn";
+        return "good";
+      }
 
-        if (bearing < 40 || nonbearing > 80 || nonViable > 25) return "crit";
-        if (bearing < 60 || nonbearing > 50 || nonViable > 15) return "warn";
+      function reportMetricColor(metric, value) {
+        const status = reportMetricStatus(metric, value);
+        if (status === "crit") return "var(--red-mid)";
+        if (status === "warn") return "var(--amber-mid)";
+        return "var(--green-mid)";
+      }
+
+      function reportMetricStatus(metric, value) {
+        const percentage = Number(value) || 0;
+        if (metric === "bearing") {
+          if (percentage < 40) return "crit";
+          if (percentage < 60) return "warn";
+          return "good";
+        }
+        if (metric === "nonbearing") {
+          if (percentage > 80) return "crit";
+          if (percentage > 50) return "warn";
+          return "good";
+        }
+        if (percentage > 25) return "crit";
+        if (percentage > 15) return "warn";
         return "good";
       }
 
