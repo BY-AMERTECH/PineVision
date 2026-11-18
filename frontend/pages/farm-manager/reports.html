@@ -1003,7 +1003,13 @@
 
       function blockStatusClass(block) {
         if (!block.totalScans || block.plants <= 0) return "none";
-        return utils.getStatusClass(block.bearing);
+        const bearing = Number(block.bearing) || 0;
+        const nonbearing = Number(block.nonbearing) || 0;
+        const nonViable = Number(block.nonViable) || 0;
+
+        if (bearing < 40 || nonbearing > 80 || nonViable > 25) return "crit";
+        if (bearing < 60 || nonbearing > 50 || nonViable > 15) return "warn";
+        return "good";
       }
 
       function blockStatusBadge(status) {
