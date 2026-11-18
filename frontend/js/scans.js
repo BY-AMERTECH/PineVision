@@ -167,7 +167,8 @@
         }
 
         const latest = scansData[0]; // Already sorted by newest first
-        const latestDate = `${latest.day} ${latest.month} ${latest.year}`;
+        const latestDate = formatScanDate(latest);
+        const latestSubtitle = `Latest completed scan · ${latestDate}`;
 
         // Calculate percentages
         const bearingPercent = latest.total > 0 ? (latest.bearing / latest.total) * 100 : 0;
@@ -184,19 +185,19 @@
             ${buildMetricCard(
             'Latest Bearing',
             formatPercent(bearingPercent),
-            latestDate,
+            latestSubtitle,
             'green'
         )}
             ${buildMetricCard(
             'Latest Non-Bearing',
             formatPercent(nonBearingPercent),
-            latestDate,
+            latestSubtitle,
             'amber'
         )}
             ${buildMetricCard(
             'Latest Non-Viable',
             formatPercent(nonViablePercent),
-            'Discoloration detected',
+            latestSubtitle,
             'yellow'
         )}
         `;
@@ -305,13 +306,8 @@
 
         return `
         <div class="scan-entry">
-            <div class="sdate">
-                <div class="sdate-day">${scan.day}</div>
-                <div class="sdate-month">${scan.month}</div>
-                <div class="sdate-year">${scan.year}</div>
-            </div>
             <div class="sinfo">
-                <div class="sinfo-title">${scan.title}</div>
+                <div class="sinfo-title">Block Scan - ${formatScanDate(scan)}</div>
                 <div class="spills">
                     <span class="badge good">
                         <span class="bdot"></span>
@@ -357,6 +353,15 @@
 
     function formatPercent(num) {
         return num.toFixed(1) + '%';
+    }
+
+    function formatScanDate(scan) {
+        const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+        const monthIndex = months.indexOf(scan.month);
+        const monthName = monthIndex >= 0
+            ? new Date(Number(scan.year), monthIndex, 1).toLocaleString('en-US', { month: 'long' })
+            : scan.month;
+        return `${monthName} ${Number(scan.day)}, ${scan.year}`;
     }
 
     function formatNumber(num) {
