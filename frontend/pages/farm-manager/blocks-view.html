@@ -678,9 +678,9 @@
         const bearingCount = counts.bearing;
         const nonbearingCount = counts.nonBearing;
         const nonViableCount = counts.nonViable;
-        // Use the same stored block percentages shown on the client detail page.
-        const estimatedPlants = Number(block.estimatedTotalPlantCount) || bearingCount + nonbearingCount;
-        const bearingDenominator = bearingCount + nonbearingCount;
+        // Derive totals and percentages from the displayed plant counts.
+        const estimatedPlants = bearingCount + nonbearingCount;
+        const bearingDenominator = estimatedPlants;
         const bearingPercent = bearingDenominator > 0 ? bearingCount / bearingDenominator * 100 : 0;
         const nonbearingPercent = bearingDenominator > 0 ? nonbearingCount / bearingDenominator * 100 : 0;
         const nonViablePercent = estimatedPlants > 0 ? nonViableCount / estimatedPlants * 100 : 0;
@@ -710,7 +710,7 @@
           </div>
 
           <div class="row row-cols-2 row-cols-md-4 g-3 mb-4">
-            ${buildMetricCard("Estimated Plant Count", block.estimatedTotalPlantCount === null ? "Unavailable" : formatNumber(block.estimatedTotalPlantCount), "Estimated total pineapple plants", "")}
+            ${buildMetricCard("Estimated Plant Count", hasScanData ? formatNumber(estimatedPlants) : "Unavailable", "Estimated total pineapple plants", "")}
             ${buildMetricCard("Bearing", formatPercent(bearingPercent), plantSub(bearingCount), "green")}
             ${buildMetricCard("Non-Bearing", formatPercent(nonbearingPercent), plantSub(nonbearingCount), "amber")}
             ${buildMetricCard("Non-Viable", formatPercent(nonViablePercent), plantSub(nonViableCount), "yellow")}
@@ -937,10 +937,9 @@
       function renderConditionBreakdown(block, hasScanData, bearingCount, nonbearingCount, nonViableCount) {
         const fmtPlant = (n) => (hasScanData ? formatNumber(n) : "—");
         const totalPlants = bearingCount + nonbearingCount;
-        const estimatedPlants = Number(block.estimatedTotalPlantCount) || totalPlants;
-        const bearingPercent = totalPlants > 0 ? bearingPlants / totalPlants * 100 : 0;
-        const nonbearingPercent = totalPlants > 0 ? nonbearingPlants / totalPlants * 100 : 0;
-        const nonViablePercent = estimatedPlants > 0 ? nonViablePlants / estimatedPlants * 100 : 0;
+        const bearingPercent = totalPlants > 0 ? bearingCount / totalPlants * 100 : 0;
+        const nonbearingPercent = totalPlants > 0 ? nonbearingCount / totalPlants * 100 : 0;
+        const nonViablePercent = totalPlants > 0 ? nonViableCount / totalPlants * 100 : 0;
         document.getElementById("condition-breakdown").innerHTML = `
         <div class="thead-row">
             <span class="thead-title">Fruit Condition Breakdown</span>

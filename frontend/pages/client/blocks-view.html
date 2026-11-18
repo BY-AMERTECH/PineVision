@@ -1270,8 +1270,8 @@
         const nonbearingPlants = counts.nonBearing;
         const nonViablePlants  = counts.nonViable;
         // Keep these values aligned with the metric cards above.
-        const estimatedPlants = Number(block.estimatedTotalPlantCount) || bearingPlants + nonbearingPlants;
-        const bearingDenominator = bearingPlants + nonbearingPlants;
+        const estimatedPlants = bearingPlants + nonbearingPlants;
+        const bearingDenominator = estimatedPlants;
         const bearingPercent = bearingDenominator > 0 ? bearingPlants / bearingDenominator * 100 : 0;
         const nonbearingPercent = bearingDenominator > 0 ? nonbearingPlants / bearingDenominator * 100 : 0;
         const nonViablePercent = estimatedPlants > 0 ? nonViablePlants / estimatedPlants * 100 : 0;
@@ -1281,7 +1281,7 @@
         document.getElementById("metric-cards-row").innerHTML =
           buildMetricCard(
             "Estimated Plant Count",
-            block.estimatedTotalPlantCount === null ? "Unavailable" : formatNumber(block.estimatedTotalPlantCount),
+            hasDetectedData ? formatNumber(estimatedPlants) : "Unavailable",
             "Estimated total pineapple plants",
             "",
           ) +
@@ -1351,8 +1351,8 @@
         const nonbearingPlants = counts.nonBearing;
         const nonViablePlants  = counts.nonViable;
         const totalPlants      = bearingPlants + nonbearingPlants;
-        const estimatedPlants = Number(block.estimatedTotalPlantCount) || bearingPlants + nonbearingPlants;
-        const bearingDenominator = bearingPlants + nonbearingPlants;
+        const estimatedPlants = bearingPlants + nonbearingPlants;
+        const bearingDenominator = estimatedPlants;
         const bearingPercent = bearingDenominator > 0 ? bearingPlants / bearingDenominator * 100 : 0;
         const nonbearingPercent = bearingDenominator > 0 ? nonbearingPlants / bearingDenominator * 100 : 0;
         const nonViablePercent = estimatedPlants > 0 ? nonViablePlants / estimatedPlants * 100 : 0;
