@@ -593,9 +593,9 @@
                 .where("userId", "==", currentUser.uid)
                 .get();
             }));
-            BLOCKS_RAW.forEach(function (block) {
+            BLOCKS_RAW.forEach(function (block, index) {
               const history = [];
-              const blockSnapshot = scanSnapshots[BLOCKS_RAW.findIndex((item) => item.id === block.id)];
+              const blockSnapshot = scanSnapshots[index];
               blockSnapshot.forEach(function (doc) {
                 const data = doc.data() || {};
                 const date = data.startTime && typeof data.startTime.toDate === "function"
@@ -611,6 +611,13 @@
                 block.bearingCount = latestResult.bearing;
                 block.nonbearingCount = latestResult.nonBearing;
                 block.nonViableCount = latestResult.nonViable;
+                const estimatedPlants = latestResult.bearing + latestResult.nonBearing;
+                block.plants = estimatedPlants;
+                if (estimatedPlants > 0) {
+                  block.bearing = latestResult.bearing / estimatedPlants * 100;
+                  block.nonbearing = latestResult.nonBearing / estimatedPlants * 100;
+                  block.nonViable = latestResult.nonViable / estimatedPlants * 100;
+                }
               }
             });
 

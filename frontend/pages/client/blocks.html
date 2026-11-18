@@ -729,6 +729,23 @@
             ALL_BLOCKS.forEach(function (block) {
               block.estimatedTotalPlantCount = latestCounts.get(block.id) || 0;
             });
+
+            await Promise.all(ALL_BLOCKS.map(async function (block) {
+              try {
+                const history = await blockScanHistory.load(block.id, currentUser.uid);
+                const result = blockScanHistory.latestCompletedResult(history, block.activeCycleId);
+                if (!result) return;
+                const estimatedPlants = result.bearing + result.nonBearing;
+                block.estimatedTotalPlantCount = estimatedPlants;
+                if (estimatedPlants > 0) {
+                  block.bearing = result.bearing / estimatedPlants * 100;
+                  block.nonbearing = result.nonBearing / estimatedPlants * 100;
+                  block.nonViable = result.nonViable / estimatedPlants * 100;
+                }
+              } catch (scanError) {
+                console.error("❌ Error loading scan metrics for block " + block.id + ":", scanError);
+              }
+            }));
           } catch (scanError) {
             console.error("❌ Error loading latest completed plant counts:", scanError);
           }
