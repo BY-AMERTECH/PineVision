@@ -1088,15 +1088,6 @@
             currentBlock.estimatedTotalPlantCount = currentBlock.latestCycleResult
               ? currentBlock.latestCycleResult.bearing + currentBlock.latestCycleResult.nonBearing
               : blockScanHistory.latestPlantCount(currentCycleScans, currentBlock.activeCycleId);
-            if (currentBlock.latestCycleResult && !currentBlock.hasActiveCycleScan && currentBlock.estimatedTotalPlantCount > 0) {
-              const result = currentBlock.latestCycleResult;
-              const estimatedPlants = currentBlock.estimatedTotalPlantCount;
-              currentBlock.displayMetrics = {
-                bearing: result.bearing / estimatedPlants * 100,
-                nonbearing: result.nonBearing / estimatedPlants * 100,
-                nonViable: result.nonViable / estimatedPlants * 100,
-              };
-            }
           } catch (scanError) {
             console.error("❌ Error loading latest completed plant counts:", scanError);
           }
@@ -1279,10 +1270,11 @@
         const nonbearingPlants = counts.nonBearing;
         const nonViablePlants  = counts.nonViable;
         // Keep these values aligned with the metric cards above.
-        const metrics = block.displayMetrics || block;
-        const bearingPercent = Number(metrics.bearing) || 0;
-        const nonbearingPercent = Number(metrics.nonbearing) || 0;
-        const nonViablePercent = Number(metrics.nonViable) || 0;
+        const estimatedPlants = Number(block.estimatedTotalPlantCount) || bearingPlants + nonbearingPlants;
+        const bearingDenominator = bearingPlants + nonbearingPlants;
+        const bearingPercent = bearingDenominator > 0 ? bearingPlants / bearingDenominator * 100 : 0;
+        const nonbearingPercent = bearingDenominator > 0 ? nonbearingPlants / bearingDenominator * 100 : 0;
+        const nonViablePercent = estimatedPlants > 0 ? nonViablePlants / estimatedPlants * 100 : 0;
 
         const plantSub = (n) => hasDetectedData ? formatNumber(n) + " plants" : "—";
 
@@ -1359,10 +1351,11 @@
         const nonbearingPlants = counts.nonBearing;
         const nonViablePlants  = counts.nonViable;
         const totalPlants      = bearingPlants + nonbearingPlants;
-        const metrics = block.displayMetrics || block;
-        const bearingPercent = Number(metrics.bearing) || 0;
-        const nonbearingPercent = Number(metrics.nonbearing) || 0;
-        const nonViablePercent = Number(metrics.nonViable) || 0;
+        const estimatedPlants = Number(block.estimatedTotalPlantCount) || bearingPlants + nonbearingPlants;
+        const bearingDenominator = bearingPlants + nonbearingPlants;
+        const bearingPercent = bearingDenominator > 0 ? bearingPlants / bearingDenominator * 100 : 0;
+        const nonbearingPercent = bearingDenominator > 0 ? nonbearingPlants / bearingDenominator * 100 : 0;
+        const nonViablePercent = estimatedPlants > 0 ? nonViablePlants / estimatedPlants * 100 : 0;
         const fmtPlant = (n) => hasDetectedData ? formatNumber(n) : "—";
 
         document.getElementById("condition-breakdown").innerHTML = `
