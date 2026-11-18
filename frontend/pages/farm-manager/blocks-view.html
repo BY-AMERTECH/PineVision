@@ -643,9 +643,11 @@
               const estimatedPlants = result.bearing + result.nonBearing;
               currentBlock.estimatedTotalPlantCount = estimatedPlants;
               if (!currentBlock.hasActiveCycleScan && estimatedPlants > 0) {
-                currentBlock.bearing = result.bearing / estimatedPlants * 100;
-                currentBlock.nonbearing = result.nonBearing / estimatedPlants * 100;
-                currentBlock.nonViable = result.nonViable / estimatedPlants * 100;
+                currentBlock.displayMetrics = {
+                  bearing: result.bearing / estimatedPlants * 100,
+                  nonbearing: result.nonBearing / estimatedPlants * 100,
+                  nonViable: result.nonViable / estimatedPlants * 100,
+                };
               }
             } else {
               currentBlock.estimatedTotalPlantCount = blockScanHistory.latestPlantCount(
@@ -684,9 +686,10 @@
         const nonbearingCount = counts.nonBearing;
         const nonViableCount = counts.nonViable;
         // Use the same stored block percentages shown on the client detail page.
-        const bearingPercent = Number(block.bearing) || 0;
-        const nonbearingPercent = Number(block.nonbearing) || 0;
-        const nonViablePercent = Number(block.nonViable) || 0;
+        const metrics = block.displayMetrics || block;
+        const bearingPercent = Number(metrics.bearing) || 0;
+        const nonbearingPercent = Number(metrics.nonbearing) || 0;
+        const nonViablePercent = Number(metrics.nonViable) || 0;
         const plantSub = (n) => (hasScanData ? formatNumber(n) + " plants" : "—");
 
         document.getElementById("block-detail-root").innerHTML = `
@@ -716,7 +719,7 @@
             ${buildMetricCard("Estimated Plant Count", block.estimatedTotalPlantCount === null ? "Unavailable" : formatNumber(block.estimatedTotalPlantCount), "Estimated total pineapple plants", "")}
             ${buildMetricCard("Bearing", formatPercent(bearingPercent), plantSub(bearingCount), "green")}
             ${buildMetricCard("Non-Bearing", formatPercent(nonbearingPercent), plantSub(nonbearingCount), "amber")}
-            ${buildMetricCard("Non-Viable", formatPercent(nonViablePercent), plantSub(nonViableCount), "red")}
+            ${buildMetricCard("Non-Viable", formatPercent(nonViablePercent), plantSub(nonViableCount), "yellow")}
           </div>
           <div class="row g-3 mb-4">
             <div class="col-md-6">
@@ -940,9 +943,10 @@
       function renderConditionBreakdown(block, hasScanData, bearingCount, nonbearingCount, nonViableCount) {
         const fmtPlant = (n) => (hasScanData ? formatNumber(n) : "—");
         const totalPlants = bearingCount + nonbearingCount;
-        const bearingPercent = Number(block.bearing) || 0;
-        const nonbearingPercent = Number(block.nonbearing) || 0;
-        const nonViablePercent = Number(block.nonViable) || 0;
+        const metrics = block.displayMetrics || block;
+        const bearingPercent = Number(metrics.bearing) || 0;
+        const nonbearingPercent = Number(metrics.nonbearing) || 0;
+        const nonViablePercent = Number(metrics.nonViable) || 0;
         document.getElementById("condition-breakdown").innerHTML = `
         <div class="thead-row">
             <span class="thead-title">Fruit Condition Breakdown</span>
